@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
+import { Send, Loader2, Radar } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -18,6 +21,12 @@ import {
   scanIntervalSchema,
   useScanInterval,
 } from "@/lib/scan-interval";
+import {
+  detectTelegramChatIdFn,
+  getTelegramPrefsFn,
+  saveTelegramPrefsFn,
+  sendTelegramTestFn,
+} from "@/lib/telegram.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
@@ -53,25 +62,75 @@ function SettingsPage() {
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
 
-  // Persist Telegram notification prefs locally so they survive refresh.
+  const qc = useQueryClient();
+  const getPrefs = useServerFn(getTelegramPrefsFn);
+  const savePrefs = useServerFn(saveTelegramPrefsFn);
+  const sendTest = useServerFn(sendTelegramTestFn);
+  const detectId = useServerFn(detectTelegramChatIdFn);
+
+  // Hydrate Telegram preferences from the operator's profile row.
+  const prefsQuery = useQuery({
+    queryKey: ["telegram-prefs"],
+    queryFn: () => getPrefs(),
+    staleTime: 30_000,
+  });
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const enabled = window.localStorage.getItem("instascanner.telegramNotif");
-    const chat = window.localStorage.getItem("instascanner.telegramChatId");
-    if (enabled !== null) setTelegramNotif(enabled === "1");
-    if (chat !== null) setTelegramChatId(chat);
-  }, []);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      "instascanner.telegramNotif",
-      telegramNotif ? "1" : "0",
+    if (!prefsQuery.data) return;
+    setTelegramChatId(prefsQuery.data.chatId);
+    setTelegramNotif(prefsQuery.data.enabled);
+  }, [prefsQuery.data]);
+
+  const saveMutation = useMutation({
+    mutationFn: (input: { chatId: string; enabled: boolean }) =>
+      savePrefs({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["telegram-prefs"] }),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: (chatId: string) => sendTest({ data: { chatId } }),
+    onSuccess: () => toast.success("Test signal delivered to Telegram"),
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : "Failed to send test"),
+  });
+
+  const detectMutation = useMutation({
+    mutationFn: () => detectId(),
+    onSuccess: (res: { chatId: string | null }) => {
+      if (res.chatId) {
+        setTelegramChatId(res.chatId);
+        toast.success(`Detected chat ID ${res.chatId}`);
+      } else {
+        toast.error("No recent messages — send /start to the bot first");
+      }
+    },
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : "Failed to detect"),
+  });
+
+  const commitPrefs = (chatId: string, enabled: boolean) => {
+    saveMutation.mutate(
+      { chatId, enabled },
+      {
+        onError: (err: unknown) =>
+          toast.error(err instanceof Error ? err.message : "Save failed"),
+      },
     );
-  }, [telegramNotif]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("instascanner.telegramChatId", telegramChatId);
-  }, [telegramChatId]);
+  };
+
+  const handleTelegramToggle = (next: boolean) => {
+    if (next && !telegramChatId.trim()) {
+      toast.error("Enter a Telegram chat ID first");
+      return;
+    }
+    setTelegramNotif(next);
+    commitPrefs(telegramChatId, next);
+  };
+
+  const handleTelegramBlur = () => {
+    // Auto-save the chat ID whenever the operator moves focus away.
+    if (prefsQuery.data?.chatId === telegramChatId) return;
+    commitPrefs(telegramChatId, telegramNotif && !!telegramChatId.trim());
+  };
 
   const handleIntervalChange = (next: string) => {
     const parsed = scanIntervalSchema.safeParse(next);
@@ -144,30 +203,59 @@ function SettingsPage() {
           <div className="divide-y divide-border">
             <SettingRow
               title="Telegram bot"
-              description="Route alerts to a Telegram chat. Message @InstaScannerBot with /start, then paste your chat ID here."
+              description="Route alerts to a Telegram chat. Message the bot with /start, tap Detect, then flip the switch."
             >
-              <div className="flex w-full items-center gap-2 sm:w-auto">
-                <div className="relative flex-1 sm:w-56 sm:flex-none">
-                  <Send className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={telegramChatId}
-                    onChange={(e) => setTelegramChatId(e.target.value)}
-                    placeholder="Chat ID (e.g. 123456789)"
-                    inputMode="numeric"
-                    className="h-9 pl-7 text-xs font-mono"
-                    disabled={!telegramNotif}
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[320px]">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Send className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      onBlur={handleTelegramBlur}
+                      placeholder="Chat ID (e.g. 123456789)"
+                      inputMode="numeric"
+                      className="h-9 pl-7 text-xs font-mono"
+                    />
+                  </div>
+                  <Switch
+                    checked={telegramNotif}
+                    onCheckedChange={handleTelegramToggle}
+                    disabled={saveMutation.isPending || prefsQuery.isLoading}
                   />
                 </div>
-                <Switch
-                  checked={telegramNotif}
-                  onCheckedChange={(next) => {
-                    if (next && !telegramChatId.trim()) {
-                      toast.error("Enter a Telegram chat ID first");
-                      return;
-                    }
-                    setTelegramNotif(next);
-                  }}
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 flex-1 gap-1.5 text-[11px]"
+                    onClick={() => detectMutation.mutate()}
+                    disabled={detectMutation.isPending}
+                  >
+                    {detectMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Radar className="h-3.5 w-3.5" />
+                    )}
+                    Detect chat
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 flex-1 gap-1.5 text-[11px]"
+                    onClick={() => testMutation.mutate(telegramChatId)}
+                    disabled={testMutation.isPending || !telegramChatId.trim()}
+                  >
+                    {testMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    Send test
+                  </Button>
+                </div>
               </div>
             </SettingRow>
             <SettingRow title="Desktop notifications" description="Show a native notification when scans complete.">
