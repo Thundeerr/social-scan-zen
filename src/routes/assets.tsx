@@ -48,6 +48,8 @@ import {
   operatorInsightsFor,
   type OperatorInsight,
 } from "@/lib/operator-intelligence";
+import { setAmbientCalm } from "@/lib/ambient-store";
+import { MissionComplete } from "@/components/mission-complete";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
