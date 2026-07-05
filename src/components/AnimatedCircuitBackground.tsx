@@ -147,9 +147,15 @@ export function AnimatedCircuitBackground() {
 
 
 
-  // Idle particles: one slow light per trace. When scanning, add ~20% more
-  // trailing lights on a subset of traces. All motion is slow (30-60s per loop).
-  const scanningExtras = isScanning ? Math.max(1, Math.round(paths.length * 0.2)) : 0;
+  // Real-time reactions to scanner state. Everything stays subtle.
+  //   - scanningExtras: ~30% more travelling lights while running
+  //   - particleSpeedMul: particles flow ~15% faster during a scan
+  //   - traceBoost: brighter stroke on a wider subset of paths
+  //   - nodeBoost: nodes glow a touch stronger
+  const scanningExtras = isScanning ? Math.max(2, Math.round(paths.length * 0.3)) : 0;
+  const particleSpeedMul = isScanning ? 0.85 : 1;
+  const nodeBoost = isScanning ? 0.08 : 0;
+
 
   return (
     <div
@@ -205,14 +211,15 @@ export function AnimatedCircuitBackground() {
           {paths.map((d, i) => {
             const purple = i % 4 === 0;
             const baseOpacity = purple ? 0.18 : 0.22;
-            const activeBoost = isScanning && i % 3 === 0 ? 0.08 : 0;
+            // While scanning, brighten a wider subset (every other path)
+            const activeBoost = isScanning ? (i % 2 === 0 ? 0.1 : 0.05) : 0;
             return (
               <path
                 key={i}
                 d={d}
                 stroke={purple ? "var(--net-purple)" : "var(--net-blue)"}
                 strokeOpacity={baseOpacity + activeBoost}
-                style={{ transition: "stroke-opacity 1200ms ease-out" }}
+                style={{ transition: "stroke-opacity 1600ms ease-out" }}
               />
             );
           })}
@@ -236,7 +243,8 @@ export function AnimatedCircuitBackground() {
                       ? "var(--net-purple)"
                       : "var(--net-blue)"
                 }
-                opacity={amber ? 0.55 : 0.4}
+                opacity={(amber ? 0.55 : 0.4) + nodeBoost}
+                style={{ transition: "opacity 1600ms ease-out" }}
               />
             );
           })}
@@ -252,8 +260,8 @@ export function AnimatedCircuitBackground() {
               : purple
                 ? "var(--net-purple)"
                 : "var(--net-blue)";
-            // 30s to 60s per traversal. Different offsets per trace.
-            const dur = 32 + (i % 5) * 6;
+            // Base 32-56s per traversal; ~15% faster while scanning.
+            const dur = (32 + (i % 5) * 6) * particleSpeedMul;
             const delay = -(i * 5);
             return (
               <circle
@@ -276,10 +284,10 @@ export function AnimatedCircuitBackground() {
           {/* Scanner-driven extras: only rendered while running */}
           {!isLow &&
             Array.from({ length: scanningExtras }).map((_, k) => {
-              const i = (k * 2) % paths.length;
+              const i = k % paths.length;
               const d = paths[i];
-              const dur = 28 + (k % 4) * 5;
-              const delay = -(k * 7);
+              const dur = 26 + (k % 5) * 4;
+              const delay = -(k * 4);
               return (
                 <circle key={`x-${k}`} r={1.1} fill="var(--net-blue)" opacity={0.55}>
                   <animateMotion
