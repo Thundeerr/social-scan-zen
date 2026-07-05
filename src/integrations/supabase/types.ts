@@ -148,11 +148,14 @@ export type Database = {
           detected_at: string
           external_id: string | null
           id: string
+          ig_permalink: string | null
+          ig_post_id: string | null
           last_seen_at: string
           likes: number
           media_type: Database["public"]["Enums"]["asset_media_type"]
           media_url: string | null
           posted_at: string | null
+          publish_status: string | null
           source_url: string | null
           thumbnail_url: string | null
           updated_at: string
@@ -169,11 +172,14 @@ export type Database = {
           detected_at?: string
           external_id?: string | null
           id?: string
+          ig_permalink?: string | null
+          ig_post_id?: string | null
           last_seen_at?: string
           likes?: number
           media_type?: Database["public"]["Enums"]["asset_media_type"]
           media_url?: string | null
           posted_at?: string | null
+          publish_status?: string | null
           source_url?: string | null
           thumbnail_url?: string | null
           updated_at?: string
@@ -190,11 +196,14 @@ export type Database = {
           detected_at?: string
           external_id?: string | null
           id?: string
+          ig_permalink?: string | null
+          ig_post_id?: string | null
           last_seen_at?: string
           likes?: number
           media_type?: Database["public"]["Enums"]["asset_media_type"]
           media_url?: string | null
           posted_at?: string | null
+          publish_status?: string | null
           source_url?: string | null
           thumbnail_url?: string | null
           updated_at?: string
@@ -209,6 +218,48 @@ export type Database = {
           },
         ]
       }
+      ig_connections: {
+        Row: {
+          created_at: string
+          id: string
+          ig_user_id: string
+          ig_username: string
+          last_error: string | null
+          page_access_token: string
+          page_id: string
+          status: string
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ig_user_id: string
+          ig_username: string
+          last_error?: string | null
+          page_access_token: string
+          page_id: string
+          status?: string
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ig_user_id?: string
+          ig_username?: string
+          last_error?: string | null
+          page_access_token?: string
+          page_id?: string
+          status?: string
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -216,6 +267,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          publishing_paused: boolean
           telegram_chat_id: string | null
           telegram_enabled: boolean
           updated_at: string
@@ -226,6 +278,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id: string
+          publishing_paused?: boolean
           telegram_chat_id?: string | null
           telegram_enabled?: boolean
           updated_at?: string
@@ -236,6 +289,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          publishing_paused?: boolean
           telegram_chat_id?: string | null
           telegram_enabled?: boolean
           updated_at?: string
@@ -265,6 +319,74 @@ export type Database = {
           warn_at_percent?: number
         }
         Relationships: []
+      }
+      publish_jobs: {
+        Row: {
+          asset_id: string
+          attempts: number
+          caption: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          ig_container_id: string | null
+          ig_permalink: string | null
+          ig_post_id: string | null
+          rehosted_url: string | null
+          scheduled_for: string
+          started_at: string | null
+          status: string
+          storage_path: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          attempts?: number
+          caption?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          ig_container_id?: string | null
+          ig_permalink?: string | null
+          ig_post_id?: string | null
+          rehosted_url?: string | null
+          scheduled_for?: string
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          attempts?: number
+          caption?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          ig_container_id?: string | null
+          ig_permalink?: string | null
+          ig_post_id?: string | null
+          rehosted_url?: string | null
+          scheduled_for?: string
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publish_jobs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scanner_runs: {
         Row: {
