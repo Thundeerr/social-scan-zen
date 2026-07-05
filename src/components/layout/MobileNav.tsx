@@ -8,6 +8,7 @@ import {
   Radar,
   Settings,
   Activity,
+  Send,
   Menu,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
@@ -21,6 +22,7 @@ const items = [
   { to: "/downloads", label: "Archive", icon: Download },
   { to: "/scanner", label: "Scanner", icon: Radar },
   { to: "/activity", label: "Activity", icon: Activity },
+  { to: "/telegram", label: "Telegram", icon: Send },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
