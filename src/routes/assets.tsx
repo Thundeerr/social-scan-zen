@@ -843,6 +843,8 @@ function IntelligencePanel({
       </div>
 
       <div className="flex flex-col gap-5 px-5 py-5">
+        <RecommendationCard asset={asset} isFavorite={isFavorite} />
+
         <IntelField label="Account" icon={Users}>
           <div className="flex items-center gap-2">
             <img
@@ -871,12 +873,6 @@ function IntelligencePanel({
 
         <IntelField label="Likes" icon={Heart}>
           <span className="text-sm tabular-nums">{asset.likes}</span>
-        </IntelField>
-
-        <IntelField label="AI Summary" icon={Sparkles} accent>
-          <p className="text-xs leading-relaxed text-foreground/85">
-            {aiSummary(asset)}
-          </p>
         </IntelField>
       </div>
 
