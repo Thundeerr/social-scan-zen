@@ -1,8 +1,20 @@
-import { Search, X, Command as CommandIcon } from "lucide-react";
+import { Search, X, Command as CommandIcon, LogOut } from "lucide-react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useGlobalQuery, setGlobalQuery } from "@/lib/search-store";
 import { setCommandPaletteOpen } from "@/lib/palette-store";
+import { useCurrentOperator, operatorInitials } from "@/lib/auth-store";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 export function TopBar() {
