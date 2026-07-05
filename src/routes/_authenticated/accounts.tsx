@@ -110,6 +110,55 @@ function AccountsPage() {
   const deleteAccount = useDeleteTrackedAccount();
   const setAssignment = useSetWatchlistAssignment();
 
+  const scanNow = useServerFn(scanAccountNowFn);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [scanning, setScanning] = useState<Record<string, boolean>>({});
+
+  async function handleScanNow(a: TrackedAccount) {
+    if (scanning[a.id]) return;
+    setScanning((s) => ({ ...s, [a.id]: true }));
+    const t = toast.loading(`Scanning @${a.username}…`);
+    try {
+      const r = await scanNow({ data: { accountId: a.id } });
+      qc.invalidateQueries({ queryKey: trackedAccountsKey });
+      if (r.status === "failed") {
+        toast.error(`Scan failed for @${a.username}`, {
+          id: t,
+          description: r.error ?? "Provider returned an error",
+        });
+      } else if (r.inserted > 0) {
+        toast.success(`Found ${r.inserted} new asset${r.inserted === 1 ? "" : "s"} from @${a.username}`, {
+          id: t,
+          action: {
+            label: "View in Inbox",
+            onClick: () =>
+              navigate({
+                to: "/assets",
+                search: { day: "all", status: "all" },
+              }),
+          },
+        });
+      } else {
+        toast(`@${a.username} is up to date`, {
+          id: t,
+          description: r.detected > 0 ? `${r.detected} posts checked, no new ones` : "Provider returned no posts",
+        });
+      }
+    } catch (err) {
+      toast.error(`Scan failed for @${a.username}`, {
+        id: t,
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setScanning((s) => {
+        const next = { ...s };
+        delete next[a.id];
+        return next;
+      });
+    }
+  }
+
   const assignmentMap = useMemo(() => {
     const m: Record<string, string> = {};
     for (const a of assignments) m[a.account_id] = a.watchlist_id;
