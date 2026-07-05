@@ -151,3 +151,59 @@
 @utility glow-ring {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 25%, transparent);
 }
+
+:root {
+  --circuit-opacity: 0.22;
+  --circuit-speed: 1;
+  --circuit-blue: oklch(0.72 0.16 250);
+  --circuit-purple: oklch(0.68 0.2 310);
+  --circuit-amber: oklch(0.82 0.14 75);
+}
+
+.circuit-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: var(--circuit-opacity);
+  contain: strict;
+}
+
+.circuit-bg__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.circuit-bg__particles {
+  animation-duration: calc(1s / var(--circuit-speed));
+}
+
+.circuit-bg__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      120% 80% at 50% 100%,
+      oklch(0.1 0.01 260 / 0.85) 0%,
+      oklch(0.14 0.01 260 / 0.55) 45%,
+      transparent 75%
+    ),
+    linear-gradient(
+      to bottom,
+      oklch(0.14 0.01 260 / 0.35) 0%,
+      transparent 30%,
+      transparent 70%,
+      oklch(0.12 0.01 260 / 0.5) 100%
+    );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circuit-bg__particles * {
+    animation: none !important;
+  }
+}
+
