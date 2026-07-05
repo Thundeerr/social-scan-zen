@@ -1,7 +1,8 @@
-import { Search, X } from "lucide-react";
+import { Search, X, Command as CommandIcon } from "lucide-react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useGlobalQuery, setGlobalQuery } from "@/lib/search-store";
+import { setCommandPaletteOpen } from "@/lib/palette-store";
 import { cn } from "@/lib/utils";
 
 export function TopBar() {
@@ -34,11 +35,12 @@ export function TopBar() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
+            id="global-search"
             value={q}
             onChange={(e) => onChange(e.target.value)}
             onFocus={onFocus}
-            placeholder="Search accounts, assets, captions…"
-            className="w-full h-9 rounded-lg bg-muted/60 border border-transparent focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 pl-9 pr-16 text-sm placeholder:text-muted-foreground"
+            placeholder="Search accounts, assets, captions…    /"
+            className="w-full h-9 rounded-lg bg-muted/60 border border-transparent focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 pl-9 pr-24 text-sm placeholder:text-muted-foreground"
           />
           {q ? (
             <button
@@ -49,9 +51,15 @@ export function TopBar() {
               <X className="h-3.5 w-3.5" />
             </button>
           ) : (
-            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-              ⌘K
-            </kbd>
+            <button
+              type="button"
+              onClick={() => setCommandPaletteOpen(true)}
+              title="Open command palette"
+              aria-label="Open command palette"
+              className="pointer-events-auto absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <CommandIcon className="h-3 w-3" /> K
+            </button>
           )}
         </div>
 
