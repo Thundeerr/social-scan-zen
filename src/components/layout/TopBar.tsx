@@ -1,4 +1,5 @@
 import { Search, X, Command as CommandIcon, LogOut } from "lucide-react";
+import { MobileNav } from "./MobileNav";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
@@ -43,8 +44,9 @@ export function TopBar() {
 
   return (
     <header className="h-14 shrink-0 border-b border-border bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
-      <div className="flex h-full items-center gap-4 px-6">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex h-full items-center gap-3 px-4 sm:gap-4 sm:px-6">
+        <MobileNav />
+        <div className="relative flex-1 min-w-0 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             id="global-search"
