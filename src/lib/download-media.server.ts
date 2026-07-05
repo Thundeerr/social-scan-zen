@@ -149,7 +149,7 @@ export async function prepareAssetDownload(input: {
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const bucket = supabaseAdmin.storage.from("ig-publish");
-  const { error: uploadError } = await bucket.upload(storagePath, arrayBuffer, {
+  const { error: uploadError } = await bucket.upload(storagePath, fetched.arrayBuffer, {
     contentType,
     cacheControl: "31536000",
     upsert: true,
@@ -169,6 +169,6 @@ export async function prepareAssetDownload(input: {
     filename,
     contentType,
     fileSize: fetched.bytes.byteLength,
-    sourceUrl: mediaUrl,
+    sourceUrl: mediaUrl ?? "",
   };
 }
