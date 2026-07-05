@@ -54,6 +54,8 @@ import { MissionComplete } from "@/components/mission-complete";
 import { NetworkSummary } from "@/components/network-summary";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { sendApprovedSessionSummaryFn } from "@/lib/telegram-handoff.functions";
 
 const DAYS = ["all", "today", "yesterday"] as const;
 const STATUSES = ["all", "new", "approved", "ignored", "downloaded"] as const;
