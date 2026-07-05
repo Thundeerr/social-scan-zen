@@ -271,7 +271,7 @@ function ActivityItem({ row }: { row: ActivityRow }) {
   const tone = toneForType(row.event_type);
   const Icon = iconForType(row.event_type);
   return (
-    <li className="flex items-start gap-3 px-4 py-3 hover:bg-muted/20">
+    <li className="flex items-start gap-3 px-3 py-3 hover:bg-muted/20 sm:px-4">
       <div
         className={cn(
           "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border",
@@ -283,8 +283,8 @@ function ActivityItem({ row }: { row: ActivityRow }) {
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm text-foreground">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
             {row.description}
           </span>
           <span
@@ -304,7 +304,7 @@ function ActivityItem({ row }: { row: ActivityRow }) {
         ) : null}
       </div>
       <div
-        className="shrink-0 text-[11px] tabular-nums text-muted-foreground"
+        className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground"
         title={new Date(row.created_at).toLocaleString()}
       >
         {formatTime(row.created_at)}
