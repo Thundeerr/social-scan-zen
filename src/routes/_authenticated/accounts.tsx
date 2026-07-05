@@ -412,30 +412,51 @@ function AccountsPage() {
                     {assetCounts[a.id] ?? 0}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditing(a)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => toggleMonitoring(a)}>
-                          {a.status === "active"
-                            ? "Disable monitoring"
-                            : "Enable monitoring"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => remove(a)}
-                        >
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 gap-1.5"
+                        disabled={!!scanning[a.id]}
+                        onClick={() => void handleScanNow(a)}
+                      >
+                        {scanning[a.id] ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Scanning
+                          </>
+                        ) : (
+                          <>
+                            <Radar className="h-3.5 w-3.5" />
+                            Scan Now
+                          </>
+                        )}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setEditing(a)}>
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => toggleMonitoring(a)}>
+                            {a.status === "active"
+                              ? "Disable monitoring"
+                              : "Enable monitoring"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => remove(a)}
+                          >
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
