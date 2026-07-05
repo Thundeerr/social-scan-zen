@@ -238,12 +238,15 @@ export type Database = {
           account_id: string | null
           accounts_scanned: number
           assets_detected: number
+          assets_found: number
           attempt: number
           completed_at: string | null
           created_at: string
           created_by: string | null
           error: string | null
           id: string
+          phase: string | null
+          phase_detail: string | null
           scheduled_for: string
           started_at: string | null
           status: Database["public"]["Enums"]["scanner_run_status"]
@@ -254,12 +257,15 @@ export type Database = {
           account_id?: string | null
           accounts_scanned?: number
           assets_detected?: number
+          assets_found?: number
           attempt?: number
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           error?: string | null
           id?: string
+          phase?: string | null
+          phase_detail?: string | null
           scheduled_for?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["scanner_run_status"]
@@ -270,12 +276,15 @@ export type Database = {
           account_id?: string | null
           accounts_scanned?: number
           assets_detected?: number
+          assets_found?: number
           attempt?: number
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           error?: string | null
           id?: string
+          phase?: string | null
+          phase_detail?: string | null
           scheduled_for?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["scanner_run_status"]
