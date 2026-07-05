@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Check, X, Download, ExternalLink } from "lucide-react";
+import { Check, X, Download, ExternalLink, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { recentPosts } from "@/lib/mock-data";
+import { usePosts, postActions } from "@/lib/posts-store";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/posts")({
