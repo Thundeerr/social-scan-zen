@@ -44,11 +44,15 @@ function SettingsPage() {
   const [newOnly, setNewOnly] = useState(true);
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-6 md:p-8 space-y-6">
       <PageHeader
+        eyebrow="Operator preferences"
+        eyebrowTone="muted"
+        eyebrowDot={false}
         title="Settings"
-        description="Configure scanner behavior and notifications."
+        description="Configure scanner behavior, notifications, and appearance."
       />
+
 
       <div className="max-w-3xl space-y-6">
         <section className="soft-shadow rounded-xl border border-border bg-card p-6">
