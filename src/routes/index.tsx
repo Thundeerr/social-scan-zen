@@ -17,10 +17,13 @@ export const Route = createFileRoute("/")({
 });
 
 function DashboardPage() {
-  const recentPosts = usePosts();
+  const allPosts = usePosts();
+  const q = useGlobalQuery();
   const sim = useScanSim();
   void sim.nowTick;
   const lastScan = sim.isScanning ? "scanning…" : formatLastScan(sim);
+  const searching = q.trim().length > 0;
+  const results = searching ? allPosts.filter((p) => matchesQuery(p, q)) : allPosts;
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div>
