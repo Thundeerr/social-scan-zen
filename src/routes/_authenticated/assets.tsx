@@ -1470,22 +1470,22 @@ function SwipeCard({
 
       {/* Overlays */}
       <div
-        className="pointer-events-none absolute left-4 top-4 rounded-md border border-destructive/60 bg-destructive/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-destructive"
-        style={{ opacity: dismissOpacity, transform: "rotate(-6deg)" }}
+        className="pointer-events-none absolute left-6 top-1/2 -translate-y-1/2 rounded-lg border-2 border-destructive/80 bg-destructive/25 px-4 py-2 text-sm font-bold uppercase tracking-[0.2em] text-destructive backdrop-blur-sm"
+        style={{ opacity: dismissOpacity, transform: "translateY(-50%) rotate(-12deg)" }}
       >
         Dismiss
       </div>
       <div
-        className="pointer-events-none absolute right-4 top-4 rounded-md border border-success/60 bg-success/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-success"
-        style={{ opacity: keepOpacity, transform: "rotate(6deg)" }}
+        className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 rounded-lg border-2 border-success/80 bg-success/25 px-4 py-2 text-sm font-bold uppercase tracking-[0.2em] text-success backdrop-blur-sm"
+        style={{ opacity: keepOpacity, transform: "translateY(-50%) rotate(12deg)" }}
       >
         Keep
       </div>
       <div
-        className="pointer-events-none absolute inset-x-0 top-16 flex justify-center"
+        className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center"
         style={{ opacity: nextOpacity }}
       >
-        <div className="rounded-md border border-primary/60 bg-primary/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary">
+        <div className="rounded-lg border-2 border-primary/80 bg-primary/25 px-4 py-2 text-sm font-bold uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
           Next
         </div>
       </div>
