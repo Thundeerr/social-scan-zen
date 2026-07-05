@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { kpis, scannerHealth, recentAssets } from "@/lib/mock-data";
+// Provider is static configuration, not simulation data.
+const API_PROVIDER = "Instagram Looter";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useTrackedAccounts, useActivityLog } from "@/lib/db-queries";
