@@ -51,29 +51,31 @@ async function loadAll() {
   const { data, error } = await supabase
     .from("asset_downloads")
     .select(
-      "id, asset_id, downloaded_by, downloaded_at, media_url, media_type, filename, file_size, asset:assets(id, caption, media_type, thumbnail_url, media_url, source_url, tracked_accounts(username, avatar_url)), operator:profiles!asset_downloads_downloaded_by_fkey(id, display_name, email)",
+      "id, asset_id, downloaded_by, downloaded_at, media_url, media_type, filename, file_size, asset:assets(id, caption, media_type, thumbnail_url, media_url, source_url, tracked_accounts(username, avatar_url))",
     )
     .order("downloaded_at", { ascending: false })
     .limit(500);
   if (error) {
-    // Retry without profile join (in case FK name differs) — fall back gracefully.
-    const fallback = await supabase
-      .from("asset_downloads")
-      .select(
-        "id, asset_id, downloaded_by, downloaded_at, media_url, media_type, filename, file_size, asset:assets(id, caption, media_type, thumbnail_url, media_url, source_url, tracked_accounts(username, avatar_url))",
-      )
-      .order("downloaded_at", { ascending: false })
-      .limit(500);
-    if (fallback.error) {
-      console.error("[downloads-store] load failed", fallback.error);
-      return;
-    }
-    const rows = (fallback.data ?? []) as unknown as DownloadRow[];
-    state = { rows, countByAsset: computeCounts(rows), loaded: true };
-    emit();
+    console.error("[downloads-store] load failed", error);
     return;
   }
   const rows = (data ?? []) as unknown as DownloadRow[];
+
+  // Enrich with operator profile info in a second query (no FK to profiles).
+  const userIds = Array.from(
+    new Set(rows.map((r) => r.downloaded_by).filter((v): v is string => !!v)),
+  );
+  if (userIds.length) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name, email")
+      .in("id", userIds);
+    const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+    for (const r of rows) {
+      r.operator = r.downloaded_by ? byId.get(r.downloaded_by) ?? null : null;
+    }
+  }
+
   state = { rows, countByAsset: computeCounts(rows), loaded: true };
   emit();
 }
