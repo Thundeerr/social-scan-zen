@@ -181,6 +181,36 @@ function extractUserId(payload: unknown): string | null {
   return null;
 }
 
+/** Extract avatar url + display name from a profile-endpoint response. */
+function extractProfileMeta(payload: unknown): { avatar_url: string | null; display_name: string | null } {
+  const seen = new Set<unknown>();
+  const stack: unknown[] = [payload];
+  let avatar_url: string | null = null;
+  let display_name: string | null = null;
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object" || seen.has(node)) continue;
+    seen.add(node);
+    const rec = node as Record<string, unknown>;
+    if (!avatar_url) {
+      const a =
+        (rec.profile_pic_url_hd as string | undefined) ??
+        (rec.profile_pic_url as string | undefined) ??
+        (rec.avatar_url as string | undefined);
+      if (typeof a === "string" && a.startsWith("http")) avatar_url = a;
+    }
+    if (!display_name) {
+      const n = (rec.full_name as string | undefined) ?? (rec.display_name as string | undefined);
+      if (typeof n === "string" && n) display_name = n;
+    }
+    if (avatar_url && display_name) break;
+    for (const value of Object.values(rec)) {
+      if (value && typeof value === "object") stack.push(value);
+    }
+  }
+  return { avatar_url, display_name };
+}
+
 export function createInstagramProvider(cfg: InstagramProviderConfig) {
   const path = cfg.path ?? DEFAULT_PATH;
   const usernameParam = cfg.usernameParam ?? "username";
@@ -189,8 +219,12 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     "X-RapidAPI-Host": cfg.host,
   };
 
-  async function resolveUserId(username: string): Promise<string> {
-    if (!cfg.profilePath) return username; // host accepts username directly
+  async function resolveProfile(
+    username: string,
+  ): Promise<{ lookupValue: string; avatar_url: string | null; display_name: string | null }> {
+    if (!cfg.profilePath) {
+      return { lookupValue: username, avatar_url: null, display_name: null };
+    }
     const url = new URL(`https://${cfg.host}${cfg.profilePath}`);
     url.searchParams.set("username", username);
     const res = await fetch(url.toString(), { headers });
@@ -201,11 +235,12 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     const json = (await res.json()) as unknown;
     const id = extractUserId(json);
     if (!id) throw new Error(`Could not resolve user id for @${username}`);
-    return id;
+    const meta = extractProfileMeta(json);
+    return { lookupValue: id, avatar_url: meta.avatar_url, display_name: meta.display_name };
   }
 
   async function fetchAccount(username: string): Promise<ProviderResponse> {
-    const lookupValue = await resolveUserId(username);
+    const { lookupValue, avatar_url, display_name } = await resolveProfile(username);
     const url = new URL(`https://${cfg.host}${path}`);
     url.searchParams.set(usernameParam, lookupValue);
     for (const [k, v] of Object.entries(cfg.extraParams ?? {})) {
@@ -217,7 +252,12 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
       throw new Error(`Instagram provider ${res.status}: ${body.slice(0, 200)}`);
     }
     const json = (await res.json()) as unknown;
-    return normaliseResponse(username, json);
+    const normalised = normaliseResponse(username, json);
+    return {
+      ...normalised,
+      avatar_url: normalised.avatar_url ?? avatar_url,
+      display_name: normalised.display_name ?? display_name,
+    };
   }
 
   return { fetchAccount };
