@@ -25,6 +25,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { useAssets, assetActions } from "@/lib/assets-store";
+import { useDownloads } from "@/lib/downloads-store";
 import { useGlobalQuery, matchesQuery, setGlobalQuery } from "@/lib/search-store";
 import { useFavorites, toggleFavorite } from "@/lib/favorites-store";
 import {
