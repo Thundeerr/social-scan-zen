@@ -389,6 +389,10 @@ export const assetActions = {
     const a = assets.find((x) => x.id === id);
     void setState(id, "approved", "Kept");
     if (a) void logActivity("asset_kept", `Kept asset from @${a.username}`, { asset_id: id });
+    // Telegram-to-self handoff: fire-and-forget, silent no-op when disabled.
+    void sendAssetToTelegramFn({ data: { assetId: id } }).catch((err) => {
+      console.error("[assets-store] telegram handoff failed", err);
+    });
   },
   ignore: (id: string) => {
     const a = assets.find((x) => x.id === id);
