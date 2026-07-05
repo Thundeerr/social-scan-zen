@@ -462,6 +462,7 @@ function InboxRail({
   onSelect,
   onReset,
   query,
+  downloadedIds,
 }: {
   assets: Asset[];
   allAssets: Asset[];
@@ -474,6 +475,7 @@ function InboxRail({
   onSelect: (id: string) => void;
   onReset: () => void;
   query: string;
+  downloadedIds: Map<string, number>;
 }) {
   const awaiting = allAssets.filter((a) => a.status === "new").length;
   return (
