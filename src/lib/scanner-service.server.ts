@@ -202,6 +202,8 @@ export async function executeScan(
         status: "failed",
         completed_at: new Date().toISOString(),
         error: message.slice(0, 500),
+        phase: "failed",
+        phase_detail: message.slice(0, 200),
       })
       .eq("id", runId);
 
