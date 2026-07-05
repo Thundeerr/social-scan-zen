@@ -325,15 +325,16 @@ function buildDetectionCaption(input: DetectionCardInput): string {
 }
 
 function buildDetectionKeyboard(assetId: string, adminUrl: string, sourceUrl: string | null) {
-  const cb = (action: string) => ({ text: action.label, callback_data: `${action.key}:${assetId}` });
+  const cb = (key: string, label: string) => ({ text: label, callback_data: `${key}:${assetId}` });
   const A = {
-    download:  cb({ key: "dl",  label: "⬇️ Download" }),
-    send:      cb({ key: "snd", label: "📤 Send Media to Me" }),
-    copy:      cb({ key: "cap", label: "📋 Copy Caption" }),
-    reviewed:  cb({ key: "rev", label: "✅ Mark Reviewed" }),
-    ignore:    cb({ key: "ign", label: "🚫 Ignore" }),
-    repost:    cb({ key: "rep", label: "♻️ Add to Repost Queue" }),
+    download: cb("dl", "⬇️ Download"),
+    send:     cb("snd", "📤 Send Media to Me"),
+    copy:     cb("cap", "📋 Copy Caption"),
+    reviewed: cb("rev", "✅ Mark Reviewed"),
+    ignore:   cb("ign", "🚫 Ignore"),
+    repost:   cb("rep", "♻️ Add to Repost Queue"),
   };
+
   const row3: Array<Record<string, unknown>> = [{ text: "🛠 Open in Admin", url: adminUrl }];
   if (sourceUrl) row3.push({ text: "🔗 Instagram", url: sourceUrl });
   return {
