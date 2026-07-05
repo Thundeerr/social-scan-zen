@@ -853,10 +853,15 @@ function IntelligencePanel({
         </IntelField>
 
         <IntelField label="Watchlist" icon={Tag}>
-          <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-            {watchlistFor(asset.username)}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <TierChip tier={tierFor(asset.username)} size="sm" showLabel />
+            <span className="text-[11px] text-muted-foreground">
+              · {watchlistFor(asset.username)}
+            </span>
+          </div>
         </IntelField>
+
+        <OperatorScoreField asset={asset} isFavorite={isFavorite} />
 
         <IntelField label="Published" icon={Clock}>
           <span className="text-sm tabular-nums">{asset.detectedAt}</span>
