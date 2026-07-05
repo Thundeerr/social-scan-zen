@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { kpis, scannerHealth, recentAssets } from "@/lib/mock-data";
+// Provider is static configuration, not simulation data.
+const API_PROVIDER = "Instagram Looter";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useTrackedAccounts, useActivityLog } from "@/lib/db-queries";
@@ -84,9 +85,10 @@ function DashboardPage() {
     ? "after current cycle"
     : sim.lastScanAt
       ? "in ~12 s"
-      : scannerHealth.nextScan;
+      : "soon";
 
-  const queuePct = Math.min(100, Math.round((sim.queueSize / 247) * 100));
+  const totalTracked = Math.max(1, trackedAccounts.length);
+  const queuePct = Math.min(100, Math.round((sim.queueSize / totalTracked) * 100));
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -183,14 +185,14 @@ function DashboardPage() {
         <StatusTile
           label="API Health"
           value={`${sim.successRate.toFixed(1)}%`}
-          hint={`${sim.avgResponse} ms avg · ${kpis.apiProvider}`}
+          hint={`${sim.avgResponse} ms avg · ${API_PROVIDER}`}
           icon={Plug}
           tone={sim.successRate >= 99 ? "success" : "warn"}
         />
         <StatusTile
           label="Download Status"
           value={downloaded}
-          hint={`${recentAssets.length} total this session`}
+          hint={`${allAssets.length} total this session`}
           icon={Download}
         />
         <StatusTile
