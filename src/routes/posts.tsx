@@ -14,8 +14,9 @@ type Filter = "today" | "yesterday" | "approved" | "ignored" | "downloaded";
 
 function PostsPage() {
   const [filter, setFilter] = useState<Filter>("today");
+  const posts = usePosts();
 
-  const filtered = recentPosts.filter((p) => {
+  const filtered = posts.filter((p) => {
     if (filter === "today") return p.day === "today";
     if (filter === "yesterday") return p.day === "yesterday";
     return p.status === filter;
