@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "./activity-log";
+import { prepareAssetDownloadFn } from "./downloads.functions";
 import {
   startProgress,
   updateProgress,
@@ -136,7 +137,37 @@ export type DownloadTarget = {
 
 function extFromMime(mime: string, fallback: string): string {
   const t = mime.split("/")[1] ?? fallback;
-  return t.split(";")[0];
+  const clean = t.split(";")[0];
+  return clean === "jpeg" ? "jpg" : clean;
+}
+
+async function blobFromUrlWithProgress(assetId: string, url: string): Promise<Blob> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Storage fetch failed ${res.status}`);
+
+  const total = Number(res.headers.get("content-length") ?? 0) || 0;
+  updateProgress(assetId, { phase: "fetching", total, received: 0 });
+
+  if (res.body && "getReader" in res.body) {
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        received += value.length;
+        updateProgress(assetId, { received });
+      }
+    }
+    const type = res.headers.get("content-type") ?? "";
+    return new Blob(chunks as BlobPart[], type ? { type } : undefined);
+  }
+
+  const blob = await res.blob();
+  updateProgress(assetId, { received: blob.size, total: blob.size });
+  return blob;
 }
 
 async function downloadOne(
@@ -161,37 +192,18 @@ async function downloadOne(
     return { ok: false, filename, url: null, error: "No media URL available" };
   }
   try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    // Stream the response so we can report per-asset byte progress.
-    const total = Number(res.headers.get("content-length") ?? 0) || 0;
-    updateProgress(target.id, { phase: "fetching", total, received: 0 });
-
-    let blob: Blob;
-    if (res.body && "getReader" in res.body) {
-      const reader = res.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-          chunks.push(value);
-          received += value.length;
-          updateProgress(target.id, { received });
-        }
-      }
-      const type = res.headers.get("content-type") ?? "";
-      blob = new Blob(chunks as BlobPart[], type ? { type } : undefined);
-    } else {
-      blob = await res.blob();
-      updateProgress(target.id, { received: blob.size, total: blob.size });
-    }
+    const prepared = await prepareAssetDownloadFn({ data: { assetId: target.id } });
+    updateProgress(target.id, {
+      phase: "fetching",
+      total: prepared.fileSize,
+      received: 0,
+      filename: prepared.filename,
+    });
+    const blob = await blobFromUrlWithProgress(target.id, prepared.signedUrl);
 
     updateProgress(target.id, { phase: "writing" });
-    const ext = extFromMime(blob.type, fallbackExt);
-    const filename = `${filenameBase}.${ext}`;
+    const ext = extFromMime(blob.type || prepared.contentType, fallbackExt);
+    const filename = prepared.filename || `${filenameBase}.${ext}`;
     const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = objectUrl;
@@ -202,7 +214,7 @@ async function downloadOne(
     // Give the browser a tick to hand the download off before revoking.
     setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     completeProgress(target.id, true, filename, null);
-    return { ok: true, blob, filename, url };
+    return { ok: true, blob, filename, url: `ig-publish:${prepared.storagePath}` };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Network or CORS error";
