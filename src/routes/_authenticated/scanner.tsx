@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
+import { providerBudgetFn, providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
