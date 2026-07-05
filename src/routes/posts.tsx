@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Check, X, Download, ExternalLink } from "lucide-react";
+import { Check, X, Download, ExternalLink, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { recentPosts } from "@/lib/mock-data";
+import { usePosts, postActions } from "@/lib/posts-store";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/posts")({
@@ -14,8 +14,9 @@ type Filter = "today" | "yesterday" | "approved" | "ignored" | "downloaded";
 
 function PostsPage() {
   const [filter, setFilter] = useState<Filter>("today");
+  const posts = usePosts();
 
-  const filtered = recentPosts.filter((p) => {
+  const filtered = posts.filter((p) => {
     if (filter === "today") return p.day === "today";
     if (filter === "yesterday") return p.day === "yesterday";
     return p.status === filter;
@@ -71,17 +72,53 @@ function PostsPage() {
                   </div>
                   <p className="text-[11px] text-white/90 line-clamp-2 mb-2">{p.caption}</p>
                   <div className="flex items-center gap-1">
-                    <IconBtn><ExternalLink className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn><Download className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn className="text-success"><Check className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn className="text-destructive"><X className="h-3.5 w-3.5" /></IconBtn>
+                    <IconBtn
+                      as="a"
+                      href={`https://instagram.com/${p.username}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title="View"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </IconBtn>
+                    {p.status === "new" ? (
+                      <>
+                        <IconBtn
+                          onClick={() => postActions.download(p.id)}
+                          title="Download"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </IconBtn>
+                        <IconBtn
+                          className="text-success"
+                          onClick={() => postActions.approve(p.id)}
+                          title="Approve"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </IconBtn>
+                        <IconBtn
+                          className="text-destructive"
+                          onClick={() => postActions.ignore(p.id)}
+                          title="Ignore"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </IconBtn>
+                      </>
+                    ) : (
+                      <IconBtn
+                        onClick={() => postActions.reset(p.id)}
+                        title="Reset to new"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </IconBtn>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="px-3 py-2 flex items-center justify-between">
                 <span className="text-xs font-medium truncate">@{p.username}</span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {p.detectedAt}
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground capitalize">
+                  {p.status === "new" ? p.detectedAt : p.status}
                 </span>
               </div>
             </div>
@@ -92,15 +129,31 @@ function PostsPage() {
   );
 }
 
-function IconBtn({ children, className }: { children: React.ReactNode; className?: string }) {
+const iconBtnClass =
+  "h-7 w-7 rounded-md bg-white/10 hover:bg-white/20 backdrop-blur flex items-center justify-center text-white transition-colors";
+
+function IconBtn({
+  children,
+  className,
+  as,
+  ...rest
+}: {
+  children: React.ReactNode;
+  className?: string;
+  as?: "a" | "button";
+} & React.HTMLAttributes<HTMLElement> &
+  Partial<React.AnchorHTMLAttributes<HTMLAnchorElement>>) {
+  if (as === "a") {
+    return (
+      <a className={cn(iconBtnClass, className)} {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>
+        {children}
+      </a>
+    );
+  }
   return (
-    <button
-      className={cn(
-        "h-7 w-7 rounded-md bg-white/10 hover:bg-white/20 backdrop-blur flex items-center justify-center text-white transition-colors",
-        className,
-      )}
-    >
+    <button className={cn(iconBtnClass, className)} {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
       {children}
     </button>
   );
 }
+

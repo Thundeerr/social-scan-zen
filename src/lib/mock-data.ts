@@ -114,7 +114,7 @@ export const recentPosts: Post[] = Array.from({ length: 24 }).map((_, i) => {
     avatar: avatar(u),
     status: (["new", "new", "new", "approved", "ignored", "downloaded"] as const)[i % 6],
     day: i < 14 ? "today" : "yesterday",
-    likes: `${(Math.random() * 500 + 20).toFixed(0)}K`,
+    likes: `${((i * 37 + 23) % 480 + 20)}K`,
   };
 });
 

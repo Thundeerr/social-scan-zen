@@ -3,7 +3,8 @@ import { Users, Sparkles, Clock, Activity, Plug } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { PostCard } from "@/components/post-card";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { kpis, recentPosts, scannerActivity } from "@/lib/mock-data";
+import { kpis, scannerActivity } from "@/lib/mock-data";
+import { usePosts } from "@/lib/posts-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/")({
 });
 
 function DashboardPage() {
+  const recentPosts = usePosts();
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div>
