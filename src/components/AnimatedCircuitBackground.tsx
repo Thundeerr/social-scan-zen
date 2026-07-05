@@ -107,6 +107,7 @@ export function AnimatedCircuitBackground() {
 
   const sim = useScanSim();
   const isScanning = sim.isScanning;
+  const isCalm = useAmbientCalm();
   const isLow = tier === "low";
 
   // Trace network. Organic-but-orthogonal routes across a huge board.
