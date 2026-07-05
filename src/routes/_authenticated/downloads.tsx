@@ -9,6 +9,7 @@ import {
   User2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -108,51 +109,45 @@ function DownloadsPage() {
 
   return (
     <div className="p-6 md:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Operator archive
-          </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Synchronized assets
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Every file the operator has pulled from the network. Metadata is
-            recorded for audit and recovery.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => void refreshDownloads()}
-            disabled={!!busy}
-          >
-            <RefreshCcw className="h-3.5 w-3.5" /> Refresh
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5"
-            onClick={onBatch}
-            disabled={!!busy || !approvedNotYet.length}
-          >
-            {busy ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Synchronizing {busy.done}/{busy.total}
-              </>
-            ) : (
-              <>
-                <Download className="h-3.5 w-3.5" />
-                Batch synchronize
-                {approvedNotYet.length ? ` (${approvedNotYet.length})` : ""}
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Operator archive"
+        title="Synchronized assets"
+        description="Every file the operator has pulled from the network. Metadata is recorded for audit and recovery."
+        status={{ label: "Archive", tone: "muted" }}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void refreshDownloads()}
+              disabled={!!busy}
+            >
+              <RefreshCcw className="h-3.5 w-3.5" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={onBatch}
+              disabled={!!busy || !approvedNotYet.length}
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Synchronizing {busy.done}/{busy.total}
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" />
+                  Batch synchronize
+                  {approvedNotYet.length ? ` (${approvedNotYet.length})` : ""}
+                </>
+              )}
+            </Button>
+          </>
+        }
+      />
+
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
