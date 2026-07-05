@@ -60,5 +60,8 @@ export const getTrackedAccountAvatarsFn = createServerFn({ method: "POST" })
       }),
     );
 
-    return Object.fromEntries(entries.filter(Boolean)) as Record<string, string>;
+    const validEntries = entries.filter(
+      (entry): entry is readonly [string, string] => entry !== null,
+    );
+    return Object.fromEntries(validEntries) as Record<string, string>;
   });
