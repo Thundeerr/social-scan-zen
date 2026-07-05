@@ -160,6 +160,7 @@ export function AnimatedCircuitBackground() {
       <div className="net-bg__base" />
 
       <svg
+        ref={svgRef}
         className="net-bg__svg"
         viewBox="0 0 1280 900"
         preserveAspectRatio="xMidYMid slice"
