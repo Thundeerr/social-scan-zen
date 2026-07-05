@@ -11,6 +11,9 @@ import {
   Download,
   Search,
   Database,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { PageHeader } from "@/components/page-header";
@@ -20,7 +23,10 @@ import {
   useScannerStats,
 } from "@/lib/db-queries";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
