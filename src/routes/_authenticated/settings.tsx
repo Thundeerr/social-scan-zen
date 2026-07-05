@@ -48,9 +48,30 @@ function SettingRow({
 function SettingsPage() {
   const [provider, setProvider] = useState("instagram-looter");
   const [interval, setIntervalValue] = useScanInterval();
-  const [emailNotif, setEmailNotif] = useState(true);
+  const [telegramNotif, setTelegramNotif] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState("");
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
+
+  // Persist Telegram notification prefs locally so they survive refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const enabled = window.localStorage.getItem("instascanner.telegramNotif");
+    const chat = window.localStorage.getItem("instascanner.telegramChatId");
+    if (enabled !== null) setTelegramNotif(enabled === "1");
+    if (chat !== null) setTelegramChatId(chat);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "instascanner.telegramNotif",
+      telegramNotif ? "1" : "0",
+    );
+  }, [telegramNotif]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("instascanner.telegramChatId", telegramChatId);
+  }, [telegramChatId]);
 
   const handleIntervalChange = (next: string) => {
     const parsed = scanIntervalSchema.safeParse(next);
