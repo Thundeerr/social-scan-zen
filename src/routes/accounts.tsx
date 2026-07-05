@@ -407,9 +407,11 @@ function AddAccountDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => history.back()}>
-            Cancel
-          </Button>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost">
+              Cancel
+            </Button>
+          </DialogClose>
           <Button type="submit" disabled={!username.trim()}>
             Add account
           </Button>
