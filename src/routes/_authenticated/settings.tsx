@@ -89,6 +89,12 @@ function SettingsPage() {
                   <SelectItem value="15">Every 15 minutes</SelectItem>
                   <SelectItem value="30">Every 30 minutes</SelectItem>
                   <SelectItem value="60">Every hour</SelectItem>
+                  <SelectItem value="240">Every 4 hours</SelectItem>
+                  <SelectItem value="480">Every 8 hours</SelectItem>
+                  <SelectItem value="720">Every 12 hours</SelectItem>
+                  <SelectItem value="1440">Every 24 hours</SelectItem>
+                  <SelectItem value="2160">Every 36 hours</SelectItem>
+                  <SelectItem value="4320">Every 72 hours</SelectItem>
                 </SelectContent>
               </Select>
             </SettingRow>
