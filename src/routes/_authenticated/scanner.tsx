@@ -541,7 +541,7 @@ function ScannerPage() {
             </div>
             <div className="mt-2">
               Scanner is on standby — every tracked account is on schedule.
-              Next dispatch in {timeUntil(stats?.nextScanAt ?? null)}.
+              Next dispatch in {timeUntil(estimatedNextScanAt)} ({fmtClock(estimatedNextScanAt)}) · every {intervalLabel}.
             </div>
           </div>
         ) : running.length > 0 ? (
