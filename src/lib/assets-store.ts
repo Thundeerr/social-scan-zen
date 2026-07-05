@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Asset } from "./mock-data";
 import type { Database } from "@/integrations/supabase/types";
 import { logActivity } from "./activity-log";
+import { sendAssetToTelegramFn } from "./telegram-handoff.functions";
 
 type Status = Asset["status"];
 type ReviewState = Database["public"]["Enums"]["review_state"];
@@ -388,6 +389,10 @@ export const assetActions = {
     const a = assets.find((x) => x.id === id);
     void setState(id, "approved", "Kept");
     if (a) void logActivity("asset_kept", `Kept asset from @${a.username}`, { asset_id: id });
+    // Telegram-to-self handoff: fire-and-forget, silent no-op when disabled.
+    void sendAssetToTelegramFn({ data: { assetId: id } }).catch((err) => {
+      console.error("[assets-store] telegram handoff failed", err);
+    });
   },
   ignore: (id: string) => {
     const a = assets.find((x) => x.id === id);

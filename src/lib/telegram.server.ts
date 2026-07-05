@@ -153,3 +153,88 @@ export async function sendPrioritySignalDigest(
 ): Promise<TelegramSendResult> {
   return sendTelegramMessage(chatId, formatPrioritySignalDigest(input));
 }
+
+// ---------------------------------------------------------------------------
+// Asset handoff — sends the raw media file to the operator's Telegram so they
+// can forward it into Instagram (or anywhere else) with one tap. No caption
+// drafting: the DM carries the media, source handle, and a link back to the
+// asset in InstaScanner. The operator writes their own IG caption.
+// ---------------------------------------------------------------------------
+
+export type AssetHandoffInput = {
+  mediaUrl: string | null;
+  mediaType: string; // image | video | reel | story | carousel
+  handle: string;
+  assetLink: string; // deep link into the app
+  sourceUrl: string | null; // original IG permalink if we have one
+};
+
+function buildAssetCaption(input: AssetHandoffInput): string {
+  const lines: string[] = [];
+  lines.push(`📥 <b>Approved asset</b> · @${escapeHtml(input.handle)}`);
+  if (input.sourceUrl) lines.push(`Source: ${escapeHtml(input.sourceUrl)}`);
+  lines.push(`<a href="${input.assetLink}">Open in InstaScanner →</a>`);
+  return lines.join("\n");
+}
+
+/**
+ * Sends the asset media as a Telegram photo/video. Falls back to a text
+ * message with the link if we have no media URL or the media send fails —
+ * the operator can then open the asset in-app and grab the file manually.
+ */
+export async function sendAssetHandoff(
+  chatId: string,
+  input: AssetHandoffInput,
+): Promise<TelegramSendResult> {
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  const connKey = process.env.TELEGRAM_API_KEY;
+  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
+  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
+  if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
+
+  const caption = buildAssetCaption(input);
+  const isVideo = ["video", "reel", "story"].includes(input.mediaType);
+  const isImage = input.mediaType === "image";
+
+  // Carousels / missing media → text-only with link.
+  if (!input.mediaUrl || (!isVideo && !isImage)) {
+    return sendTelegramMessage(chatId, caption);
+  }
+
+  const endpoint = isVideo ? "sendVideo" : "sendPhoto";
+  const payloadKey = isVideo ? "video" : "photo";
+
+  try {
+    const res = await fetch(`${GATEWAY_URL}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": connKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId.trim(),
+        [payloadKey]: input.mediaUrl,
+        caption,
+        parse_mode: "HTML",
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      description?: string;
+      result?: { message_id?: number };
+    };
+    if (!res.ok || data.ok === false) {
+      // Media fetch by Telegram can fail on expiring IG CDN URLs — fall back
+      // to plain text so the operator still gets the handoff signal.
+      const textFallback = await sendTelegramMessage(
+        chatId,
+        `${caption}\n\n<i>Media could not be attached (${escapeHtml(data.description ?? `HTTP ${res.status}`)}). Open in InstaScanner to download.</i>`,
+      );
+      return textFallback;
+    }
+    return { ok: true, messageId: data.result?.message_id ?? 0 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
