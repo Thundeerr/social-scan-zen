@@ -915,6 +915,60 @@ function IntelField({
   );
 }
 
+function OperatorScoreField({
+  asset,
+  isFavorite,
+}: {
+  asset: Asset;
+  isFavorite: boolean;
+}) {
+  const { score, factors } = computeOperatorScore(asset, { isFavorite });
+  const tone = scoreToneClasses(score);
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-primary">
+        <Sparkles className="h-3 w-3" />
+        Operator Score
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <ScoreRing score={score} size={56} />
+        <div className="min-w-0">
+          <div className={cn("text-xs font-medium", tone.text)}>
+            {scoreConfidenceLabel(score)}
+          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            Confidence · updated live
+          </div>
+        </div>
+      </div>
+      <ul className="mt-3 space-y-1.5">
+        {factors.map((f) => (
+          <li key={f.key}>
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="uppercase tracking-wider">{f.label}</span>
+              <span className="tabular-nums text-foreground/70">
+                {Math.round(f.value)}
+                <span className="text-muted-foreground/60"> · {f.weight}%</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted/40">
+              <div
+                className={cn("h-full", tone.text.replace("text-", "bg-"))}
+                style={{ width: `${Math.max(2, Math.round(f.value))}%` }}
+              />
+            </div>
+            {f.note && (
+              <div className="mt-0.5 truncate text-[10px] text-muted-foreground/70">
+                {f.note}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ---------------- Mobile: Swipe Deck ----------------
 
 function MobileHeader({ count, total }: { count: number; total: number }) {
