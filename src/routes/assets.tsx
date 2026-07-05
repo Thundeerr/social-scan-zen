@@ -44,6 +44,10 @@ import {
   TIER_META,
 } from "@/lib/priority";
 import { ScoreRing, TierChip } from "@/components/operator-score";
+import {
+  operatorInsightsFor,
+  type OperatorInsight,
+} from "@/lib/operator-intelligence";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
