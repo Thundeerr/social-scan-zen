@@ -27,6 +27,7 @@ import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { providerBudgetFn, providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
+import { intervalShortLabel, useScanInterval } from "@/lib/scan-interval";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
@@ -71,6 +72,28 @@ function timeAgo(iso: string | null): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+function fmtClock(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (sameDay) return `today ${time}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  if (
+    d.getFullYear() === tomorrow.getFullYear() &&
+    d.getMonth() === tomorrow.getMonth() &&
+    d.getDate() === tomorrow.getDate()
+  ) {
+    return `tomorrow ${time}`;
+  }
+  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
 }
 
 function fmtElapsed(ms: number): string {
@@ -370,6 +393,8 @@ function ScannerPage() {
   const { data: queue = [] } = useScannerQueue();
   const { data: runs = [] } = useScannerRuns(20);
   const { data: stats } = useScannerStats();
+  const [scanInterval] = useScanInterval();
+  const intervalLabel = intervalShortLabel(scanInterval);
 
   // Live ticking clock for elapsed / next-scan countdowns.
   useTick(200);
@@ -433,12 +458,22 @@ function ScannerPage() {
     ? Math.round((successCount / runs.length) * 100)
     : 100;
 
+  // Estimated next scan — prefer the scheduler's real `next_scan_at`
+  // (soonest across all active accounts), otherwise derive it from the
+  // last successful scan + the operator's selected interval.
+  const intervalMs = Number(scanInterval) * 60 * 1000;
+  const estimatedNextScanAt =
+    stats?.nextScanAt ??
+    (stats?.lastSuccessAt
+      ? new Date(new Date(stats.lastSuccessAt).getTime() + intervalMs).toISOString()
+      : new Date(Date.now() + intervalMs).toISOString());
+
   return (
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
         eyebrow="Live operations"
         title="Scanner"
-        description="Autonomous network scans every tracked account every 8 hours, plus on-demand."
+        description={`Autonomous network scans every tracked account every ${intervalLabel}, plus on-demand.`}
         status={
           running.length > 0
             ? { label: `${running.length} in flight`, tone: "primary", live: true }
@@ -475,9 +510,13 @@ function ScannerPage() {
         />
         <KpiCard
           label="Next Scan"
-          value={timeUntil(stats?.nextScanAt ?? null)}
+          value={timeUntil(estimatedNextScanAt)}
           icon={Clock}
-          hint={running.length ? "running" : "auto-scheduled"}
+          hint={
+            running.length
+              ? "running"
+              : `${fmtClock(estimatedNextScanAt)} · every ${intervalLabel}`
+          }
         />
       </div>
 
@@ -502,7 +541,7 @@ function ScannerPage() {
             </div>
             <div className="mt-2">
               Scanner is on standby — every tracked account is on schedule.
-              Next dispatch in {timeUntil(stats?.nextScanAt ?? null)}.
+              Next dispatch in {timeUntil(estimatedNextScanAt)} ({fmtClock(estimatedNextScanAt)}) · every {intervalLabel}.
             </div>
           </div>
         ) : running.length > 0 ? (
