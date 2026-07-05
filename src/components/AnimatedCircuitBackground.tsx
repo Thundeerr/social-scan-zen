@@ -260,8 +260,8 @@ export function AnimatedCircuitBackground() {
               : purple
                 ? "var(--net-purple)"
                 : "var(--net-blue)";
-            // 30s to 60s per traversal. Different offsets per trace.
-            const dur = 32 + (i % 5) * 6;
+            // Base 32-56s per traversal; ~15% faster while scanning.
+            const dur = (32 + (i % 5) * 6) * particleSpeedMul;
             const delay = -(i * 5);
             return (
               <circle
