@@ -101,11 +101,11 @@ const captions = [
   "Weekend inspiration from the Dolomites.",
 ];
 
-const sampleVideos = [
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-];
+import sneakerVideo from "@/assets/videos/asset-sneaker.mp4.asset.json";
+import mountainVideo from "@/assets/videos/asset-mountain.mp4.asset.json";
+import watchVideo from "@/assets/videos/asset-watch.mp4.asset.json";
+
+const sampleVideos = [sneakerVideo.url, mountainVideo.url, watchVideo.url];
 
 export const recentAssets: Asset[] = Array.from({ length: 24 }).map((_, i) => {
   const [u] = brands[i % brands.length];
