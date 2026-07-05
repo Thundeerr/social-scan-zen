@@ -1,17 +1,66 @@
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
+
+/**
+ * Performance tier detection.
+ * - "low" on: prefers-reduced-motion, save-data, small viewport,
+ *   low deviceMemory, low hardwareConcurrency, or coarse pointer (mobile).
+ * - "high" otherwise.
+ * Runs after mount so SSR always renders the full version, then downgrades.
+ */
+function usePerfTier(): "high" | "low" {
+  const [tier, setTier] = useState<"high" | "low">("high");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const compute = () => {
+      const nav = navigator as Navigator & {
+        deviceMemory?: number;
+        connection?: { saveData?: boolean; effectiveType?: string };
+      };
+      const lowMem = (nav.deviceMemory ?? 8) <= 4;
+      const lowCpu = (nav.hardwareConcurrency ?? 8) <= 4;
+      const saveData = nav.connection?.saveData === true;
+      const slowNet = /2g/.test(nav.connection?.effectiveType ?? "");
+      const smallVp = window.innerWidth < 768;
+      const isLow =
+        mql.matches ||
+        saveData ||
+        slowNet ||
+        smallVp ||
+        coarse.matches ||
+        lowMem ||
+        lowCpu;
+      setTier(isLow ? "low" : "high");
+    };
+    compute();
+    mql.addEventListener?.("change", compute);
+    coarse.addEventListener?.("change", compute);
+    window.addEventListener("resize", compute, { passive: true });
+    return () => {
+      mql.removeEventListener?.("change", compute);
+      coarse.removeEventListener?.("change", compute);
+      window.removeEventListener("resize", compute);
+    };
+  }, []);
+  return tier;
+}
 
 /**
  * Subtle animated cyberpunk circuit-board background.
  * - fixed, non-interactive, sits behind all app content
  * - respects prefers-reduced-motion
+ * - downshifts particle/node/path counts on low-power devices
  * - tunable via CSS vars: --circuit-opacity, --circuit-speed,
  *   --circuit-blue, --circuit-purple, --circuit-amber
  */
 export function AnimatedCircuitBackground() {
+  const tier = usePerfTier();
   const uid = useId().replace(/:/g, "");
   const gridId = `circuit-grid-${uid}`;
   const glowId = `circuit-glow-${uid}`;
   const fadeId = `circuit-fade-${uid}`;
+
 
   // A handful of hand-drawn "trace" paths particles will travel along.
   const paths = [
