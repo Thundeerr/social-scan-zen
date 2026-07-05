@@ -155,24 +155,18 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
             toast = "Caption sent";
             break;
           }
-          case "rev": {
-            await setState("reviewed");
-            toast = "Marked reviewed";
-            break;
-          }
           case "ign": {
+            // Milestone 1: "Ignore" only dismisses the asset from the
+            // operator's queue. Repost / reviewed transitions belong to the
+            // admin panel — Telegram stays a speed layer.
             await setState("dismissed");
             toast = "Ignored";
-            break;
-          }
-          case "rep": {
-            await setState("approved"); // approval trigger enqueues publish_jobs
-            toast = "Queued for repost";
             break;
           }
           default:
             toast = "Unknown action";
         }
+
 
         await answerCallbackQuery(cb.id, toast);
 

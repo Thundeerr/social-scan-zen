@@ -326,13 +326,15 @@ function buildDetectionCaption(input: DetectionCardInput): string {
 
 function buildDetectionKeyboard(assetId: string, adminUrl: string, sourceUrl: string | null) {
   const cb = (key: string, label: string) => ({ text: label, callback_data: `${key}:${assetId}` });
+  // Milestone 1 — Core Operator Flow. Only the five fast actions live on the
+  // card: Download, Send Media, Copy Caption, Ignore, plus the Open Admin
+  // URL button. Repost queue and review-state buttons come in later
+  // milestones — the admin panel is the source of truth.
   const A = {
     download: cb("dl", "⬇️ Download"),
     send:     cb("snd", "📤 Send Media to Me"),
     copy:     cb("cap", "📋 Copy Caption"),
-    reviewed: cb("rev", "✅ Mark Reviewed"),
     ignore:   cb("ign", "🚫 Ignore"),
-    repost:   cb("rep", "♻️ Add to Repost Queue"),
   };
 
   const row3: Array<Record<string, unknown>> = [{ text: "🛠 Open in Admin", url: adminUrl }];
@@ -340,12 +342,12 @@ function buildDetectionKeyboard(assetId: string, adminUrl: string, sourceUrl: st
   return {
     inline_keyboard: [
       [A.download, A.send],
-      [A.copy, A.reviewed],
-      [A.repost, A.ignore],
+      [A.copy, A.ignore],
       row3,
     ],
   };
 }
+
 
 /**
  * Sends a rich detection card with inline action buttons. Falls back to a
