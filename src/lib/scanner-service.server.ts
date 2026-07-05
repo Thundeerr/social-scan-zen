@@ -282,6 +282,46 @@ export async function executeScan(
       metadata: { account_id: accountId, run_id: runId, inserted, duplicates },
     });
 
+    // Telegram notification — fire-and-forget. Only when new assets landed
+    // and the account owner has opted in. Failures are logged, never thrown,
+    // so a bot outage cannot fail the scan.
+    if (inserted > 0) {
+      try {
+        const { data: acct } = await db
+          .from("tracked_accounts")
+          .select("created_by")
+          .eq("id", accountId)
+          .maybeSingle();
+        const ownerId = acct?.created_by;
+        if (ownerId) {
+          const { data: prefs } = await db
+            .from("profiles")
+            .select("telegram_chat_id, telegram_enabled")
+            .eq("id", ownerId)
+            .maybeSingle();
+          if (prefs?.telegram_enabled && prefs.telegram_chat_id) {
+            const { sendTelegramMessage } = await import("@/lib/telegram.server");
+            const msg = [
+              `<b>${inserted} new asset${inserted === 1 ? "" : "s"}</b> — @${username}`,
+              duplicates > 0
+                ? `<i>${duplicates} already archived</i>`
+                : "",
+              "",
+              "Open InstaScanner to review.",
+            ]
+              .filter(Boolean)
+              .join("\n");
+            const result = await sendTelegramMessage(prefs.telegram_chat_id, msg);
+            if (!result.ok) {
+              console.warn("[telegram] send failed", result.error);
+            }
+          }
+        }
+      } catch (notifyErr) {
+        console.warn("[telegram] notify hook error", notifyErr);
+      }
+    }
+
     return {
       runId,
       accountId,
