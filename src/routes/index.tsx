@@ -6,6 +6,8 @@ import { ActivityTimeline } from "@/components/activity-timeline";
 import { kpis } from "@/lib/mock-data";
 import { usePosts } from "@/lib/posts-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
+import { useGlobalQuery, matchesQuery } from "@/lib/search-store";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   head: () => ({
