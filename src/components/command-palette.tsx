@@ -14,6 +14,7 @@ import {
   Search,
   ArrowDown,
   ArrowUp,
+  Undo2,
 } from "lucide-react";
 import {
   CommandDialog,
