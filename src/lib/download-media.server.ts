@@ -83,15 +83,7 @@ async function resolveFreshMediaUrl(asset: AssetForDownload, username: string) {
   return asset.media_url ?? asset.thumbnail_url ?? null;
 }
 
-export async function prepareAssetDownload(input: {
-  asset: AssetForDownload;
-  userId: string;
-}): Promise<PreparedAssetDownload> {
-  const { asset, userId } = input;
-  const username = firstAccount(asset)?.username ?? "unknown";
-  const mediaUrl = await resolveFreshMediaUrl(asset, username);
-  if (!mediaUrl) throw new Error("No media URL available for this asset");
-
+async function fetchMediaBytes(asset: AssetForDownload, mediaUrl: string) {
   const res = await fetch(mediaUrl, {
     headers: {
       Accept: isVideoType(asset.media_type) ? "video/*,*/*" : "image/*,*/*",
@@ -106,11 +98,48 @@ export async function prepareAssetDownload(input: {
     throw new Error(`Media fetch failed ${res.status}${body ? `: ${body.slice(0, 120)}` : ""}`);
   }
 
-  const fallbackContentType = isVideoType(asset.media_type) ? "video/mp4" : "image/jpeg";
-  const contentType = res.headers.get("content-type") ?? fallbackContentType;
   const arrayBuffer = await res.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
   if (bytes.byteLength === 0) throw new Error("Media fetch returned an empty file");
+
+  return {
+    arrayBuffer,
+    bytes,
+    contentType: res.headers.get("content-type"),
+  };
+}
+
+export async function prepareAssetDownload(input: {
+  asset: AssetForDownload;
+  userId: string;
+}): Promise<PreparedAssetDownload> {
+  const { asset, userId } = input;
+  const username = firstAccount(asset)?.username ?? "unknown";
+  let mediaUrl = asset.media_url ?? asset.thumbnail_url ?? null;
+  let fetched:
+    | { arrayBuffer: ArrayBuffer; bytes: Uint8Array; contentType: string | null }
+    | null = null;
+
+  if (mediaUrl) {
+    try {
+      fetched = await fetchMediaBytes(asset, mediaUrl);
+    } catch (error) {
+      console.warn(
+        "[download-media] stored media URL failed; resolving a fresh provider URL",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  if (!fetched) {
+    const freshUrl = await resolveFreshMediaUrl(asset, username);
+    if (!freshUrl) throw new Error("No media URL available for this asset");
+    mediaUrl = freshUrl;
+    fetched = await fetchMediaBytes(asset, freshUrl);
+  }
+
+  const fallbackContentType = isVideoType(asset.media_type) ? "video/mp4" : "image/jpeg";
+  const contentType = fetched.contentType ?? fallbackContentType;
 
   const fallbackExt = isVideoType(asset.media_type) ? "mp4" : "jpg";
   const ext = extFromContentType(contentType, fallbackExt);
@@ -139,7 +168,7 @@ export async function prepareAssetDownload(input: {
     storagePath,
     filename,
     contentType,
-    fileSize: bytes.byteLength,
+    fileSize: fetched.bytes.byteLength,
     sourceUrl: mediaUrl,
   };
 }
