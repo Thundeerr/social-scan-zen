@@ -191,55 +191,75 @@ export type Database = {
       }
       scanner_runs: {
         Row: {
+          account_id: string | null
           accounts_scanned: number
           assets_detected: number
+          attempt: number
           completed_at: string | null
           created_at: string
           created_by: string | null
           error: string | null
           id: string
+          scheduled_for: string
           started_at: string | null
           status: Database["public"]["Enums"]["scanner_run_status"]
           triggered_by: string | null
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
           accounts_scanned?: number
           assets_detected?: number
+          attempt?: number
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           error?: string | null
           id?: string
+          scheduled_for?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["scanner_run_status"]
           triggered_by?: string | null
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
           accounts_scanned?: number
           assets_detected?: number
+          attempt?: number
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
           error?: string | null
           id?: string
+          scheduled_for?: string
           started_at?: string | null
           status?: Database["public"]["Enums"]["scanner_run_status"]
           triggered_by?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scanner_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tracked_accounts: {
         Row: {
           avatar_url: string | null
+          consecutive_failures: number
           created_at: string
           created_by: string | null
           display_name: string
           followers: string | null
           id: string
+          last_error: string | null
           last_scan_at: string | null
+          next_scan_at: string | null
           notes: string | null
           status: Database["public"]["Enums"]["account_status"]
           tier: Database["public"]["Enums"]["priority_tier"]
@@ -248,12 +268,15 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          consecutive_failures?: number
           created_at?: string
           created_by?: string | null
           display_name: string
           followers?: string | null
           id?: string
+          last_error?: string | null
           last_scan_at?: string | null
+          next_scan_at?: string | null
           notes?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           tier?: Database["public"]["Enums"]["priority_tier"]
@@ -262,12 +285,15 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          consecutive_failures?: number
           created_at?: string
           created_by?: string | null
           display_name?: string
           followers?: string | null
           id?: string
+          last_error?: string | null
           last_scan_at?: string | null
+          next_scan_at?: string | null
           notes?: string | null
           status?: Database["public"]["Enums"]["account_status"]
           tier?: Database["public"]["Enums"]["priority_tier"]

@@ -172,14 +172,66 @@ export function useScannerRuns(limit = 20) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scanner_runs")
-        .select("*")
+        .select("*, tracked_accounts(username, display_name, avatar_url)")
         .order("created_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 15_000,
   });
 }
+
+// Live queue view — queued + running, ordered by scheduled_for.
+export function useScannerQueue() {
+  return useQuery({
+    queryKey: ["scanner_queue"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("scanner_runs")
+        .select("*, tracked_accounts(username, display_name, avatar_url)")
+        .in("status", ["queued", "running"])
+        .order("scheduled_for", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 5_000,
+  });
+}
+
+// Aggregate scheduling stats for the scanner dashboard.
+export function useScannerStats() {
+  return useQuery({
+    queryKey: ["scanner_stats"],
+    queryFn: async () => {
+      const [{ data: accounts }, { data: lastOk }] = await Promise.all([
+        supabase
+          .from("tracked_accounts")
+          .select("id, username, status, next_scan_at, last_scan_at")
+          .eq("status", "active"),
+        supabase
+          .from("scanner_runs")
+          .select("id, completed_at, tracked_accounts(username)")
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const nextTs = (accounts ?? [])
+        .map((a) => (a.next_scan_at ? new Date(a.next_scan_at).getTime() : Infinity))
+        .sort((x, y) => x - y)[0];
+      return {
+        activeAccounts: accounts?.length ?? 0,
+        nextScanAt: Number.isFinite(nextTs) ? new Date(nextTs).toISOString() : null,
+        lastSuccessAt: lastOk?.completed_at ?? null,
+        lastSuccessAccount:
+          (lastOk?.tracked_accounts as { username?: string } | null)?.username ?? null,
+      };
+    },
+    refetchInterval: 15_000,
+  });
+}
+
 
 // ---------- Activity log ----------
 export function useActivityLog(limit = 50) {

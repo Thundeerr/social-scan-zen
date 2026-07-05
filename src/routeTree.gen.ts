@@ -17,6 +17,7 @@ import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -57,6 +58,12 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksScannerTickRoute =
+  ApiPublicHooksScannerTickRouteImport.update({
+    id: '/api/public/hooks/scanner-tick',
+    path: '/api/public/hooks/scanner-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -75,6 +83,7 @@ export interface FileRoutesByTo {
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,6 +95,7 @@ export interface FileRoutesById {
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/scanner'
     | '/settings'
+    | '/api/public/hooks/scanner-tick'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/scanner'
     | '/settings'
     | '/'
+    | '/api/public/hooks/scanner-tick'
   id:
     | '__root__'
     | '/_authenticated'
@@ -116,11 +128,13 @@ export interface FileRouteTypes {
     | '/_authenticated/scanner'
     | '/_authenticated/settings'
     | '/_authenticated/'
+    | '/api/public/hooks/scanner-tick'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -181,6 +195,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/scanner-tick': {
+      id: '/api/public/hooks/scanner-tick'
+      path: '/api/public/hooks/scanner-tick'
+      fullPath: '/api/public/hooks/scanner-tick'
+      preLoaderRoute: typeof ApiPublicHooksScannerTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -208,6 +229,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
