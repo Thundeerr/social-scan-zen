@@ -419,10 +419,12 @@ function AccountsPage() {
   }, [watchlists]);
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-6 md:p-8 space-y-6">
       <PageHeader
+        eyebrow="Watchlist active"
         title="Tracked Accounts"
-        description={`${dbRows.length} accounts under active surveillance.`}
+        description={`${dbRows.length} accounts under active surveillance. Ranked by operator priority tier.`}
+        status={{ label: "Monitoring", tone: "success", live: true }}
         actions={
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
@@ -441,7 +443,8 @@ function AccountsPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input

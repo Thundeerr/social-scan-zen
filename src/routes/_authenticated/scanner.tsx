@@ -436,9 +436,16 @@ function ScannerPage() {
   return (
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
+        eyebrow="Live operations"
         title="Scanner"
-        description="Live operations — the network scans every tracked account every 8 hours, plus on-demand."
+        description="Autonomous network scans every tracked account every 8 hours, plus on-demand."
+        status={
+          running.length > 0
+            ? { label: `${running.length} in flight`, tone: "primary", live: true }
+            : { label: "Standby", tone: "success", live: true }
+        }
       />
+
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <KpiCard
