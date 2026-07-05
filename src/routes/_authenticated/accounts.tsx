@@ -557,7 +557,11 @@ function AccountsPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <img
-                        src={a.avatar_url || getAvatar(a.username)}
+                        src={
+                          a.avatar_url
+                            ? `/api/public/avatar?u=${encodeURIComponent(a.username)}`
+                            : getAvatar(a.username)
+                        }
                         alt=""
                         loading="lazy"
                         referrerPolicy="no-referrer"
