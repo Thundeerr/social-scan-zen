@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Asset } from "./mock-data";
 import type { Database } from "@/integrations/supabase/types";
 import { logActivity } from "./activity-log";
+import { sendAssetToTelegramFn } from "./telegram-handoff.functions";
 
 type Status = Asset["status"];
 type ReviewState = Database["public"]["Enums"]["review_state"];
