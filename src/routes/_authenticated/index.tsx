@@ -17,7 +17,7 @@ import { ActivityTimeline } from "@/components/activity-timeline";
 import { kpis, scannerHealth, recentAssets } from "@/lib/mock-data";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
-import { useTrackedAccounts } from "@/lib/db-queries";
+import { useTrackedAccounts, useActivityLog } from "@/lib/db-queries";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
