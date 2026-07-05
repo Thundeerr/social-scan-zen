@@ -5,6 +5,7 @@ import { z } from "zod";
 // the Scanner page share one source of truth without a circular dependency.
 export const SCAN_INTERVAL_OPTIONS = [
   { value: "240", label: "Every 4 hours", short: "4h" },
+  { value: "360", label: "Every 6 hours (4×/day)", short: "6h" },
   { value: "480", label: "Every 8 hours", short: "8h" },
   { value: "720", label: "Every 12 hours", short: "12h" },
   { value: "1440", label: "Every 24 hours", short: "24h" },
@@ -19,7 +20,7 @@ export const scanIntervalSchema = z.enum(
   { errorMap: () => ({ message: "Unsupported scan interval" }) },
 );
 
-export const DEFAULT_SCAN_INTERVAL: ScanIntervalValue = "480";
+export const DEFAULT_SCAN_INTERVAL: ScanIntervalValue = "360";
 const STORAGE_KEY = "instascanner.scanInterval";
 
 function readStored(): ScanIntervalValue {
