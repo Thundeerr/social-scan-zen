@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { scannerHealth } from "@/lib/mock-data";
 import { useScanSim } from "@/lib/scan-simulator";
 
-export const Route = createFileRoute("/scanner")({
+export const Route = createFileRoute("/_authenticated/scanner")({
   head: () => ({ meta: [{ title: "Scanner — InstaScanner" }] }),
   component: ScannerPage,
 });

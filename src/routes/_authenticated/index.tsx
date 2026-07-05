@@ -18,7 +18,7 @@ import { kpis, scannerHealth, trackedAccounts, recentAssets } from "@/lib/mock-d
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Network Status — InstaScanner" },

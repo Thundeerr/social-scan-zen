@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Download, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/downloads")({
+export const Route = createFileRoute("/_authenticated/downloads")({
   head: () => ({ meta: [{ title: "Downloads — InstaScanner" }] }),
   component: DownloadsPage,
 });

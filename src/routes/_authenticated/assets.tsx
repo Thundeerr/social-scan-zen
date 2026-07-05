@@ -72,7 +72,7 @@ const searchSchema = z.object({
   status: fallback(z.enum(STATUSES), "new").default("new"),
 });
 
-export const Route = createFileRoute("/assets")({
+export const Route = createFileRoute("/_authenticated/assets")({
   head: () => ({
     meta: [
       { title: "Asset Inbox — InstaScanner" },
