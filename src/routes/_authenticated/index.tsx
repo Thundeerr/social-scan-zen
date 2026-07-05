@@ -85,9 +85,10 @@ function DashboardPage() {
     ? "after current cycle"
     : sim.lastScanAt
       ? "in ~12 s"
-      : scannerHealth.nextScan;
+      : "soon";
 
-  const queuePct = Math.min(100, Math.round((sim.queueSize / 247) * 100));
+  const totalTracked = Math.max(1, trackedAccounts.length);
+  const queuePct = Math.min(100, Math.round((sim.queueSize / totalTracked) * 100));
 
   return (
     <div className="p-6 md:p-8 space-y-6">
