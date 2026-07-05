@@ -18,6 +18,11 @@ import {
   Tag,
   Volume2,
   VolumeX,
+  Brain,
+  TrendingUp,
+  Repeat,
+  Film,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useAssets, assetActions } from "@/lib/assets-store";
 import { useGlobalQuery, matchesQuery, setGlobalQuery } from "@/lib/search-store";
@@ -39,6 +44,10 @@ import {
   TIER_META,
 } from "@/lib/priority";
 import { ScoreRing, TierChip } from "@/components/operator-score";
+import {
+  operatorInsightsFor,
+  type OperatorInsight,
+} from "@/lib/operator-intelligence";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -831,6 +840,7 @@ function IntelligencePanel({
 
       <div className="flex flex-col gap-5 px-5 py-5">
         <RecommendationCard asset={asset} isFavorite={isFavorite} />
+        <OperatorInsightCard asset={asset} />
 
         <IntelField label="Account" icon={Users}>
           <div className="flex items-center gap-2">
@@ -930,6 +940,88 @@ function RecommendationCard({
     </div>
   );
 }
+
+function OperatorInsightCard({ asset }: { asset: Asset }) {
+  const liveAssets = useAssets();
+  const insights = useMemo(
+    () => operatorInsightsFor(asset, liveAssets),
+    [asset, liveAssets],
+  );
+
+  return (
+    <div className="rounded-lg border border-border/70 bg-background/40 p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-primary">
+          <Brain className="h-3 w-3" />
+          Operator Insight
+        </div>
+        <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+          Learned from your history
+        </span>
+      </div>
+
+      {insights.length === 0 ? (
+        <div className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+          Not enough personal history for @{asset.username} yet. Operator
+          Intelligence is learning from your decisions.
+        </div>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {insights.map((ins, i) => (
+            <InsightRow key={i} insight={ins} />
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-3 border-t border-border/40 pt-2 text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+        Only your decisions · never global trends
+      </div>
+    </div>
+  );
+}
+
+function InsightRow({ insight }: { insight: OperatorInsight }) {
+  const tone =
+    insight.tone === "positive"
+      ? "text-success"
+      : insight.tone === "caution"
+        ? "text-warning"
+        : "text-foreground/80";
+  const dotTone =
+    insight.tone === "positive"
+      ? "bg-success"
+      : insight.tone === "caution"
+        ? "bg-warning"
+        : "bg-muted-foreground";
+  const Icon =
+    insight.kind === "creator"
+      ? Users
+      : insight.kind === "watchlist"
+        ? TrendingUp
+        : insight.kind === "repost"
+          ? Repeat
+          : insight.kind === "download"
+            ? Download
+            : insight.kind === "format"
+              ? insight.text.toLowerCase().includes("video")
+                ? Film
+                : ImageIcon
+              : Sparkles;
+
+  return (
+    <li className="flex gap-2.5">
+      <span className="mt-1.5 flex items-center gap-1.5">
+        <span className={cn("h-1 w-1 shrink-0 rounded-full", dotTone)} />
+        <Icon className={cn("h-3 w-3 shrink-0", tone)} />
+      </span>
+      <span className="text-[12px] leading-snug text-foreground/85">
+        {insight.text}
+      </span>
+    </li>
+  );
+}
+
+
 
 function IntelField({
   label,
