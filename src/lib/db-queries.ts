@@ -41,7 +41,7 @@ export function useCreateTrackedAccount() {
       void logActivity(
         "account_added",
         `Tracking @${data.username}`,
-        { account_id: data.id, priority: data.priority },
+        { account_id: data.id },
       );
     },
   });
