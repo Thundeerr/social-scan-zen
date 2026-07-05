@@ -214,3 +214,91 @@ export const providerBudgetFn = createServerFn({ method: "GET" })
     const { getBudgetStatus } = await import("@/lib/scanner-service.server");
     return getBudgetStatus(context.supabase);
   });
+
+// ---------- Burn forecast -----------------------------------------------------
+
+/**
+ * Burn-rate telemetry for the "Token Burn" console. Combines current-month
+ * budget consumption with the size of the active fleet and the fixed
+ * autonomous cadence (4 scans / day / account, ~6h intervals) to project
+ * daily, weekly, and monthly provider request usage.
+ *
+ * `actualLast24h` counts scanner_runs created in the last rolling 24 hours
+ * so the operator can compare "what the fleet is actually spending" against
+ * "what the schedule predicts".
+ */
+export type BurnForecast = {
+  activeAccounts: number;
+  scansPerAccountPerDay: number;
+  projectedPerDay: number;
+  projectedPerWeek: number;
+  projectedPerMonth: number;
+  actualLast24h: number;
+  actualLast7d: number;
+  daysUntilCap: number | null; // null = never (projection ≤ 0)
+  budget: {
+    used: number;
+    monthlyCap: number;
+    remaining: number;
+    percentUsed: number;
+    periodStart: string;
+    periodEnd: string;
+    warning: boolean;
+    exhausted: boolean;
+  };
+};
+
+export const burnForecastFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<BurnForecast> => {
+    const { getBudgetStatus } = await import("@/lib/scanner-service.server");
+    const budget = await getBudgetStatus(context.supabase);
+
+    const { count: activeCount } = await context.supabase
+      .from("tracked_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active");
+    const activeAccounts = activeCount ?? 0;
+
+    const scansPerAccountPerDay = 4; // 4×/day autonomous cadence
+    const projectedPerDay = activeAccounts * scansPerAccountPerDay;
+    const projectedPerWeek = projectedPerDay * 7;
+    const projectedPerMonth = projectedPerDay * 30;
+
+    const now = Date.now();
+    const dayAgo = new Date(now - 24 * 60 * 60_000).toISOString();
+    const weekAgo = new Date(now - 7 * 24 * 60 * 60_000).toISOString();
+    const { count: c24 } = await context.supabase
+      .from("scanner_runs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", dayAgo);
+    const { count: c7d } = await context.supabase
+      .from("scanner_runs")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", weekAgo);
+
+    const daysUntilCap =
+      projectedPerDay > 0 ? budget.remaining / projectedPerDay : null;
+
+    return {
+      activeAccounts,
+      scansPerAccountPerDay,
+      projectedPerDay,
+      projectedPerWeek,
+      projectedPerMonth,
+      actualLast24h: c24 ?? 0,
+      actualLast7d: c7d ?? 0,
+      daysUntilCap,
+      budget: {
+        used: budget.used,
+        monthlyCap: budget.monthlyCap,
+        remaining: budget.remaining,
+        percentUsed: budget.percentUsed,
+        periodStart: budget.periodStart,
+        periodEnd: budget.periodEnd,
+        warning: budget.warning,
+        exhausted: budget.exhausted,
+      },
+    };
+  });
+
