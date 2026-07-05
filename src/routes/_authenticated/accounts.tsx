@@ -899,3 +899,137 @@ function AccountFormDialog({
     </DialogContent>
   );
 }
+
+// ---------- Scan queue progress panel ----------------------------------------
+
+function fmtDuration(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  return `${m}m ${String(rs).padStart(2, "0")}s`;
+}
+
+function ScanQueuePanel({
+  queue,
+  onCancel,
+  onClose,
+}: {
+  queue: {
+    ids: string[];
+    index: number;
+    startedAt: number;
+    nowTick: number;
+    results: Array<{
+      id: string;
+      username: string;
+      status: "pending" | "running" | "ok" | "failed";
+      inserted: number;
+      error?: string;
+    }>;
+    cancelled: boolean;
+  };
+  onCancel: () => void;
+  onClose: () => void;
+}) {
+  const total = queue.ids.length;
+  const doneCount = queue.results.filter(
+    (r) => r.status === "ok" || r.status === "failed",
+  ).length;
+  const running = queue.results[queue.index];
+  const remaining = Math.max(0, total - doneCount - (running?.status === "running" ? 1 : 0));
+  const isFinished = doneCount >= total || queue.cancelled;
+  const elapsed = queue.nowTick - queue.startedAt;
+  // ETA: only estimate once we have at least one completed run.
+  const avgMs = doneCount > 0 ? elapsed / doneCount : 0;
+  const remainingForEta = total - doneCount;
+  const etaMs = avgMs > 0 ? Math.round(avgMs * remainingForEta) : null;
+  const totalInserted = queue.results.reduce((s, r) => s + r.inserted, 0);
+  const totalFailed = queue.results.filter((r) => r.status === "failed").length;
+  const pct = Math.round((doneCount / total) * 100);
+
+  return (
+    <div className="soft-shadow mb-4 overflow-hidden rounded-xl border border-primary/25 bg-card">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border/60 bg-primary/5 px-4 py-3">
+        <div className="grid h-8 w-8 place-items-center rounded-md bg-primary/15 ring-1 ring-primary/30">
+          {isFinished ? (
+            <Radar className="h-4 w-4 text-primary" />
+          ) : (
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold tracking-tight">
+            {queue.cancelled
+              ? "Queue cancelled"
+              : isFinished
+                ? "Queue complete"
+                : `Scanning @${running?.username ?? "…"}`}
+          </div>
+          <div className="text-[11px] text-muted-foreground tabular-nums">
+            {doneCount}/{total} accounts · {remaining} remaining ·{" "}
+            {totalInserted} new asset{totalInserted === 1 ? "" : "s"}
+            {totalFailed > 0 ? ` · ${totalFailed} failed` : ""}
+          </div>
+        </div>
+        <div className="hidden sm:flex flex-col items-end text-[11px] text-muted-foreground tabular-nums">
+          <span>Elapsed {fmtDuration(elapsed)}</span>
+          {!isFinished && (
+            <span>
+              ETA {etaMs != null ? fmtDuration(etaMs) : "calculating…"}
+            </span>
+          )}
+        </div>
+        {isFinished ? (
+          <Button size="sm" variant="ghost" onClick={onClose} className="gap-1.5">
+            <X className="h-3.5 w-3.5" /> Dismiss
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" onClick={onCancel} disabled={queue.cancelled}>
+            {queue.cancelled ? "Stopping…" : "Cancel"}
+          </Button>
+        )}
+      </div>
+
+      <div className="px-4 pt-3">
+        <Progress value={pct} className="h-1.5" />
+      </div>
+
+      <ul className="max-h-56 divide-y divide-border/50 overflow-y-auto px-1 py-1">
+        {queue.results.map((r) => (
+          <li
+            key={r.id}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs",
+              r.status === "running" && "bg-primary/5",
+            )}
+          >
+            <span className="w-4">
+              {r.status === "running" ? (
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              ) : r.status === "ok" ? (
+                <span className="inline-block h-2 w-2 rounded-full bg-success" />
+              ) : r.status === "failed" ? (
+                <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
+              ) : (
+                <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium text-foreground/90">
+              @{r.username}
+            </span>
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              {r.status === "ok"
+                ? r.inserted > 0
+                  ? `+${r.inserted}`
+                  : "no new"
+                : r.status === "failed"
+                  ? r.error ?? "failed"
+                  : r.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
