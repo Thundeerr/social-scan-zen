@@ -75,6 +75,8 @@ function rowToAsset(r: Row): Asset {
     : r.asset_status?.state;
   const status: Status = state ? STATE_TO_STATUS[state] : "new";
   const isVideo = r.media_type === "video";
+  const detectedMs = new Date(r.detected_at).getTime();
+  const justDetected = Number.isFinite(detectedMs) && Date.now() - detectedMs < 90_000;
   return {
     id: r.id,
     username,
@@ -86,6 +88,7 @@ function rowToAsset(r: Row): Asset {
     status,
     day: dayBucket(r.posted_at ?? r.detected_at),
     likes: formatLikes(r.likes ?? 0),
+    justDetected,
   };
 }
 
