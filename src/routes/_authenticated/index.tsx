@@ -36,6 +36,7 @@ export const Route = createFileRoute("/_authenticated/")({
 function DashboardPage() {
   const allAssets = useAssets();
   const sim = useScanSim();
+  const { data: trackedAccounts = [] } = useTrackedAccounts();
   void sim.nowTick;
 
   const newAssets = useMemo(
