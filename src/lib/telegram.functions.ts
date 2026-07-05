@@ -30,6 +30,9 @@ export const getTelegramPrefsFn = createServerFn({ method: "GET" })
     return {
       chatId: data?.telegram_chat_id ?? "",
       enabled: data?.telegram_enabled ?? false,
+      // Per-user token the operator must include when they send `/start` to
+      // the shared bot so `detectTelegramChatIdFn` can safely match their chat.
+      setupToken: context.userId,
     };
   });
 
