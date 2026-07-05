@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Asset } from "./mock-data";
 import type { Database } from "@/integrations/supabase/types";
+import { logActivity } from "./activity-log";
 
 type Status = Asset["status"];
 type ReviewState = Database["public"]["Enums"]["review_state"];
