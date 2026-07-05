@@ -1,8 +1,23 @@
-import { useSyncExternalStore, useEffect } from "react";
-import { scannerActivity, scannerHealth, kpis } from "./mock-data";
+/**
+ * Real scanner state hook.
+ *
+ * This module used to run an in-memory simulation with hard-coded brand
+ * names ("Checked @louisvuitton…"). It's now a thin adapter over the real
+ * `scanner_runs` / `assets` tables so the dashboard, top bar and ambient
+ * background all reflect actual monitoring activity.
+ *
+ * The shape returned by `useScanSim()` is preserved so existing consumers
+ * don't need to change. Fields we do not yet track in the database
+ * (per-request latency, provider request count, success rate) are exposed
+ * as neutral defaults instead of fabricated numbers.
+ */
+
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export type SimEvent = {
-  id: number;
+  id: number | string;
   time: string;
   label: string;
   kind: "info" | "success" | "muted";
@@ -16,167 +31,84 @@ type State = {
   requests: number;
   successRate: number;
   avgResponse: number;
-  lastScanAt: number | null; // epoch ms
-  nowTick: number; // updated periodically so "X min ago" refreshes
+  lastScanAt: number | null;
+  nowTick: number;
 };
 
-let eid = 0;
-const mkEvent = (label: string, kind: SimEvent["kind"]): SimEvent => {
+function startOfTodayIso(): string {
   const d = new Date();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return { id: ++eid, time: `${hh}:${mm}`, label, kind };
-};
-
-// Seed with the static mock events so SSR + first paint match.
-const seedEvents: SimEvent[] = scannerActivity.map((e, i) => ({
-  id: -1 - i,
-  time: e.time,
-  label: e.label,
-  kind: (e.kind ?? "muted") as SimEvent["kind"],
-}));
-
-const INITIAL_STATE: State = {
-  events: seedEvents,
-  isScanning: false,
-  newAssetsToday: kpis.newAssetsToday,
-  queueSize: scannerHealth.queueSize,
-  requests: scannerHealth.requests,
-  successRate: scannerHealth.successRate,
-  avgResponse: scannerHealth.avgResponse,
-  lastScanAt: null,
-  nowTick: 0,
-};
-
-let state: State = { ...INITIAL_STATE };
-
-const listeners = new Set<() => void>();
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => listeners.delete(l);
-};
-const set = (patch: Partial<State>) => {
-  state = { ...state, ...patch };
-  listeners.forEach((l) => l());
-};
-
-const pushEvent = (label: string, kind: SimEvent["kind"]) => {
-  const next = [mkEvent(label, kind), ...state.events].slice(0, 12);
-  state = { ...state, events: next };
-  listeners.forEach((l) => l());
-};
-
-const BRANDS = [
-  "nike", "adidas", "apple", "spacex", "natgeo", "chanelofficial",
-  "gucci", "prada", "louisvuitton", "ferrari", "porsche", "bmw",
-  "patagonia", "arcteryx", "off____white", "stussy", "kithnyc", "ssense",
-];
-
-const rand = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
-
-// ---- Simulation loop ----
-
-let running = false;
-let timeouts: ReturnType<typeof setTimeout>[] = [];
-const wait = (ms: number) =>
-  new Promise<void>((resolve) => {
-    const t = setTimeout(() => resolve(), ms);
-    timeouts.push(t);
-  });
-
-async function runScanCycle() {
-  const total = 247;
-  set({
-    isScanning: true,
-    queueSize: total,
-  });
-  pushEvent(`Started scan · ${total} accounts`, "info");
-  await wait(900);
-
-  let processed = 0;
-  let foundThisScan = 0;
-  const steps = 9;
-  for (let i = 0; i < steps; i++) {
-    if (!running) return;
-    const batch = Math.ceil(total / steps) + rand(-3, 3);
-    processed += batch;
-    const brand = BRANDS[rand(0, BRANDS.length - 1)];
-    const found = Math.random() < 0.45 ? rand(1, 3) : 0;
-    foundThisScan += found;
-    set({
-      queueSize: Math.max(0, total - processed),
-      requests: state.requests + rand(18, 42),
-      newAssetsToday: state.newAssetsToday + found,
-      avgResponse: Math.max(360, Math.min(480, state.avgResponse + rand(-12, 12))),
-    });
-    pushEvent(
-      found > 0
-        ? `Checked @${brand} · ${found} new asset${found > 1 ? "s" : ""}`
-        : `Checked @${brand} · No new assets`,
-      found > 0 ? "info" : "muted",
-    );
-    await wait(rand(700, 1200));
-  }
-
-  if (!running) return;
-  set({
-    isScanning: false,
-    queueSize: 0,
-    lastScanAt: Date.now(),
-  });
-  pushEvent(`Scan complete · ${foundThisScan} new asset${foundThisScan === 1 ? "" : "s"} delivered`, "success");
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
-async function loop() {
-  while (running) {
-    await runScanCycle();
-    if (!running) break;
-    await wait(12000); // idle between scans
-  }
-}
-
-let nowInterval: ReturnType<typeof setInterval> | null = null;
-let refCount = 0;
-
-function start() {
-  refCount++;
-  if (refCount > 1) return;
-  running = true;
-  loop();
-  nowInterval = setInterval(() => {
-    state = { ...state, nowTick: state.nowTick + 1 };
-    listeners.forEach((l) => l());
-  }, 5000);
-}
-
-function stop() {
-  refCount = Math.max(0, refCount - 1);
-  if (refCount > 0) return;
-  running = false;
-  timeouts.forEach(clearTimeout);
-  timeouts = [];
-  if (nowInterval) clearInterval(nowInterval);
-  nowInterval = null;
-}
-
-const getSnapshot = () => state;
-// Always return the deterministic initial state during SSR so hydration
-// never mismatches when the module singleton is reused across requests.
-const getServerSnapshot = () => INITIAL_STATE;
-
-export function useScanSim() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-}
-
-/** Mount once at the app shell to keep the simulator running. */
-export function useScanSimulator() {
+/** Live view of real scanner state. Refetches every 10s and re-renders
+ *  every 5s so relative-time strings stay fresh. */
+export function useScanSim(): State {
+  const [nowTick, setNowTick] = useState(0);
   useEffect(() => {
-    start();
-    return () => stop();
+    const t = setInterval(() => setNowTick((n) => n + 1), 5000);
+    return () => clearInterval(t);
   }, []);
+
+  const { data } = useQuery({
+    queryKey: ["scanner_realtime_state"],
+    queryFn: async () => {
+      const todayIso = startOfTodayIso();
+      const [{ data: runs }, { count: assetsToday }, { data: lastOk }] = await Promise.all([
+        supabase
+          .from("scanner_runs")
+          .select("id,status")
+          .in("status", ["queued", "running"]),
+        supabase
+          .from("assets")
+          .select("id", { count: "exact", head: true })
+          .gte("detected_at", todayIso),
+        supabase
+          .from("scanner_runs")
+          .select("completed_at")
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const isScanning = (runs ?? []).some((r) => r.status === "running");
+      const queueSize = (runs ?? []).length;
+      const lastScanAt = lastOk?.completed_at
+        ? new Date(lastOk.completed_at as string).getTime()
+        : null;
+
+      return {
+        isScanning,
+        queueSize,
+        newAssetsToday: assetsToday ?? 0,
+        lastScanAt,
+      };
+    },
+    refetchInterval: 10_000,
+  });
+
+  return {
+    events: [],
+    isScanning: data?.isScanning ?? false,
+    newAssetsToday: data?.newAssetsToday ?? 0,
+    queueSize: data?.queueSize ?? 0,
+    // Not tracked in the DB yet. Neutral defaults beat fabricated numbers.
+    requests: 0,
+    successRate: 100,
+    avgResponse: 0,
+    lastScanAt: data?.lastScanAt ?? null,
+    nowTick,
+  };
 }
 
-export function formatLastScan(state: State): string {
+/** Kept for backwards compatibility. The old simulator started a timer
+ *  loop that pushed fake events; there's nothing to start now. */
+export function useScanSimulator() {
+  /* no-op */
+}
+
+export function formatLastScan(state: Pick<State, "lastScanAt">): string {
   if (state.lastScanAt == null) return "monitoring";
   const diff = Math.max(0, Date.now() - state.lastScanAt);
   const s = Math.floor(diff / 1000);
