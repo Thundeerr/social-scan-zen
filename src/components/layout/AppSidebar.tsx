@@ -6,10 +6,10 @@ import {
   Download,
   Radar,
   Settings,
-  ScanLine,
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/layout/BrandMark";
 
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, hint: "G D" },
@@ -26,15 +26,15 @@ export function AppSidebar() {
 
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center gap-2.5 px-5 h-14 border-b border-sidebar-border">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/30">
-          <ScanLine className="h-4 w-4 text-primary" />
-        </div>
-        <div className="flex flex-col leading-tight">
+      <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
+        <BrandMark />
+        <div className="flex min-w-0 flex-col leading-tight">
           <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
             InstaScanner
           </span>
-          <span className="text-[10px] text-muted-foreground">Autonomous Monitoring</span>
+          <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            Autonomous Monitoring
+          </span>
         </div>
       </div>
 
