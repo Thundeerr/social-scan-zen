@@ -282,20 +282,21 @@ export async function executeScan(
       metadata: { account_id: accountId, run_id: runId, inserted, duplicates },
     });
 
-    // Smart notification — fire-and-forget. Filters to genuine signals only:
-    // S/A-tier source, AI verdict KEEP, confidence ≥80%, currently in the
-    // operator's Priority review queue. If nothing passes, we stay silent —
-    // silence is the default, the operator sees a filled queue in-app.
+    // Rich per-asset Telegram notifications — fire-and-forget. Fires for
+    // every newly-inserted asset from an S/A-tier tracked account whose
+    // owner has Telegram enabled. Each message carries the media preview,
+    // metadata block, and inline action buttons handled by the public
+    // /api/public/telegram/webhook route. Silent for B/C tier so the DM
+    // channel stays high-signal.
     if (inserted > 0) {
       try {
         const { data: acct } = await db
           .from("tracked_accounts")
-          .select("created_by, tier")
+          .select("created_by, tier, username, display_name")
           .eq("id", accountId)
           .maybeSingle();
         const ownerId = acct?.created_by;
         const tier = acct?.tier;
-        // Only S/A-tier sources are eligible for push at all.
         if (ownerId && (tier === "S" || tier === "A")) {
           const { data: prefs } = await db
             .from("profiles")
@@ -303,55 +304,44 @@ export async function executeScan(
             .eq("id", ownerId)
             .maybeSingle();
           if (prefs?.telegram_enabled && prefs.telegram_chat_id) {
-            // Pull the freshly-inserted assets that also pass AI + Priority filters.
-            const { data: signalRows } = await db
+            const { data: freshRows } = await db
               .from("assets")
               .select(
-                "id, ai_verdict, ai_confidence, ai_reasons, caption, asset_status!inner(state)",
+                "id, caption, media_type, media_url, thumbnail_url, source_url, posted_at, detected_at, ai_verdict, ai_confidence, ai_reasons",
               )
               .eq("account_id", accountId)
-              .eq("ai_verdict", "KEEP")
-              .gte("ai_confidence", 0.8)
-              .eq("asset_status.state", "priority")
               .gte("detected_at", new Date(Date.now() - 10 * 60_000).toISOString())
-              .order("ai_confidence", { ascending: false })
-              .limit(50);
-
-            const rowsArr = signalRows ?? [];
-            if (rowsArr.length > 0) {
-              const { data: acctFull } = await db
-                .from("tracked_accounts")
-                .select("username")
-                .eq("id", accountId)
-                .maybeSingle();
-              const handle = acctFull?.username ?? username;
-              const gistFor = (r: (typeof rowsArr)[number]): string => {
-                const reasons = Array.isArray(r.ai_reasons)
-                  ? (r.ai_reasons as unknown[]).filter((x): x is string => typeof x === "string")
-                  : [];
-                const raw = reasons[0] ?? r.caption ?? "";
-                const trimmed = raw.replace(/\s+/g, " ").trim();
-                return trimmed.length > 42 ? trimmed.slice(0, 40) + "…" : trimmed;
-              };
-              const signals = rowsArr.slice(0, 3).map((r) => ({
-                tier: tier as "S" | "A",
+              .order("detected_at", { ascending: false })
+              .limit(5); // cap per scan to avoid spam
+            const handle = acct?.username ?? username;
+            const displayName = acct?.display_name ?? null;
+            const origin =
+              process.env.LOVABLE_PUBLISHED_URL ??
+              "https://social-scan-zen.lovable.app";
+            const { sendDetectionCard } = await import("@/lib/telegram.server");
+            for (const r of freshRows ?? []) {
+              const reasons = Array.isArray(r.ai_reasons)
+                ? (r.ai_reasons as unknown[]).filter(
+                    (x): x is string => typeof x === "string",
+                  )
+                : [];
+              const result = await sendDetectionCard(prefs.telegram_chat_id, {
+                assetId: r.id,
                 handle,
-                confidencePct: Math.round((r.ai_confidence ?? 0) * 100),
-                gist: gistFor(r),
-              }));
-              const origin =
-                process.env.LOVABLE_PUBLISHED_URL ??
-                "https://social-scan-zen.lovable.app";
-              const inboxUrl = `${origin}/assets`;
-              const scanLabel = new Date().toISOString().slice(11, 16) + " UTC";
-              const { sendPrioritySignalDigest } = await import("@/lib/telegram.server");
-              const result = await sendPrioritySignalDigest(prefs.telegram_chat_id, {
-                signals,
-                totalCount: rowsArr.length,
-                inboxUrl,
-                scanLabel,
+                displayName,
+                caption: r.caption,
+                postedAt: r.posted_at,
+                detectedAt: r.detected_at,
+                mediaType: r.media_type,
+                mediaUrl: r.media_url,
+                thumbnailUrl: r.thumbnail_url,
+                sourceUrl: r.source_url,
+                aiVerdict: r.ai_verdict,
+                aiConfidence: r.ai_confidence,
+                aiReasons: reasons,
+                adminUrl: `${origin}/assets?focus=${r.id}`,
               });
-              if (!result.ok) console.warn("[telegram] send failed", result.error);
+              if (!result.ok) console.warn("[telegram] detection send failed", result.error);
             }
           }
         }
@@ -359,6 +349,7 @@ export async function executeScan(
         console.warn("[telegram] notify hook error", notifyErr);
       }
     }
+
 
     return {
       runId,
