@@ -462,12 +462,44 @@ function AccountsPage() {
             </button>
           ))}
         </div>
-        <div className="ml-auto text-xs text-muted-foreground tabular-nums">
-          {filtered.length} results
+        <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+          {selected.size > 0 && (
+            <>
+              <span>{selected.size} selected</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setSelected(new Set())}
+                disabled={!!queue}
+              >
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 gap-1.5"
+                onClick={() => void runQueue(Array.from(selected))}
+                disabled={!!queue}
+              >
+                <Radar className="h-3.5 w-3.5" />
+                Scan Selected ({selected.size})
+              </Button>
+            </>
+          )}
+          <span>{filtered.length} results</span>
         </div>
       </div>
 
+      {queue && (
+        <ScanQueuePanel
+          queue={queue}
+          onCancel={cancelQueue}
+          onClose={closeQueue}
+        />
+      )}
+
       <div className="soft-shadow rounded-xl border border-border bg-card overflow-hidden">
+
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
