@@ -185,14 +185,14 @@ function DashboardPage() {
         <StatusTile
           label="API Health"
           value={`${sim.successRate.toFixed(1)}%`}
-          hint={`${sim.avgResponse} ms avg · ${kpis.apiProvider}`}
+          hint={`${sim.avgResponse} ms avg · ${API_PROVIDER}`}
           icon={Plug}
           tone={sim.successRate >= 99 ? "success" : "warn"}
         />
         <StatusTile
           label="Download Status"
           value={downloaded}
-          hint={`${recentAssets.length} total this session`}
+          hint={`${allAssets.length} total this session`}
           icon={Download}
         />
         <StatusTile
