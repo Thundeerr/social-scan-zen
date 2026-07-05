@@ -185,34 +185,174 @@ export function refreshAssets() {
   return loadAll();
 }
 
-async function setState(id: string, state: ReviewState) {
-  // Optimistic
+// -----------------------------------------------------------------------------
+// Undo stack — every review-state transition is reversible.
+//
+// The AI recommends, the operator decides — and decisions must never be
+// terminal. Each call to `setState` first reads the prior review state (or
+// records `null` if the asset was untouched), and pushes an entry onto a
+// bounded LIFO stack. `undoLast()` / `undoAsset()` reapply the prior state
+// (or delete the row entirely if there was none) and emit an activity log
+// entry so the audit trail is symmetric.
+// -----------------------------------------------------------------------------
+
+export type UndoEntry = {
+  assetId: string;
+  username: string;
+  previousState: ReviewState | null;
+  nextState: ReviewState;
+  label: string; // human-readable action name for toast copy
+  at: number;
+};
+
+const UNDO_LIMIT = 50;
+const undoStack: UndoEntry[] = [];
+const undoListeners = new Set<() => void>();
+
+function emitUndo() {
+  undoListeners.forEach((l) => l());
+}
+
+export function subscribeUndo(l: () => void) {
+  undoListeners.add(l);
+  return () => {
+    undoListeners.delete(l);
+  };
+}
+
+export function getUndoDepth() {
+  return undoStack.length;
+}
+
+export function peekUndo(): UndoEntry | null {
+  return undoStack[undoStack.length - 1] ?? null;
+}
+
+async function readCurrentState(id: string): Promise<ReviewState | null> {
+  const { data } = await supabase
+    .from("asset_status")
+    .select("state")
+    .eq("asset_id", id)
+    .maybeSingle();
+  return (data?.state as ReviewState | undefined) ?? null;
+}
+
+async function writeState(id: string, state: ReviewState) {
+  const { data: userRes } = await supabase.auth.getUser();
+  const reviewer_id = userRes.user?.id ?? null;
+  return supabase.from("asset_status").upsert(
+    {
+      asset_id: id,
+      state,
+      reviewer_id,
+      reviewed_at: new Date().toISOString(),
+    },
+    { onConflict: "asset_id" },
+  );
+}
+
+async function clearState(id: string) {
+  return supabase.from("asset_status").delete().eq("asset_id", id);
+}
+
+/**
+ * Apply a new review state, capture the prior state, and push an undo entry.
+ *
+ * `label` is the copy used in the toast ("Kept", "Dismissed", "Archived", …)
+ * so the same helper serves every review-state surface consistently.
+ */
+async function setState(id: string, state: ReviewState, label = "Updated") {
+  const previousState = await readCurrentState(id);
+
+  // Optimistic UI update
   const idx = assets.findIndex((a) => a.id === id);
   if (idx !== -1) {
     assets[idx] = { ...assets[idx], status: STATE_TO_STATUS[state] };
     emit();
   }
-  const { data: userRes } = await supabase.auth.getUser();
-  const reviewer_id = userRes.user?.id ?? null;
-  const { error } = await supabase
-    .from("asset_status")
-    .upsert(
-      {
-        asset_id: id,
-        state,
-        reviewer_id,
-        reviewed_at: new Date().toISOString(),
-      },
-      { onConflict: "asset_id" },
-    );
+  const username = assets[idx]?.username ?? "unknown";
+
+  const { error } = await writeState(id, state);
   if (error) {
     console.error("[assets-store] setState failed", error);
-    void refreshOne(id); // revert
+    void refreshOne(id);
+    return;
+  }
+
+  // Only record the entry after the write succeeded and only when it changed
+  // something — a no-op state change should not clutter the undo stack.
+  if (previousState !== state) {
+    undoStack.push({
+      assetId: id,
+      username,
+      previousState,
+      nextState: state,
+      label,
+      at: Date.now(),
+    });
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    emitUndo();
   }
 }
 
 export function setAssetStatus(id: string, status: Status) {
-  void setState(id, STATUS_TO_STATE[status]);
+  void setState(id, STATUS_TO_STATE[status], "Updated");
+}
+
+/**
+ * Revert a specific undo entry. Called by `undoLast` and by
+ * `undoAsset(id)`; both funnel through here so activity-log copy and
+ * emit semantics stay identical.
+ */
+async function applyUndo(entry: UndoEntry) {
+  const { assetId, previousState, username, label } = entry;
+
+  // Optimistic mirror
+  const idx = assets.findIndex((a) => a.id === assetId);
+  if (idx !== -1) {
+    assets[idx] = {
+      ...assets[idx],
+      status: previousState ? STATE_TO_STATUS[previousState] : "new",
+    };
+    emit();
+  }
+
+  const { error } = previousState
+    ? await writeState(assetId, previousState)
+    : await clearState(assetId);
+
+  if (error) {
+    console.error("[assets-store] undo failed", error);
+    void refreshOne(assetId);
+    return false;
+  }
+
+  void logActivity("asset_undo", `Reverted "${label}" on @${username}`, {
+    asset_id: assetId,
+    from: entry.nextState,
+    to: previousState,
+  });
+  return true;
+}
+
+/** Pop and revert the most recent review-state change. */
+export async function undoLast(): Promise<UndoEntry | null> {
+  const entry = undoStack.pop() ?? null;
+  if (!entry) return null;
+  emitUndo();
+  const ok = await applyUndo(entry);
+  return ok ? entry : null;
+}
+
+/** Revert the most recent change for a specific asset, if any. */
+export async function undoAsset(id: string): Promise<UndoEntry | null> {
+  const i = [...undoStack].reverse().findIndex((e) => e.assetId === id);
+  if (i === -1) return null;
+  const realIdx = undoStack.length - 1 - i;
+  const [entry] = undoStack.splice(realIdx, 1);
+  emitUndo();
+  const ok = await applyUndo(entry);
+  return ok ? entry : null;
 }
 
 import { downloadAsset as runDownload } from "./downloads-store";
@@ -226,26 +366,38 @@ async function triggerDownload(a: Asset) {
     thumbnail_url: a.thumbnail ?? null,
     is_video: !!a.video,
   });
-  void r; // reserved for future rowToAsset extension
+  void r;
 }
 
 export const assetActions = {
   approve: (id: string) => {
     const a = assets.find((x) => x.id === id);
-    void setState(id, "approved");
+    void setState(id, "approved", "Kept");
     if (a) void logActivity("asset_kept", `Kept asset from @${a.username}`, { asset_id: id });
   },
   ignore: (id: string) => {
     const a = assets.find((x) => x.id === id);
-    void setState(id, "dismissed");
+    void setState(id, "dismissed", "Dismissed");
     if (a) void logActivity("asset_dismissed", `Dismissed asset from @${a.username}`, { asset_id: id });
+  },
+  archive: (id: string) => {
+    const a = assets.find((x) => x.id === id);
+    void setState(id, "archived", "Archived");
+    if (a) void logActivity("asset_archived", `Archived asset from @${a.username}`, { asset_id: id });
+  },
+  prioritize: (id: string) => {
+    const a = assets.find((x) => x.id === id);
+    void setState(id, "priority", "Prioritized");
+    if (a) void logActivity("asset_prioritized", `Prioritized asset from @${a.username}`, { asset_id: id });
   },
   download: (id: string) => {
     const a = assets.find((x) => x.id === id);
     if (a) void triggerDownload(a);
-    void setState(id, "reviewed");
+    void setState(id, "reviewed", "Downloaded");
   },
-  reset: (id: string) => void setState(id, "worth_reviewing"),
+  reset: (id: string) => void setState(id, "worth_reviewing", "Reset"),
+  undoLast,
+  undoAsset,
 };
 
 // Awake auth changes: reload when user signs in/out.
