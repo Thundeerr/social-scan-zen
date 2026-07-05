@@ -191,29 +191,69 @@ function AssetInbox() {
   const [session, setSession] = useState({ approved: 0, dismissed: 0 });
   const [complete, setComplete] = useState(false);
 
+  const undoLast = async () => {
+    const entry = await assetActions.undoLast();
+    if (!entry) {
+      toast("Nothing to undo");
+      return;
+    }
+    // Roll back session counters that reflect this action.
+    if (entry.nextState === "approved") {
+      setSession((s) => ({ ...s, approved: Math.max(0, s.approved - 1) }));
+    } else if (entry.nextState === "dismissed" || entry.nextState === "archived") {
+      setSession((s) => ({ ...s, dismissed: Math.max(0, s.dismissed - 1) }));
+    }
+    toast.success(`Reverted "${entry.label}" on @${entry.username}`);
+  };
+
+  const withUndo = (msg: string, kind: "success" | "info" = "success") => {
+    const opts = {
+      action: { label: "Undo", onClick: () => void undoLast() },
+    } as const;
+    if (kind === "success") toast.success(msg, opts);
+    else toast(msg, opts);
+  };
+
   const keep = (a: Asset | null) => {
     if (!a) return;
     assetActions.approve(a.id);
     setSession((s) => ({ ...s, approved: s.approved + 1 }));
-    toast.success("Kept");
+    withUndo("Kept");
     advance(1);
   };
   const dismiss = (a: Asset | null) => {
     if (!a) return;
     assetActions.ignore(a.id);
     setSession((s) => ({ ...s, dismissed: s.dismissed + 1 }));
-    toast("Dismissed");
+    withUndo("Dismissed", "info");
     advance(1);
   };
   const download = (a: Asset | null) => {
     if (!a) return;
     assetActions.download(a.id);
-    toast.success("Download queued");
+    withUndo("Download queued");
   };
   const openSource = (a: Asset | null) => {
     if (!a) return;
     window.open(`https://instagram.com/${a.username}`, "_blank", "noopener,noreferrer");
   };
+
+  // Global keyboard shortcut — ⌘Z / Ctrl+Z reverts the most recent review
+  // state change from anywhere on the page. Ignored while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      if (e.key.toLowerCase() !== "z") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      void undoLast();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // Awaiting count across the entire inbox (independent of filter) — the
   // mission is truly complete only when nothing is left to review anywhere.
