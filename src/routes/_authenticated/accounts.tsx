@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Plus, MoreHorizontal, Search, Loader2, Radar, X } from "lucide-react";
 import { toast } from "sonner";
 import { scanAccountNowFn } from "@/lib/scanner.functions";
+import { getTrackedAccountAvatarsFn } from "@/lib/avatar.functions";
 import { trackedAccountsKey } from "@/lib/db-queries";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -113,9 +114,21 @@ function AccountsPage() {
   const setAssignment = useSetWatchlistAssignment();
 
   const scanNow = useServerFn(scanAccountNowFn);
+  const getTrackedAccountAvatars = useServerFn(getTrackedAccountAvatarsFn);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [scanning, setScanning] = useState<Record<string, boolean>>({});
+  const avatarUsernames = useMemo(
+    () => Array.from(new Set(dbRows.map((a) => a.username))).sort(),
+    [dbRows],
+  );
+  const { data: accountAvatars = {} } = useQuery({
+    queryKey: ["tracked_account_avatars", avatarUsernames],
+    enabled: avatarUsernames.length > 0,
+    staleTime: 6 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    queryFn: () => getTrackedAccountAvatars({ data: { usernames: avatarUsernames } }),
+  });
 
   async function handleScanNow(a: TrackedAccount) {
     if (scanning[a.id]) return;
@@ -557,14 +570,9 @@ function AccountsPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <img
-                        src={
-                          a.avatar_url
-                            ? `/api/public/avatar?u=${encodeURIComponent(a.username)}`
-                            : getAvatar(a.username)
-                        }
+                        src={accountAvatars[a.username] ?? getAvatar(a.username)}
                         alt=""
                         loading="lazy"
-                        referrerPolicy="no-referrer"
                         onError={(e) => {
                           const img = e.currentTarget;
                           const fb = getAvatar(a.username);
