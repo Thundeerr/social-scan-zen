@@ -1,11 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
-import { Send, Loader2, Radar } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -21,18 +18,11 @@ import {
   scanIntervalSchema,
   useScanInterval,
 } from "@/lib/scan-interval";
-import {
-  detectTelegramChatIdFn,
-  getTelegramPrefsFn,
-  saveTelegramPrefsFn,
-  sendTelegramTestFn,
-} from "@/lib/telegram.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
   component: SettingsPage,
 });
-
 
 function SettingRow({
   title,
@@ -57,80 +47,8 @@ function SettingRow({
 function SettingsPage() {
   const [provider, setProvider] = useState("instagram-looter");
   const [interval, setIntervalValue] = useScanInterval();
-  const [telegramNotif, setTelegramNotif] = useState(false);
-  const [telegramChatId, setTelegramChatId] = useState("");
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
-
-  const qc = useQueryClient();
-  const getPrefs = useServerFn(getTelegramPrefsFn);
-  const savePrefs = useServerFn(saveTelegramPrefsFn);
-  const sendTest = useServerFn(sendTelegramTestFn);
-  const detectId = useServerFn(detectTelegramChatIdFn);
-
-  // Hydrate Telegram preferences from the operator's profile row.
-  const prefsQuery = useQuery({
-    queryKey: ["telegram-prefs"],
-    queryFn: () => getPrefs(),
-    staleTime: 30_000,
-  });
-  useEffect(() => {
-    if (!prefsQuery.data) return;
-    setTelegramChatId(prefsQuery.data.chatId);
-    setTelegramNotif(prefsQuery.data.enabled);
-  }, [prefsQuery.data]);
-
-  const saveMutation = useMutation({
-    mutationFn: (input: { chatId: string; enabled: boolean }) =>
-      savePrefs({ data: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["telegram-prefs"] }),
-  });
-
-  const testMutation = useMutation({
-    mutationFn: (chatId: string) => sendTest({ data: { chatId } }),
-    onSuccess: () => toast.success("Test signal delivered to Telegram"),
-    onError: (err: unknown) =>
-      toast.error(err instanceof Error ? err.message : "Failed to send test"),
-  });
-
-  const detectMutation = useMutation({
-    mutationFn: () => detectId(),
-    onSuccess: (res: { chatId: string | null }) => {
-      if (res.chatId) {
-        setTelegramChatId(res.chatId);
-        toast.success(`Detected chat ID ${res.chatId}`);
-      } else {
-        toast.error("No recent messages — send /start to the bot first");
-      }
-    },
-    onError: (err: unknown) =>
-      toast.error(err instanceof Error ? err.message : "Failed to detect"),
-  });
-
-  const commitPrefs = (chatId: string, enabled: boolean) => {
-    saveMutation.mutate(
-      { chatId, enabled },
-      {
-        onError: (err: unknown) =>
-          toast.error(err instanceof Error ? err.message : "Save failed"),
-      },
-    );
-  };
-
-  const handleTelegramToggle = (next: boolean) => {
-    if (next && !telegramChatId.trim()) {
-      toast.error("Enter a Telegram chat ID first");
-      return;
-    }
-    setTelegramNotif(next);
-    commitPrefs(telegramChatId, next);
-  };
-
-  const handleTelegramBlur = () => {
-    // Auto-save the chat ID whenever the operator moves focus away.
-    if (prefsQuery.data?.chatId === telegramChatId) return;
-    commitPrefs(telegramChatId, telegramNotif && !!telegramChatId.trim());
-  };
 
   const handleIntervalChange = (next: string) => {
     const parsed = scanIntervalSchema.safeParse(next);
@@ -141,7 +59,6 @@ function SettingsPage() {
     setIntervalValue(parsed.data);
   };
 
-
   return (
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
@@ -151,7 +68,6 @@ function SettingsPage() {
         title="Settings"
         description="Configure scanner behavior, notifications, and appearance."
       />
-
 
       <div className="max-w-3xl space-y-6">
         <section className="soft-shadow rounded-xl border border-border bg-card p-6">
@@ -206,11 +122,32 @@ function SettingsPage() {
               description="Manage Telegram delivery from the dedicated Telegram section."
             >
               <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
-                <a href="/telegram">
+                <Link to="/telegram">
                   <Send className="h-3.5 w-3.5" />
                   Open Telegram
-                </a>
+                </Link>
               </Button>
+            </SettingRow>
+            <SettingRow title="Desktop notifications" description="Show a native notification when scans complete.">
+              <Switch checked={desktopNotif} onCheckedChange={setDesktopNotif} />
+            </SettingRow>
+            <SettingRow title="New assets only" description="Suppress notifications for empty scans.">
+              <Switch checked={newOnly} onCheckedChange={setNewOnly} />
+            </SettingRow>
+          </div>
+        </section>
+
+        <section className="soft-shadow rounded-xl border border-border bg-card p-6">
+          <h2 className="text-sm font-semibold mb-1">Appearance</h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            InstaScanner is designed for extended late-night review sessions.
+          </p>
+          <div className="divide-y divide-border">
+            <SettingRow title="Dark Mode" description="Dark mode is enforced by design.">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Locked on</Label>
+                <Switch checked disabled />
+              </div>
             </SettingRow>
           </div>
         </section>
