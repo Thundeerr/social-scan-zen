@@ -503,6 +503,24 @@ function AccountsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="Select all"
+                  disabled={!!queue || filtered.length === 0}
+                  checked={
+                    filtered.length > 0 &&
+                    filtered.every((a) => selected.has(a.id))
+                  }
+                  onCheckedChange={(v) => {
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (v) filtered.forEach((a) => next.add(a.id));
+                      else filtered.forEach((a) => next.delete(a.id));
+                      return next;
+                    });
+                  }}
+                />
+              </TableHead>
               <TableHead className="w-[28%]">Account</TableHead>
               <TableHead>Priority</TableHead>
               <TableHead>Watchlist</TableHead>
@@ -519,7 +537,15 @@ function AccountsPage() {
                 ? watchlistNameById[assignmentMap[a.id]]
                 : null;
               return (
-                <TableRow key={a.id}>
+                <TableRow key={a.id} data-selected={selected.has(a.id) ? "true" : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      aria-label={`Select ${a.username}`}
+                      disabled={!!queue}
+                      checked={selected.has(a.id)}
+                      onCheckedChange={() => toggleSelected(a.id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <img
