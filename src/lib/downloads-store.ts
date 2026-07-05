@@ -245,29 +245,38 @@ async function recordDownload(
 }
 
 export async function downloadAsset(target: DownloadTarget): Promise<boolean> {
-  const result = await downloadOne(target);
-  await recordDownload(target, result);
+  const result = await downloadOne(target, null);
+  if (result.ok) await recordDownload(target, result);
   return result.ok;
+}
+
+/** Retry a single asset. Used by the progress panel. */
+export async function retryDownload(target: DownloadTarget): Promise<boolean> {
+  return downloadAsset(target);
 }
 
 export async function batchDownloadAssets(
   targets: DownloadTarget[],
   onProgress?: (done: number, total: number) => void,
-): Promise<{ ok: number; failed: number }> {
+): Promise<{ ok: number; failed: number; batchId: string }> {
+  const batchId = startBatch(targets.length);
   let ok = 0;
   let failed = 0;
   for (let i = 0; i < targets.length; i++) {
-    const result = await downloadOne(targets[i]);
-    await recordDownload(targets[i], result);
-    if (result.ok) ok++;
-    else failed++;
+    const result = await downloadOne(targets[i], batchId);
+    if (result.ok) {
+      await recordDownload(targets[i], result);
+      ok++;
+    } else {
+      failed++;
+    }
     onProgress?.(i + 1, targets.length);
     // Small pause so the browser doesn't drop rapid downloads.
     if (i < targets.length - 1) {
       await new Promise((r) => setTimeout(r, 400));
     }
   }
-  return { ok, failed };
+  return { ok, failed, batchId };
 }
 
 supabase.auth.onAuthStateChange((event) => {
