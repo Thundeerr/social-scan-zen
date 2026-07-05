@@ -161,7 +161,7 @@ export function AnimatedCircuitBackground() {
 
   return (
     <div
-      className={`net-bg${isLow ? " net-bg--low" : ""}${isScanning ? " net-bg--active" : ""}`}
+      className={`net-bg${isLow ? " net-bg--low" : ""}${isScanning ? " net-bg--active" : ""}${isCalm ? " net-bg--calm" : ""}`}
       aria-hidden="true"
     >
       {/* Layer 1: darkening base — sinks the app background toward black */}
