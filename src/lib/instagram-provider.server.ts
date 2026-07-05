@@ -148,21 +148,70 @@ export type InstagramProviderConfig = {
   host: string;
   path?: string;
   usernameParam?: string;
+  /**
+   * When set (e.g. `/profile` for instagram-looter2), the provider first
+   * resolves username → numeric IG user id via this endpoint, then calls the
+   * main media endpoint with `usernameParam` = that id. Required by hosts
+   * whose media endpoint accepts only numeric ids (`/user-feeds?id=…`).
+   */
+  profilePath?: string;
+  /** Extra query params appended to the media request (e.g. `count=30`). */
+  extraParams?: Record<string, string>;
 };
+
+/** Walk a nested object and return the first non-empty numeric IG id found. */
+function extractUserId(payload: unknown): string | null {
+  const seen = new Set<unknown>();
+  const stack: unknown[] = [payload];
+  const idKeys = new Set(["id", "pk", "user_id", "fbid_v2"]);
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object" || seen.has(node)) continue;
+    seen.add(node);
+    const rec = node as Record<string, unknown>;
+    for (const key of idKeys) {
+      const raw = rec[key];
+      if (typeof raw === "string" && /^\d+$/.test(raw)) return raw;
+      if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+    }
+    for (const value of Object.values(rec)) {
+      if (value && typeof value === "object") stack.push(value);
+    }
+  }
+  return null;
+}
 
 export function createInstagramProvider(cfg: InstagramProviderConfig) {
   const path = cfg.path ?? DEFAULT_PATH;
   const usernameParam = cfg.usernameParam ?? "username";
+  const headers = {
+    "X-RapidAPI-Key": cfg.apiKey,
+    "X-RapidAPI-Host": cfg.host,
+  };
+
+  async function resolveUserId(username: string): Promise<string> {
+    if (!cfg.profilePath) return username; // host accepts username directly
+    const url = new URL(`https://${cfg.host}${cfg.profilePath}`);
+    url.searchParams.set("username", username);
+    const res = await fetch(url.toString(), { headers });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Instagram profile lookup ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as unknown;
+    const id = extractUserId(json);
+    if (!id) throw new Error(`Could not resolve user id for @${username}`);
+    return id;
+  }
 
   async function fetchAccount(username: string): Promise<ProviderResponse> {
+    const lookupValue = await resolveUserId(username);
     const url = new URL(`https://${cfg.host}${path}`);
-    url.searchParams.set(usernameParam, username);
-    const res = await fetch(url.toString(), {
-      headers: {
-        "X-RapidAPI-Key": cfg.apiKey,
-        "X-RapidAPI-Host": cfg.host,
-      },
-    });
+    url.searchParams.set(usernameParam, lookupValue);
+    for (const [k, v] of Object.entries(cfg.extraParams ?? {})) {
+      url.searchParams.set(k, v);
+    }
+    const res = await fetch(url.toString(), { headers });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new Error(`Instagram provider ${res.status}: ${body.slice(0, 200)}`);
@@ -180,11 +229,20 @@ export function getInstagramProviderFromEnv() {
   if (!apiKey || !host) {
     throw new Error("Instagram provider not configured (missing RAPIDAPI_KEY/RAPIDAPI_HOST)");
   }
+  // Optional: `RAPIDAPI_EXTRA_PARAMS` is a URL-encoded query string like
+  // `count=30&max_id=` — appended verbatim to the media request.
+  const extraParams: Record<string, string> = {};
+  const raw = process.env.RAPIDAPI_EXTRA_PARAMS;
+  if (raw) {
+    for (const [k, v] of new URLSearchParams(raw).entries()) extraParams[k] = v;
+  }
   return createInstagramProvider({
     apiKey,
     host,
     path: process.env.RAPIDAPI_PATH,
     usernameParam: process.env.RAPIDAPI_USERNAME_PARAM,
+    profilePath: process.env.RAPIDAPI_PROFILE_PATH,
+    extraParams,
   });
 }
 
@@ -193,5 +251,9 @@ export function describeProviderRequest(username: string): string {
   const host = process.env.RAPIDAPI_HOST ?? "provider";
   const path = process.env.RAPIDAPI_PATH ?? DEFAULT_PATH;
   const param = process.env.RAPIDAPI_USERNAME_PARAM ?? "username";
+  const profilePath = process.env.RAPIDAPI_PROFILE_PATH;
+  if (profilePath) {
+    return `GET https://${host}${profilePath}?username=${username} → GET https://${host}${path}?${param}=<id>`;
+  }
   return `GET https://${host}${path}?${param}=${username}`;
 }
