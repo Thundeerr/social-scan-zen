@@ -1,5 +1,44 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useScanSim } from "@/lib/scan-simulator";
+
+/**
+ * Pauses SMIL animations on the SVG while the tab is hidden or the window
+ * loses focus. Resumes when the user returns. Keeps CPU near-zero when the
+ * user isn't looking at the app.
+ */
+function useAnimationsWhileVisible(ref: React.RefObject<SVGSVGElement | null>) {
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const getSvg = () => ref.current as (SVGSVGElement & {
+      pauseAnimations?: () => void;
+      unpauseAnimations?: () => void;
+    }) | null;
+
+    const apply = () => {
+      const svg = getSvg();
+      if (!svg) return;
+      const hidden = document.visibilityState === "hidden";
+      if (hidden) svg.pauseAnimations?.();
+      else svg.unpauseAnimations?.();
+    };
+
+    const onBlur = () => getSvg()?.pauseAnimations?.();
+    const onFocus = () => {
+      if (document.visibilityState === "visible") getSvg()?.unpauseAnimations?.();
+    };
+
+    apply();
+    document.addEventListener("visibilitychange", apply);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", apply);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [ref]);
+}
+
 
 /**
  * Performance tier detection.
