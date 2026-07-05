@@ -1,6 +1,12 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "./activity-log";
+import {
+  startProgress,
+  updateProgress,
+  completeProgress,
+  startBatch,
+} from "./download-progress-store";
 
 export type DownloadRow = {
   id: string;
@@ -133,22 +139,57 @@ function extFromMime(mime: string, fallback: string): string {
   return t.split(";")[0];
 }
 
-async function downloadOne(target: DownloadTarget): Promise<{
+async function downloadOne(
+  target: DownloadTarget,
+  batchId: string | null = null,
+): Promise<{
   ok: boolean;
   blob?: Blob;
   filename: string;
   url: string | null;
+  error?: string;
 }> {
   const url = target.media_url ?? target.thumbnail_url ?? null;
   const fallbackExt = target.is_video ? "mp4" : "jpg";
   const filenameBase = `${target.username}-${target.id}`;
+
+  startProgress(target, batchId);
+
   if (!url) {
-    return { ok: false, filename: `${filenameBase}.${fallbackExt}`, url: null };
+    const filename = `${filenameBase}.${fallbackExt}`;
+    completeProgress(target.id, false, filename, "No media URL available");
+    return { ok: false, filename, url: null, error: "No media URL available" };
   }
   try {
     const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error(String(res.status));
-    const blob = await res.blob();
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    // Stream the response so we can report per-asset byte progress.
+    const total = Number(res.headers.get("content-length") ?? 0) || 0;
+    updateProgress(target.id, { phase: "fetching", total, received: 0 });
+
+    let blob: Blob;
+    if (res.body && "getReader" in res.body) {
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          received += value.length;
+          updateProgress(target.id, { received });
+        }
+      }
+      const type = res.headers.get("content-type") ?? "";
+      blob = new Blob(chunks as BlobPart[], type ? { type } : undefined);
+    } else {
+      blob = await res.blob();
+      updateProgress(target.id, { received: blob.size, total: blob.size });
+    }
+
+    updateProgress(target.id, { phase: "writing" });
     const ext = extFromMime(blob.type, fallbackExt);
     const filename = `${filenameBase}.${ext}`;
     const objectUrl = URL.createObjectURL(blob);
@@ -158,16 +199,16 @@ async function downloadOne(target: DownloadTarget): Promise<{
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(objectUrl);
+    // Give the browser a tick to hand the download off before revoking.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    completeProgress(target.id, true, filename, null);
     return { ok: true, blob, filename, url };
-  } catch {
-    // Fallback: open in new tab so the user can save manually.
-    window.open(url, "_blank", "noopener,noreferrer");
-    return {
-      ok: false,
-      filename: `${filenameBase}.${fallbackExt}`,
-      url,
-    };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Network or CORS error";
+    const filename = `${filenameBase}.${fallbackExt}`;
+    completeProgress(target.id, false, filename, message);
+    return { ok: false, filename, url, error: message };
   }
 }
 
@@ -204,29 +245,38 @@ async function recordDownload(
 }
 
 export async function downloadAsset(target: DownloadTarget): Promise<boolean> {
-  const result = await downloadOne(target);
-  await recordDownload(target, result);
+  const result = await downloadOne(target, null);
+  if (result.ok) await recordDownload(target, result);
   return result.ok;
+}
+
+/** Retry a single asset. Used by the progress panel. */
+export async function retryDownload(target: DownloadTarget): Promise<boolean> {
+  return downloadAsset(target);
 }
 
 export async function batchDownloadAssets(
   targets: DownloadTarget[],
   onProgress?: (done: number, total: number) => void,
-): Promise<{ ok: number; failed: number }> {
+): Promise<{ ok: number; failed: number; batchId: string }> {
+  const batchId = startBatch(targets.length);
   let ok = 0;
   let failed = 0;
   for (let i = 0; i < targets.length; i++) {
-    const result = await downloadOne(targets[i]);
-    await recordDownload(targets[i], result);
-    if (result.ok) ok++;
-    else failed++;
+    const result = await downloadOne(targets[i], batchId);
+    if (result.ok) {
+      await recordDownload(targets[i], result);
+      ok++;
+    } else {
+      failed++;
+    }
     onProgress?.(i + 1, targets.length);
     // Small pause so the browser doesn't drop rapid downloads.
     if (i < targets.length - 1) {
       await new Promise((r) => setTimeout(r, 400));
     }
   }
-  return { ok, failed };
+  return { ok, failed, batchId };
 }
 
 supabase.auth.onAuthStateChange((event) => {
