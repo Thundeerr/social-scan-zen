@@ -59,6 +59,13 @@ export async function executeScan(
     .update({ status: "running", started_at: new Date().toISOString() })
     .eq("id", runId);
 
+  await db.from("activity_log").insert({
+    event_type: "scan_started",
+    description: `Scanning @${username}${attempt > 1 ? ` (attempt ${attempt})` : ""}`,
+    metadata: { account_id: accountId, run_id: runId, attempt },
+  });
+
+
   try {
     const provider = getInstagramProviderFromEnv();
     const result = await provider.fetchAccount(username);
