@@ -430,7 +430,7 @@ function ScannerPage() {
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
         title="Scanner"
-        description="Live operations — the network scans every tracked account every 60–90 minutes."
+        description="Live operations — the network scans every tracked account every 8 hours, plus on-demand."
       />
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">

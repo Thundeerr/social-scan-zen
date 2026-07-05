@@ -6,7 +6,7 @@
  *  - `scanAccount` → run a single account (used by manual "Scan Now")
  *
  * Every scan is idempotent per-account (asset upsert on (account_id,
- * external_id)) and schedules the next run 60–90 minutes ahead with
+ * external_id)) and schedules the next run ~8 hours ahead with
  * exponential backoff on failure.
  */
 
@@ -20,8 +20,11 @@ import {
 
 type DB = SupabaseClient<Database>;
 
-const MIN_INTERVAL_MIN = 60;
-const MAX_INTERVAL_MIN = 90;
+// Autonomous cadence: every ~8 hours, with ±30min jitter so a large fleet
+// doesn't stampede the provider on the hour. On-demand scans bypass this
+// schedule entirely via `scanAccountNow`.
+const MIN_INTERVAL_MIN = 8 * 60 - 30; // 7h30m
+const MAX_INTERVAL_MIN = 8 * 60 + 30; // 8h30m
 const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MIN = 5; // 5, 10, 20, 40, 80 min
 
