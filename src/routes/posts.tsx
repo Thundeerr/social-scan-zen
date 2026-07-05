@@ -32,13 +32,14 @@ function matches(p: Post, day: Day, status: Status, q: string) {
 }
 
 function PostsPage() {
-  const { day, status, q } = Route.useSearch();
+  const { day, status } = Route.useSearch();
+  const q = useGlobalQuery();
   const navigate = useNavigate({ from: "/posts" });
   const posts = usePosts();
 
-  const setSearch = (patch: Partial<{ day: Day; status: Status; q: string }>) =>
+  const setSearch = (patch: Partial<{ day: Day; status: Status }>) =>
     navigate({
-      search: (prev: { day: Day; status: Status; q: string }) => ({ ...prev, ...patch }),
+      search: (prev: { day: Day; status: Status }) => ({ ...prev, ...patch }),
       replace: true,
     });
 
@@ -63,7 +64,11 @@ function PostsPage() {
     <div className="p-6 md:p-8">
       <PageHeader
         title="New Posts"
-        description="Review, approve, or ignore freshly detected posts."
+        description={
+          q
+            ? `Showing matches for “${q}”.`
+            : "Review, approve, or ignore freshly detected posts."
+        }
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -112,25 +117,19 @@ function PostsPage() {
           ))}
         </div>
 
-        <div className="relative ml-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setSearch({ q: e.target.value })}
-            placeholder="Search username or caption…"
-            className="pl-9 h-8 w-64"
-          />
-        </div>
-
         {(day !== "today" || status !== "all" || q) && (
           <button
-            onClick={() => setSearch({ day: "today", status: "all", q: "" })}
-            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={() => {
+              setSearch({ day: "today", status: "all" });
+              setGlobalQuery("");
+            }}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
           >
             Reset
           </button>
         )}
       </div>
+
 
 
       {filtered.length === 0 ? (
