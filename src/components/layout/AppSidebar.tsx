@@ -7,6 +7,7 @@ import {
   Radar,
   Settings,
   Activity,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/BrandMark";
@@ -18,6 +19,7 @@ const items = [
   { to: "/downloads", label: "Archive", icon: Download, hint: null as string | null },
   { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
   { to: "/activity", label: "Activity", icon: Activity, hint: null as string | null },
+  { to: "/telegram", label: "Telegram", icon: Send, hint: null as string | null },
   { to: "/settings", label: "Settings", icon: Settings, hint: null as string | null },
 ] as const;
 

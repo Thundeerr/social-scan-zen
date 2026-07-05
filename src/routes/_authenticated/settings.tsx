@@ -1,11 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
-import { Send, Loader2, Radar } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -21,18 +18,11 @@ import {
   scanIntervalSchema,
   useScanInterval,
 } from "@/lib/scan-interval";
-import {
-  detectTelegramChatIdFn,
-  getTelegramPrefsFn,
-  saveTelegramPrefsFn,
-  sendTelegramTestFn,
-} from "@/lib/telegram.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
   component: SettingsPage,
 });
-
 
 function SettingRow({
   title,
@@ -57,80 +47,8 @@ function SettingRow({
 function SettingsPage() {
   const [provider, setProvider] = useState("instagram-looter");
   const [interval, setIntervalValue] = useScanInterval();
-  const [telegramNotif, setTelegramNotif] = useState(false);
-  const [telegramChatId, setTelegramChatId] = useState("");
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
-
-  const qc = useQueryClient();
-  const getPrefs = useServerFn(getTelegramPrefsFn);
-  const savePrefs = useServerFn(saveTelegramPrefsFn);
-  const sendTest = useServerFn(sendTelegramTestFn);
-  const detectId = useServerFn(detectTelegramChatIdFn);
-
-  // Hydrate Telegram preferences from the operator's profile row.
-  const prefsQuery = useQuery({
-    queryKey: ["telegram-prefs"],
-    queryFn: () => getPrefs(),
-    staleTime: 30_000,
-  });
-  useEffect(() => {
-    if (!prefsQuery.data) return;
-    setTelegramChatId(prefsQuery.data.chatId);
-    setTelegramNotif(prefsQuery.data.enabled);
-  }, [prefsQuery.data]);
-
-  const saveMutation = useMutation({
-    mutationFn: (input: { chatId: string; enabled: boolean }) =>
-      savePrefs({ data: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["telegram-prefs"] }),
-  });
-
-  const testMutation = useMutation({
-    mutationFn: (chatId: string) => sendTest({ data: { chatId } }),
-    onSuccess: () => toast.success("Test signal delivered to Telegram"),
-    onError: (err: unknown) =>
-      toast.error(err instanceof Error ? err.message : "Failed to send test"),
-  });
-
-  const detectMutation = useMutation({
-    mutationFn: () => detectId(),
-    onSuccess: (res: { chatId: string | null }) => {
-      if (res.chatId) {
-        setTelegramChatId(res.chatId);
-        toast.success(`Detected chat ID ${res.chatId}`);
-      } else {
-        toast.error("No recent messages — send /start to the bot first");
-      }
-    },
-    onError: (err: unknown) =>
-      toast.error(err instanceof Error ? err.message : "Failed to detect"),
-  });
-
-  const commitPrefs = (chatId: string, enabled: boolean) => {
-    saveMutation.mutate(
-      { chatId, enabled },
-      {
-        onError: (err: unknown) =>
-          toast.error(err instanceof Error ? err.message : "Save failed"),
-      },
-    );
-  };
-
-  const handleTelegramToggle = (next: boolean) => {
-    if (next && !telegramChatId.trim()) {
-      toast.error("Enter a Telegram chat ID first");
-      return;
-    }
-    setTelegramNotif(next);
-    commitPrefs(telegramChatId, next);
-  };
-
-  const handleTelegramBlur = () => {
-    // Auto-save the chat ID whenever the operator moves focus away.
-    if (prefsQuery.data?.chatId === telegramChatId) return;
-    commitPrefs(telegramChatId, telegramNotif && !!telegramChatId.trim());
-  };
 
   const handleIntervalChange = (next: string) => {
     const parsed = scanIntervalSchema.safeParse(next);
@@ -141,7 +59,6 @@ function SettingsPage() {
     setIntervalValue(parsed.data);
   };
 
-
   return (
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
@@ -151,7 +68,6 @@ function SettingsPage() {
         title="Settings"
         description="Configure scanner behavior, notifications, and appearance."
       />
-
 
       <div className="max-w-3xl space-y-6">
         <section className="soft-shadow rounded-xl border border-border bg-card p-6">
@@ -203,60 +119,14 @@ function SettingsPage() {
           <div className="divide-y divide-border">
             <SettingRow
               title="Telegram bot"
-              description="Route alerts to a Telegram chat. Message the bot with /start, tap Detect, then flip the switch."
+              description="Manage Telegram delivery from the dedicated Telegram section."
             >
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[320px]">
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Send className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                      onBlur={handleTelegramBlur}
-                      placeholder="Chat ID (e.g. 123456789)"
-                      inputMode="numeric"
-                      className="h-9 pl-7 text-xs font-mono"
-                    />
-                  </div>
-                  <Switch
-                    checked={telegramNotif}
-                    onCheckedChange={handleTelegramToggle}
-                    disabled={saveMutation.isPending || prefsQuery.isLoading}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 flex-1 gap-1.5 text-[11px]"
-                    onClick={() => detectMutation.mutate()}
-                    disabled={detectMutation.isPending}
-                  >
-                    {detectMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Radar className="h-3.5 w-3.5" />
-                    )}
-                    Detect chat
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 flex-1 gap-1.5 text-[11px]"
-                    onClick={() => testMutation.mutate(telegramChatId)}
-                    disabled={testMutation.isPending || !telegramChatId.trim()}
-                  >
-                    {testMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Send className="h-3.5 w-3.5" />
-                    )}
-                    Send test
-                  </Button>
-                </div>
-              </div>
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+                <Link to="/telegram">
+                  <Send className="h-3.5 w-3.5" />
+                  Open Telegram
+                </Link>
+              </Button>
             </SettingRow>
             <SettingRow title="Desktop notifications" description="Show a native notification when scans complete.">
               <Switch checked={desktopNotif} onCheckedChange={setDesktopNotif} />
