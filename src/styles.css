@@ -153,32 +153,56 @@
 }
 
 :root {
-  --circuit-opacity: 0.22;
+  /* Legacy names retained for external tuning */
+  --circuit-opacity: 0.18;
   --circuit-speed: 1;
-  --circuit-blue: oklch(0.72 0.16 250);
-  --circuit-purple: oklch(0.68 0.2 310);
+  --circuit-blue: oklch(0.68 0.14 250);
+  --circuit-purple: oklch(0.62 0.16 310);
   --circuit-amber: oklch(0.82 0.14 75);
+
+  /* Autonomous network tokens */
+  --net-opacity: var(--circuit-opacity);
+  --net-blue: var(--circuit-blue);
+  --net-purple: var(--circuit-purple);
+  --net-amber: var(--circuit-amber);
 }
 
-.circuit-bg {
+.net-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  opacity: var(--circuit-opacity);
+  opacity: var(--net-opacity);
   contain: strict;
   will-change: opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
+  transition: opacity 1600ms ease-out;
 }
 
-.circuit-bg--low {
-  opacity: calc(var(--circuit-opacity) * 0.85);
+.net-bg--low {
+  opacity: calc(var(--net-opacity) * 0.8);
 }
 
+/* Scanner running — imperceptibly lift the whole network */
+.net-bg--active {
+  opacity: calc(var(--net-opacity) * 1.15);
+}
 
-.circuit-bg__svg {
+.net-bg__base {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      140% 100% at 50% 40%,
+      transparent 0%,
+      oklch(0.08 0.01 260 / 0.55) 70%,
+      oklch(0.06 0.01 260 / 0.85) 100%
+    );
+}
+
+.net-bg__svg {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -186,32 +210,29 @@
   display: block;
 }
 
-.circuit-bg__particles {
-  animation-duration: calc(1s / var(--circuit-speed));
-}
-
-.circuit-bg__overlay {
+.net-bg__vignette {
   position: absolute;
   inset: 0;
   background:
     radial-gradient(
       120% 80% at 50% 100%,
-      oklch(0.1 0.01 260 / 0.85) 0%,
-      oklch(0.14 0.01 260 / 0.55) 45%,
+      oklch(0.08 0.01 260 / 0.85) 0%,
+      oklch(0.12 0.01 260 / 0.45) 45%,
       transparent 75%
     ),
     linear-gradient(
       to bottom,
-      oklch(0.14 0.01 260 / 0.35) 0%,
-      transparent 30%,
-      transparent 70%,
-      oklch(0.12 0.01 260 / 0.5) 100%
+      oklch(0.12 0.01 260 / 0.3) 0%,
+      transparent 25%,
+      transparent 75%,
+      oklch(0.08 0.01 260 / 0.55) 100%
     );
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .circuit-bg__particles * {
+  .net-bg__particles * {
     animation: none !important;
+    display: none;
   }
 }
 
