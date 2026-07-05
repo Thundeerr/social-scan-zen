@@ -17,7 +17,7 @@ import { ActivityTimeline } from "@/components/activity-timeline";
 import { kpis, scannerHealth, recentAssets } from "@/lib/mock-data";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
-import { useTrackedAccounts } from "@/lib/db-queries";
+import { useTrackedAccounts, useActivityLog } from "@/lib/db-queries";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -37,7 +37,24 @@ function DashboardPage() {
   const allAssets = useAssets();
   const sim = useScanSim();
   const { data: trackedAccounts = [] } = useTrackedAccounts();
+  const { data: activityRows = [] } = useActivityLog(20);
   void sim.nowTick;
+
+  const activityEvents = useMemo(
+    () =>
+      activityRows.map((r) => {
+        const kind: "info" | "success" | "muted" =
+          r.event_type === "scan_completed" || r.event_type === "asset_downloaded"
+            ? "success"
+            : r.event_type === "scan_failed"
+            ? "muted"
+            : "info";
+        const d = new Date(r.created_at as string);
+        const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        return { id: r.id as string, time, label: (r.description as string) ?? r.event_type, kind };
+      }),
+    [activityRows],
+  );
 
   const newAssets = useMemo(
     () => allAssets.filter((a) => a.status === "new"),
@@ -221,7 +238,7 @@ function DashboardPage() {
               {sim.isScanning ? "Live" : "Standby"}
             </span>
           </div>
-          <ActivityTimeline events={sim.events} />
+          <ActivityTimeline events={activityEvents.length ? activityEvents : [{ time: "—", label: "No scanner activity yet", kind: "muted" }]} />
         </aside>
       </div>
     </div>
