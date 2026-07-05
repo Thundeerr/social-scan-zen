@@ -107,10 +107,13 @@ function DashboardPage() {
               <div className="mt-0.5 text-lg font-semibold tracking-tight">
                 {newAssets.length} asset{newAssets.length === 1 ? "" : "s"} ready for review
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Approve, download, or ignore. Keyboard: <kbd className="kbd">J</kbd>{" "}
-                <kbd className="kbd">K</kbd> to move · <kbd className="kbd">A</kbd> approve ·{" "}
-                <kbd className="kbd">D</kbd> download
+              <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span>Approve, download, or ignore.</span>
+                <Kbd>J</Kbd><Kbd>K</Kbd><span className="opacity-60">move</span>
+                <span className="opacity-30">·</span>
+                <Kbd>A</Kbd><span className="opacity-60">approve</span>
+                <span className="opacity-30">·</span>
+                <Kbd>D</Kbd><span className="opacity-60">download</span>
               </div>
             </div>
           </div>
