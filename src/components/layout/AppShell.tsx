@@ -6,6 +6,7 @@ import { useScanSimulator } from "@/lib/scan-simulator";
 import { AnimatedCircuitBackground } from "@/components/AnimatedCircuitBackground";
 import { KeyboardShortcuts } from "@/lib/keyboard-shortcuts";
 import { CommandPalette } from "@/components/command-palette";
+import { DownloadProgressPanel } from "@/components/download-progress-panel";
 
 export function AppShell({ children }: { children: ReactNode }) {
   useScanSimulator();
