@@ -4,9 +4,9 @@ import { z } from "zod";
 import { useMemo } from "react";
 import { Check, X, Download, ExternalLink, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { usePosts, postActions } from "@/lib/posts-store";
+import { useAssets, assetActions } from "@/lib/assets-store";
 import { useGlobalQuery, setGlobalQuery, matchesQuery } from "@/lib/search-store";
-import type { Post } from "@/lib/mock-data";
+import type { Asset } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const DAYS = ["all", "today", "yesterday"] as const;
@@ -14,28 +14,36 @@ const STATUSES = ["all", "new", "approved", "ignored", "downloaded"] as const;
 type Day = (typeof DAYS)[number];
 type Status = (typeof STATUSES)[number];
 
+const STATUS_LABEL: Record<Status, string> = {
+  all: "all",
+  new: "new",
+  approved: "approved",
+  ignored: "archived",
+  downloaded: "synchronized",
+};
+
 const searchSchema = z.object({
   day: fallback(z.enum(DAYS), "today").default("today"),
   status: fallback(z.enum(STATUSES), "all").default("all"),
 });
 
-export const Route = createFileRoute("/posts")({
-  head: () => ({ meta: [{ title: "New Posts — InstaScanner" }] }),
+export const Route = createFileRoute("/assets")({
+  head: () => ({ meta: [{ title: "New Assets — InstaScanner" }] }),
   validateSearch: zodValidator(searchSchema),
-  component: PostsPage,
+  component: AssetsPage,
 });
 
-function matches(p: Post, day: Day, status: Status, q: string) {
-  if (day !== "all" && p.day !== day) return false;
-  if (status !== "all" && p.status !== status) return false;
-  return matchesQuery(p, q);
+function matches(a: Asset, day: Day, status: Status, q: string) {
+  if (day !== "all" && a.day !== day) return false;
+  if (status !== "all" && a.status !== status) return false;
+  return matchesQuery(a, q);
 }
 
-function PostsPage() {
+function AssetsPage() {
   const { day, status } = Route.useSearch();
   const q = useGlobalQuery();
-  const navigate = useNavigate({ from: "/posts" });
-  const posts = usePosts();
+  const navigate = useNavigate({ from: "/assets" });
+  const assets = useAssets();
 
   const setSearch = (patch: Partial<{ day: Day; status: Status }>) =>
     navigate({
@@ -46,28 +54,28 @@ function PostsPage() {
   const dayCounts = useMemo(
     () =>
       Object.fromEntries(
-        DAYS.map((d) => [d, posts.filter((p) => matches(p, d, status, q)).length]),
+        DAYS.map((d) => [d, assets.filter((a) => matches(a, d, status, q)).length]),
       ) as Record<Day, number>,
-    [posts, status, q],
+    [assets, status, q],
   );
   const statusCounts = useMemo(
     () =>
       Object.fromEntries(
-        STATUSES.map((s) => [s, posts.filter((p) => matches(p, day, s, q)).length]),
+        STATUSES.map((s) => [s, assets.filter((a) => matches(a, day, s, q)).length]),
       ) as Record<Status, number>,
-    [posts, day, q],
+    [assets, day, q],
   );
 
-  const filtered = posts.filter((p) => matches(p, day, status, q));
+  const filtered = assets.filter((a) => matches(a, day, status, q));
 
   return (
     <div className="p-6 md:p-8">
       <PageHeader
-        title="New Posts"
+        title="New Assets"
         description={
           q
             ? `Showing matches for “${q}”.`
-            : "Review, approve, or ignore freshly detected posts."
+            : "Freshly detected assets delivered by the scanner."
         }
       />
 
@@ -109,7 +117,7 @@ function PostsPage() {
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
-              {s}
+              {STATUS_LABEL[s]}
               <span className="text-[10px] tabular-nums text-muted-foreground/80">
                 {statusCounts[s]}
               </span>
@@ -134,7 +142,7 @@ function PostsPage() {
 
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card/30 p-16 text-center">
-          <p className="text-sm text-muted-foreground">No posts in this bucket yet.</p>
+          <p className="text-sm text-muted-foreground">No new assets.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -170,29 +178,29 @@ function PostsPage() {
                     {p.status === "new" ? (
                       <>
                         <IconBtn
-                          onClick={() => postActions.download(p.id)}
-                          title="Download"
+                          onClick={() => assetActions.download(p.id)}
+                          title="Synchronize"
                         >
                           <Download className="h-3.5 w-3.5" />
                         </IconBtn>
                         <IconBtn
                           className="text-success"
-                          onClick={() => postActions.approve(p.id)}
+                          onClick={() => assetActions.approve(p.id)}
                           title="Approve"
                         >
                           <Check className="h-3.5 w-3.5" />
                         </IconBtn>
                         <IconBtn
                           className="text-destructive"
-                          onClick={() => postActions.ignore(p.id)}
-                          title="Ignore"
+                          onClick={() => assetActions.ignore(p.id)}
+                          title="Archive"
                         >
                           <X className="h-3.5 w-3.5" />
                         </IconBtn>
                       </>
                     ) : (
                       <IconBtn
-                        onClick={() => postActions.reset(p.id)}
+                        onClick={() => assetActions.reset(p.id)}
                         title="Reset to new"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
@@ -204,7 +212,7 @@ function PostsPage() {
               <div className="px-3 py-2 flex items-center justify-between">
                 <span className="text-xs font-medium truncate">@{p.username}</span>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground capitalize">
-                  {p.status === "new" ? p.detectedAt : p.status}
+                  {p.status === "new" ? p.detectedAt : STATUS_LABEL[p.status as Status]}
                 </span>
               </div>
             </div>
@@ -242,4 +250,3 @@ function IconBtn({
     </button>
   );
 }
-

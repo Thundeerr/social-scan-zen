@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/accounts", label: "Tracked Accounts", icon: Users },
-  { to: "/posts", label: "New Posts", icon: Images },
-  { to: "/downloads", label: "Downloads", icon: Download },
+  { to: "/assets", label: "New Assets", icon: Images },
+  { to: "/downloads", label: "Archive", icon: Download },
   { to: "/scanner", label: "Scanner", icon: Radar },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -32,7 +32,7 @@ export function AppSidebar() {
           <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
             InstaScanner
           </span>
-          <span className="text-[10px] text-muted-foreground">Private Monitoring</span>
+          <span className="text-[10px] text-muted-foreground">Autonomous Monitoring</span>
         </div>
       </div>
 
@@ -66,7 +66,7 @@ export function AppSidebar() {
             OW
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-xs font-medium text-sidebar-foreground">Owner</span>
+            <span className="text-xs font-medium text-sidebar-foreground">Operator</span>
             <span className="text-[10px] text-muted-foreground">Internal · 2 seats</span>
           </div>
         </div>
