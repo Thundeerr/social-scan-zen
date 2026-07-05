@@ -38,6 +38,7 @@ function Sparkline({ points }: { points: number[] }) {
 }
 
 function ScannerPage() {
+  const sim = useScanSim();
   return (
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
@@ -46,11 +47,11 @@ function ScannerPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        <KpiCard label="Queue Size" value={scannerHealth.queueSize} icon={Layers} hint="accounts pending" />
-        <KpiCard label="Requests (1h)" value={scannerHealth.requests.toLocaleString()} icon={Zap} hint="+8% vs. avg" accent />
-        <KpiCard label="Success Rate" value={`${scannerHealth.successRate}%`} icon={CheckCircle2} hint="last 24h" />
-        <KpiCard label="Avg Response" value={`${scannerHealth.avgResponse} ms`} icon={Timer} hint="p50 latency" />
-        <KpiCard label="Next Scan" value={scannerHealth.nextScan} icon={Clock} hint="auto-scheduled" />
+        <KpiCard label="Queue Size" value={sim.queueSize} icon={Layers} hint={sim.isScanning ? "scanning…" : "idle"} />
+        <KpiCard label="Requests (1h)" value={sim.requests.toLocaleString()} icon={Zap} hint="+8% vs. avg" accent />
+        <KpiCard label="Success Rate" value={`${sim.successRate}%`} icon={CheckCircle2} hint="last 24h" />
+        <KpiCard label="Avg Response" value={`${sim.avgResponse} ms`} icon={Timer} hint="p50 latency" />
+        <KpiCard label="Next Scan" value={sim.isScanning ? "running" : scannerHealth.nextScan} icon={Clock} hint="auto-scheduled" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
