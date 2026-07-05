@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -46,9 +48,30 @@ function SettingRow({
 function SettingsPage() {
   const [provider, setProvider] = useState("instagram-looter");
   const [interval, setIntervalValue] = useScanInterval();
-  const [emailNotif, setEmailNotif] = useState(true);
+  const [telegramNotif, setTelegramNotif] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState("");
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
+
+  // Persist Telegram notification prefs locally so they survive refresh.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const enabled = window.localStorage.getItem("instascanner.telegramNotif");
+    const chat = window.localStorage.getItem("instascanner.telegramChatId");
+    if (enabled !== null) setTelegramNotif(enabled === "1");
+    if (chat !== null) setTelegramChatId(chat);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "instascanner.telegramNotif",
+      telegramNotif ? "1" : "0",
+    );
+  }, [telegramNotif]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("instascanner.telegramChatId", telegramChatId);
+  }, [telegramChatId]);
 
   const handleIntervalChange = (next: string) => {
     const parsed = scanIntervalSchema.safeParse(next);
@@ -119,8 +142,33 @@ function SettingsPage() {
             Choose how you're alerted when new assets are detected.
           </p>
           <div className="divide-y divide-border">
-            <SettingRow title="Email alerts" description="Send a daily digest at 09:00 UTC.">
-              <Switch checked={emailNotif} onCheckedChange={setEmailNotif} />
+            <SettingRow
+              title="Telegram bot"
+              description="Route alerts to a Telegram chat. Message @InstaScannerBot with /start, then paste your chat ID here."
+            >
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <div className="relative flex-1 sm:w-56 sm:flex-none">
+                  <Send className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="Chat ID (e.g. 123456789)"
+                    inputMode="numeric"
+                    className="h-9 pl-7 text-xs font-mono"
+                    disabled={!telegramNotif}
+                  />
+                </div>
+                <Switch
+                  checked={telegramNotif}
+                  onCheckedChange={(next) => {
+                    if (next && !telegramChatId.trim()) {
+                      toast.error("Enter a Telegram chat ID first");
+                      return;
+                    }
+                    setTelegramNotif(next);
+                  }}
+                />
+              </div>
             </SettingRow>
             <SettingRow title="Desktop notifications" description="Show a native notification when scans complete.">
               <Switch checked={desktopNotif} onCheckedChange={setDesktopNotif} />
