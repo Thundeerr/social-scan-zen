@@ -121,6 +121,7 @@ type QueueRow = {
   phase_detail: string | null;
   assets_found: number | null;
   assets_detected: number;
+  assets_duplicates: number | null;
   error: string | null;
   tracked_accounts: {
     username: string;
@@ -335,7 +336,7 @@ function QueueLine({
             {variant === "running"
               ? row.phase_detail ?? "Working…"
               : variant === "completed"
-                ? `${row.assets_detected} new · ${timeAgo(row.completed_at)}`
+                ? `${row.assets_detected} new · ${row.assets_duplicates ?? 0} dupes · ${timeAgo(row.completed_at)}`
                 : variant === "failed"
                   ? row.error?.slice(0, 90) ?? "failed"
                   : `Queued · attempt ${row.attempt ?? 1}`}
@@ -576,7 +577,7 @@ function ScannerPage() {
                       </div>
                       <div className="text-[11px] text-muted-foreground truncate">
                         {r.status === "completed"
-                          ? `${r.assets_detected} new · ${timeAgo(r.completed_at)}`
+                          ? `${r.assets_detected} new · ${r.assets_duplicates ?? 0} dupes · ${timeAgo(r.completed_at)}`
                           : failed
                             ? r.error?.slice(0, 80) ?? "failed"
                             : r.phase_detail ?? `attempt ${r.attempt ?? 1}`}

@@ -241,6 +241,7 @@ export type Database = {
           account_id: string | null
           accounts_scanned: number
           assets_detected: number
+          assets_duplicates: number
           assets_found: number
           attempt: number
           completed_at: string | null
@@ -260,6 +261,7 @@ export type Database = {
           account_id?: string | null
           accounts_scanned?: number
           assets_detected?: number
+          assets_duplicates?: number
           assets_found?: number
           attempt?: number
           completed_at?: string | null
@@ -279,6 +281,7 @@ export type Database = {
           account_id?: string | null
           accounts_scanned?: number
           assets_detected?: number
+          assets_duplicates?: number
           assets_found?: number
           attempt?: number
           completed_at?: string | null

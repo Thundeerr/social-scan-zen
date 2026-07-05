@@ -179,6 +179,7 @@ export async function executeScan(
         completed_at: new Date().toISOString(),
         accounts_scanned: 1,
         assets_detected: inserted,
+        assets_duplicates: duplicates,
         assets_found: rows.length,
         phase: "completed",
         phase_detail:
