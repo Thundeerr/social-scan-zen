@@ -30,10 +30,21 @@ function DashboardPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <KpiCard label="Tracked Accounts" value={kpis.trackedAccounts} icon={Users} hint="+4 this week" />
-        <KpiCard label="New Posts Today" value={kpis.newPostsToday} icon={Sparkles} hint="+12 vs. yesterday" accent />
-        <KpiCard label="Last Scan" value={kpis.lastScan} icon={Clock} hint="14:06 UTC" />
-        <KpiCard label="Scanner Status" value={kpis.scannerStatus} icon={Activity} hint="All systems nominal" />
-        <KpiCard label="API Provider" value={kpis.apiProvider} icon={Plug} hint="99.2% success" />
+        <KpiCard
+          label="New Posts Today"
+          value={sim.newPostsToday}
+          icon={Sparkles}
+          hint={`+${Math.max(0, sim.newPostsToday - kpis.newPostsToday)} this session`}
+          accent
+        />
+        <KpiCard label="Last Scan" value={lastScan} icon={Clock} hint={sim.isScanning ? "in progress" : "auto every 15s"} />
+        <KpiCard
+          label="Scanner Status"
+          value={sim.isScanning ? "Running" : "Idle"}
+          icon={Activity}
+          hint={sim.isScanning ? `${sim.queueSize} in queue` : "All systems nominal"}
+        />
+        <KpiCard label="API Provider" value={kpis.apiProvider} icon={Plug} hint={`${sim.successRate}% success`} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
