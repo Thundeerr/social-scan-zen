@@ -14,6 +14,7 @@ export type Asset = {
   detectedAt: string;
   caption: string;
   thumbnail: string;
+  video?: string;
   avatar: string;
   status: "new" | "approved" | "ignored" | "downloaded";
   day: "today" | "yesterday";
