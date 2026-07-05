@@ -6,7 +6,6 @@ import { Plus, MoreHorizontal, Search, Loader2, Radar } from "lucide-react";
 import { toast } from "sonner";
 import { scanAccountNowFn } from "@/lib/scanner.functions";
 import { trackedAccountsKey } from "@/lib/db-queries";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Table,
