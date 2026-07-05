@@ -121,6 +121,7 @@ type QueueRow = {
   phase_detail: string | null;
   assets_found: number | null;
   assets_detected: number;
+  assets_duplicates: number | null;
   error: string | null;
   tracked_accounts: {
     username: string;
