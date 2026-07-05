@@ -15,6 +15,9 @@ export type ActivityEventType =
   | "asset_downloaded"
   | "asset_kept"
   | "asset_dismissed"
+  | "asset_archived"
+  | "asset_prioritized"
+  | "asset_undo"
   | "error";
 
 export type ActivityRow = {
