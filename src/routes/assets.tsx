@@ -182,15 +182,22 @@ function AssetInbox() {
     if (nextId) selectAsset(nextId);
   };
 
+  // Session tally — powers the mission-complete panel. Reset once the panel
+  // finishes so a subsequent batch of new assets can trigger it again.
+  const [session, setSession] = useState({ approved: 0, dismissed: 0 });
+  const [complete, setComplete] = useState(false);
+
   const keep = (a: Asset | null) => {
     if (!a) return;
     assetActions.approve(a.id);
+    setSession((s) => ({ ...s, approved: s.approved + 1 }));
     toast.success("Kept");
     advance(1);
   };
   const dismiss = (a: Asset | null) => {
     if (!a) return;
     assetActions.ignore(a.id);
+    setSession((s) => ({ ...s, dismissed: s.dismissed + 1 }));
     toast("Dismissed");
     advance(1);
   };
@@ -202,6 +209,27 @@ function AssetInbox() {
   const openSource = (a: Asset | null) => {
     if (!a) return;
     window.open(`https://instagram.com/${a.username}`, "_blank", "noopener,noreferrer");
+  };
+
+  // Awaiting count across the entire inbox (independent of filter) — the
+  // mission is truly complete only when nothing is left to review anywhere.
+  const totalAwaiting = useMemo(
+    () => assets.filter((a) => a.status === "new").length,
+    [assets],
+  );
+
+  useEffect(() => {
+    if (complete) return;
+    if (totalAwaiting !== 0) return;
+    if (session.approved + session.dismissed === 0) return;
+    setComplete(true);
+    setAmbientCalm(true);
+  }, [totalAwaiting, session, complete]);
+
+  const handleCompletionDone = () => {
+    setComplete(false);
+    setAmbientCalm(false);
+    setSession({ approved: 0, dismissed: 0 });
   };
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
