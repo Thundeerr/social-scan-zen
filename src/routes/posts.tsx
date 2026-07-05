@@ -28,16 +28,7 @@ export const Route = createFileRoute("/posts")({
 function matches(p: Post, day: Day, status: Status, q: string) {
   if (day !== "all" && p.day !== day) return false;
   if (status !== "all" && p.status !== status) return false;
-  if (q) {
-    const needle = q.toLowerCase();
-    if (
-      !p.username.toLowerCase().includes(needle) &&
-      !p.caption.toLowerCase().includes(needle)
-    ) {
-      return false;
-    }
-  }
-  return true;
+  return matchesQuery(p, q);
 }
 
 function PostsPage() {
