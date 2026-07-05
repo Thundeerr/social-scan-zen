@@ -1,6 +1,12 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logActivity } from "./activity-log";
+import {
+  startProgress,
+  updateProgress,
+  completeProgress,
+  startBatch,
+} from "./download-progress-store";
 
 export type DownloadRow = {
   id: string;
