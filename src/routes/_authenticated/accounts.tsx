@@ -1,7 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Plus, MoreHorizontal, Search, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Search, Loader2, Radar } from "lucide-react";
 import { toast } from "sonner";
+import { scanAccountNowFn } from "@/lib/scanner.functions";
+import { trackedAccountsKey } from "@/lib/db-queries";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -105,6 +109,55 @@ function AccountsPage() {
   const updateAccount = useUpdateTrackedAccount();
   const deleteAccount = useDeleteTrackedAccount();
   const setAssignment = useSetWatchlistAssignment();
+
+  const scanNow = useServerFn(scanAccountNowFn);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [scanning, setScanning] = useState<Record<string, boolean>>({});
+
+  async function handleScanNow(a: TrackedAccount) {
+    if (scanning[a.id]) return;
+    setScanning((s) => ({ ...s, [a.id]: true }));
+    const t = toast.loading(`Scanning @${a.username}…`);
+    try {
+      const r = await scanNow({ data: { accountId: a.id } });
+      qc.invalidateQueries({ queryKey: trackedAccountsKey });
+      if (r.status === "failed") {
+        toast.error(`Scan failed for @${a.username}`, {
+          id: t,
+          description: r.error ?? "Provider returned an error",
+        });
+      } else if (r.inserted > 0) {
+        toast.success(`Found ${r.inserted} new asset${r.inserted === 1 ? "" : "s"} from @${a.username}`, {
+          id: t,
+          action: {
+            label: "View in Inbox",
+            onClick: () =>
+              navigate({
+                to: "/assets",
+                search: { day: "all", status: "all" },
+              }),
+          },
+        });
+      } else {
+        toast(`@${a.username} is up to date`, {
+          id: t,
+          description: r.detected > 0 ? `${r.detected} posts checked, no new ones` : "Provider returned no posts",
+        });
+      }
+    } catch (err) {
+      toast.error(`Scan failed for @${a.username}`, {
+        id: t,
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setScanning((s) => {
+        const next = { ...s };
+        delete next[a.id];
+        return next;
+      });
+    }
+  }
 
   const assignmentMap = useMemo(() => {
     const m: Record<string, string> = {};
@@ -283,7 +336,7 @@ function AccountsPage() {
               <TableHead>Last Scan</TableHead>
               <TableHead>Next Scan</TableHead>
               <TableHead className="text-right">Total Assets</TableHead>
-              <TableHead className="w-10"></TableHead>
+              <TableHead className="w-[160px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -359,30 +412,51 @@ function AccountsPage() {
                     {assetCounts[a.id] ?? 0}
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditing(a)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => toggleMonitoring(a)}>
-                          {a.status === "active"
-                            ? "Disable monitoring"
-                            : "Enable monitoring"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => remove(a)}
-                        >
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 gap-1.5"
+                        disabled={!!scanning[a.id]}
+                        onClick={() => void handleScanNow(a)}
+                      >
+                        {scanning[a.id] ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Scanning
+                          </>
+                        ) : (
+                          <>
+                            <Radar className="h-3.5 w-3.5" />
+                            Scan Now
+                          </>
+                        )}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setEditing(a)}>
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => toggleMonitoring(a)}>
+                            {a.status === "active"
+                              ? "Disable monitoring"
+                              : "Enable monitoring"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => remove(a)}
+                          >
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
