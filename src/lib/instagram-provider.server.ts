@@ -187,3 +187,11 @@ export function getInstagramProviderFromEnv() {
     usernameParam: process.env.RAPIDAPI_USERNAME_PARAM,
   });
 }
+
+/** Build the outbound provider URL for display (no secrets). */
+export function describeProviderRequest(username: string): string {
+  const host = process.env.RAPIDAPI_HOST ?? "provider";
+  const path = process.env.RAPIDAPI_PATH ?? DEFAULT_PATH;
+  const param = process.env.RAPIDAPI_USERNAME_PARAM ?? "username";
+  return `GET https://${host}${path}?${param}=${username}`;
+}
