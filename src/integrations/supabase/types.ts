@@ -236,6 +236,30 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_budget: {
+        Row: {
+          id: boolean
+          monthly_cap: number
+          updated_at: string
+          updated_by: string | null
+          warn_at_percent: number
+        }
+        Insert: {
+          id?: boolean
+          monthly_cap?: number
+          updated_at?: string
+          updated_by?: string | null
+          warn_at_percent?: number
+        }
+        Update: {
+          id?: boolean
+          monthly_cap?: number
+          updated_at?: string
+          updated_by?: string | null
+          warn_at_percent?: number
+        }
+        Relationships: []
+      }
       scanner_runs: {
         Row: {
           account_id: string | null
