@@ -510,9 +510,13 @@ function ScannerPage() {
         />
         <KpiCard
           label="Next Scan"
-          value={timeUntil(stats?.nextScanAt ?? null)}
+          value={timeUntil(estimatedNextScanAt)}
           icon={Clock}
-          hint={running.length ? "running" : "auto-scheduled"}
+          hint={
+            running.length
+              ? "running"
+              : `${fmtClock(estimatedNextScanAt)} · every ${intervalLabel}`
+          }
         />
       </div>
 
