@@ -50,6 +50,7 @@ import {
 } from "@/lib/operator-intelligence";
 import { setAmbientCalm } from "@/lib/ambient-store";
 import { MissionComplete } from "@/components/mission-complete";
+import { NetworkSummary } from "@/components/network-summary";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
