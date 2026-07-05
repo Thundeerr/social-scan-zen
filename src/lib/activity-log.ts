@@ -43,6 +43,9 @@ const CATEGORY_ORDER: ActivityEventType[] = [
   "asset_downloaded",
   "asset_kept",
   "asset_dismissed",
+  "asset_archived",
+  "asset_prioritized",
+  "asset_undo",
   "error",
 ];
 
