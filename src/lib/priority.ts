@@ -262,3 +262,97 @@ export function scoreToneClasses(score: number): {
     border: "border-border",
   };
 }
+
+// -----------------------------------------------------------------------------
+// AI Recommendation
+//
+// InstaScanner's AI is an intelligence analyst, not a chatbot. For every
+// asset it answers a single question — "Should the operator keep this?" —
+// with a verdict, a confidence percentage, and up to five terse reasons the
+// operator can scan in under five seconds. The operator always decides.
+// -----------------------------------------------------------------------------
+
+export type Verdict = "KEEP" | "DISMISS" | "REVIEW";
+
+export type Recommendation = {
+  verdict: Verdict;
+  confidence: number; // 0–100
+  reasons: string[];
+  score: number;
+  tier: Tier;
+};
+
+export function computeRecommendation(
+  asset: Asset,
+  { isFavorite = false }: { isFavorite?: boolean } = {},
+): Recommendation {
+  const { score, tier, factors } = computeOperatorScore(asset, { isFavorite });
+  const byKey = Object.fromEntries(factors.map((f) => [f.key, f] as const));
+
+  let verdict: Verdict;
+  let confidence: number;
+  if (score >= 70) {
+    verdict = "KEEP";
+    confidence = Math.min(99, 60 + Math.round((score - 70) * 1.3));
+  } else if (score <= 42) {
+    verdict = "DISMISS";
+    confidence = Math.min(99, 60 + Math.round((42 - score) * 1.3));
+  } else {
+    verdict = "REVIEW";
+    // Confidence peaks at midpoint of the review band (~56).
+    confidence = 55 + Math.round(15 - Math.abs(score - 56));
+  }
+
+  const reasons: string[] = [];
+  // 1) Tier
+  reasons.push(`Tier ${tier} source · ${TIER_META[tier].label}`);
+  // 2) AI content signal
+  const aiNote = byKey.ai?.note ?? "";
+  if (/launch/i.test(aiNote)) reasons.push("Strong opening hook");
+  else if (/collab/i.test(aiNote)) reasons.push("Collaboration signal");
+  else if (/scarcity/i.test(aiNote)) reasons.push("Scarcity signal detected");
+  else if (/BTS/i.test(aiNote)) reasons.push("Behind-the-scenes narrative");
+  else if (verdict === "DISMISS") reasons.push("No strong content signal");
+  // 3) Engagement velocity
+  if ((byKey.eng?.value ?? 0) >= 75) reasons.push("High engagement velocity");
+  else if ((byKey.eng?.value ?? 0) <= 30) reasons.push("Low engagement so far");
+  // 4) Content type / repost fit
+  if (asset.video) reasons.push("Fits repost strategy");
+  // 5) Historical match
+  if (isFavorite) reasons.push("Matches previous favorites");
+  else if (tier === "S" || tier === "A") reasons.push("Matches previous successful assets");
+  // 6) Frequency — only when it flips the read
+  if ((byKey.freq?.value ?? 0) >= 90) reasons.push("Rare post from this source");
+  else if ((byKey.freq?.value ?? 0) <= 30 && verdict === "DISMISS")
+    reasons.push("High posting frequency");
+
+  return { verdict, confidence, reasons: reasons.slice(0, 5), score, tier };
+}
+
+export function verdictToneClasses(verdict: Verdict): {
+  text: string;
+  bg: string;
+  border: string;
+  dot: string;
+} {
+  if (verdict === "KEEP")
+    return {
+      text: "text-success",
+      bg: "bg-success/12",
+      border: "border-success/50",
+      dot: "bg-success",
+    };
+  if (verdict === "DISMISS")
+    return {
+      text: "text-destructive",
+      bg: "bg-destructive/12",
+      border: "border-destructive/50",
+      dot: "bg-destructive",
+    };
+  return {
+    text: "text-warning",
+    bg: "bg-warning/10",
+    border: "border-warning/45",
+    dot: "bg-warning",
+  };
+}

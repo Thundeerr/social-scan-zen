@@ -30,6 +30,8 @@ import {
 import type { Asset } from "@/lib/mock-data";
 import {
   computeOperatorScore,
+  computeRecommendation,
+  verdictToneClasses,
   rankByOperatorScore,
   scoreToneClasses,
   scoreConfidenceLabel,
@@ -103,19 +105,6 @@ const WATCHLIST: Record<string, string> = {
 };
 const watchlistFor = (u: string) => WATCHLIST[u] ?? "General";
 
-function aiSummary(a: Asset): string {
-  const cap = a.caption.toLowerCase();
-  const signals: string[] = [];
-  if (/drop|launch|new|collection|available/.test(cap))
-    signals.push("Product-launch signal");
-  if (/collab|partnership|friends/.test(cap)) signals.push("Collaboration signal");
-  if (/limited|edition|500|worldwide/.test(cap)) signals.push("Scarcity signal");
-  if (/behind the scenes|studio|archive/.test(cap))
-    signals.push("Behind-the-scenes content");
-  if (!signals.length) signals.push("Editorial content");
-  const priority = a.status === "new" ? "standard" : "logged";
-  return `${signals.join(" · ")}. Category: ${watchlistFor(a.username)}. Priority: ${priority}.`;
-}
 
 function matches(a: Asset, day: Day, status: Status, q: string) {
   if (day !== "all" && a.day !== day) return false;
@@ -841,6 +830,8 @@ function IntelligencePanel({
       </div>
 
       <div className="flex flex-col gap-5 px-5 py-5">
+        <RecommendationCard asset={asset} isFavorite={isFavorite} />
+
         <IntelField label="Account" icon={Users}>
           <div className="flex items-center gap-2">
             <img
@@ -870,12 +861,6 @@ function IntelligencePanel({
         <IntelField label="Likes" icon={Heart}>
           <span className="text-sm tabular-nums">{asset.likes}</span>
         </IntelField>
-
-        <IntelField label="AI Summary" icon={Sparkles} accent>
-          <p className="text-xs leading-relaxed text-foreground/85">
-            {aiSummary(asset)}
-          </p>
-        </IntelField>
       </div>
 
       <div className="mt-auto border-t border-border/60 px-5 py-4 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
@@ -885,6 +870,64 @@ function IntelligencePanel({
         <span className="text-foreground/80">S</span> download
       </div>
     </aside>
+  );
+}
+
+function RecommendationCard({
+  asset,
+  isFavorite,
+}: {
+  asset: Asset;
+  isFavorite: boolean;
+}) {
+  const rec = computeRecommendation(asset, { isFavorite });
+  const tone = verdictToneClasses(rec.verdict);
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-4",
+        tone.border,
+        tone.bg,
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <Sparkles className="h-3 w-3" />
+        Recommendation
+      </div>
+      <div className="mt-2 flex items-baseline justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className={cn("h-2 w-2 rounded-full", tone.dot)} />
+          <span className={cn("text-2xl font-semibold tracking-tight", tone.text)}>
+            {rec.verdict}
+          </span>
+        </div>
+        <div className="text-right">
+          <div className={cn("text-lg font-semibold tabular-nums", tone.text)}>
+            {rec.confidence}%
+          </div>
+          <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+            Confidence
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        Reasoning
+      </div>
+      <ul className="mt-1.5 space-y-1">
+        {rec.reasons.map((r, i) => (
+          <li
+            key={i}
+            className="flex gap-2 text-[12px] leading-snug text-foreground/85"
+          >
+            <span className={cn("mt-1.5 h-1 w-1 shrink-0 rounded-full", tone.dot)} />
+            <span>{r}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 border-t border-border/40 pt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        AI recommends · <span className="text-foreground/80">Operator decides</span>
+      </div>
+    </div>
   );
 }
 
@@ -1236,10 +1279,37 @@ function SwipeCard({
           </div>
         </div>
         <p className="mt-2 line-clamp-2 text-[13px] text-white/90">{asset.caption}</p>
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-white/80">
-          <Sparkles className="h-3 w-3" />
-          <span className="line-clamp-1">{aiSummary(asset)}</span>
-        </div>
+        {(() => {
+          const rec = computeRecommendation(asset);
+          const tone = verdictToneClasses(rec.verdict);
+          return (
+            <div
+              className={cn(
+                "mt-3 flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 backdrop-blur",
+                tone.border,
+                tone.bg,
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles className={cn("h-3 w-3", tone.text)} />
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold uppercase tracking-[0.18em]",
+                    tone.text,
+                  )}
+                >
+                  {rec.verdict}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.15em] text-white/60">
+                  · {rec.reasons[0]}
+                </span>
+              </div>
+              <span className={cn("text-[11px] font-semibold tabular-nums", tone.text)}>
+                {rec.confidence}%
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Bottom quick-actions */}
