@@ -53,6 +53,83 @@ export type ScanOutcome = {
   error?: string;
 };
 
+// ---------- Provider request budget --------------------------------------------------
+//
+// Every RapidAPI call counts against a monthly cap (default 40,000). We
+// approximate "one scanner_run = one provider request", which matches how
+// executeScan is structured (single fetchAccount call per run). Manual and
+// autonomous scans both consult this budget before spending a request, so a
+// runaway cadence can never overshoot the plan.
+
+export type BudgetStatus = {
+  monthlyCap: number;
+  warnAtPercent: number;
+  used: number;
+  remaining: number;
+  percentUsed: number;
+  periodStart: string; // ISO — first day of current month, UTC
+  periodEnd: string;   // ISO — first day of next month, UTC (exclusive)
+  exhausted: boolean;
+  warning: boolean;
+};
+
+function currentPeriod(): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { start, end };
+}
+
+/**
+ * Read the current monthly budget status. `used` counts every scanner_run
+ * created in the current UTC month — including failed runs, since a failed
+ * request still consumes provider quota.
+ */
+export async function getBudgetStatus(db: DB): Promise<BudgetStatus> {
+  const { start, end } = currentPeriod();
+  const { data: cfg } = await db
+    .from("provider_budget")
+    .select("monthly_cap, warn_at_percent")
+    .eq("id", true)
+    .maybeSingle();
+  const monthlyCap = cfg?.monthly_cap ?? 40_000;
+  const warnAtPercent = cfg?.warn_at_percent ?? 85;
+
+  const { count } = await db
+    .from("scanner_runs")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString());
+  const used = count ?? 0;
+  const remaining = Math.max(0, monthlyCap - used);
+  const percentUsed = monthlyCap > 0 ? Math.min(100, (used / monthlyCap) * 100) : 100;
+
+  return {
+    monthlyCap,
+    warnAtPercent,
+    used,
+    remaining,
+    percentUsed,
+    periodStart: start.toISOString(),
+    periodEnd: end.toISOString(),
+    exhausted: remaining <= 0,
+    warning: percentUsed >= warnAtPercent,
+  };
+}
+
+async function logBudgetBlocked(db: DB, budget: BudgetStatus, reason: string) {
+  await db.from("activity_log").insert({
+    event_type: "provider_budget_blocked",
+    description: `Provider budget reached · ${budget.used}/${budget.monthlyCap} · ${reason}`,
+    metadata: {
+      used: budget.used,
+      monthly_cap: budget.monthlyCap,
+      period_start: budget.periodStart,
+      period_end: budget.periodEnd,
+    },
+  });
+}
+
 async function setPhase(
   db: DB,
   runId: string,
