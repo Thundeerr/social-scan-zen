@@ -105,19 +105,6 @@ const WATCHLIST: Record<string, string> = {
 };
 const watchlistFor = (u: string) => WATCHLIST[u] ?? "General";
 
-function aiSummary(a: Asset): string {
-  const cap = a.caption.toLowerCase();
-  const signals: string[] = [];
-  if (/drop|launch|new|collection|available/.test(cap))
-    signals.push("Product-launch signal");
-  if (/collab|partnership|friends/.test(cap)) signals.push("Collaboration signal");
-  if (/limited|edition|500|worldwide/.test(cap)) signals.push("Scarcity signal");
-  if (/behind the scenes|studio|archive/.test(cap))
-    signals.push("Behind-the-scenes content");
-  if (!signals.length) signals.push("Editorial content");
-  const priority = a.status === "new" ? "standard" : "logged";
-  return `${signals.join(" · ")}. Category: ${watchlistFor(a.username)}. Priority: ${priority}.`;
-}
 
 function matches(a: Asset, day: Day, status: Status, q: string) {
   if (day !== "all" && a.day !== day) return false;
