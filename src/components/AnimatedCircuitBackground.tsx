@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useScanSim } from "@/lib/scan-simulator";
+import { useAmbientCalm } from "@/lib/ambient-store";
 
 /**
  * Pauses SMIL animations on the SVG while the tab is hidden or the window
