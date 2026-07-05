@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, MoreHorizontal, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 import { getAvatar } from "@/lib/mock-data";
-import { tierFor } from "@/lib/priority";
 import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 import {
@@ -49,8 +48,32 @@ import {
   useCreateTrackedAccount,
   useUpdateTrackedAccount,
   useDeleteTrackedAccount,
+  useWatchlists,
+  useWatchlistAssignments,
+  useSetWatchlistAssignment,
+  useAccountAssetCounts,
   type TrackedAccount,
+  type Watchlist,
 } from "@/lib/db-queries";
+
+export const Route = createFileRoute("/_authenticated/accounts")({
+  head: () => ({ meta: [{ title: "Tracked Accounts — InstaScanner" }] }),
+  component: AccountsPage,
+});
+
+type Tier = "S" | "A" | "B" | "C";
+const TIERS: Tier[] = ["S", "A", "B", "C"];
+const TIER_LABEL: Record<Tier, string> = {
+  S: "S — Mission Critical",
+  A: "A — High Priority",
+  B: "B — Normal",
+  C: "C — Low Priority",
+};
+
+// Approximate scan cadence per tier (minutes)
+const TIER_CADENCE_MIN: Record<Tier, number> = { S: 5, A: 15, B: 30, C: 60 };
+
+const USERNAME_RE = /^[a-z0-9._]{1,30}$/;
 
 function timeAgo(iso: string | null) {
   if (!iso) return "—";
@@ -61,120 +84,158 @@ function timeAgo(iso: string | null) {
   return `${Math.floor(s / 86400)} d ago`;
 }
 
-export const Route = createFileRoute("/_authenticated/accounts")({
-  head: () => ({ meta: [{ title: "Tracked Accounts — InstaScanner" }] }),
-  component: AccountsPage,
-});
-
-type Category = "brand" | "creator" | "competitor" | "reference";
-
-type Row = {
-  id: string;
-  username: string;
-  displayName: string;
-  status: "active" | "paused";
-  lastScan: string;
-  assetsToday: number;
-  followers: string;
-  tier?: TrackedAccount["tier"];
-  category?: Category;
-  notes?: string;
-  notify?: boolean;
-  optimistic?: boolean;
-};
-
-function toRow(a: TrackedAccount): Row {
-  return {
-    id: a.id,
-    username: a.username,
-    displayName: a.display_name,
-    status: a.status,
-    lastScan: timeAgo(a.last_scan_at),
-    assetsToday: 0,
-    followers: a.followers ?? "—",
-    tier: a.tier,
-    notes: a.notes ?? undefined,
-  };
+function nextScanLabel(a: TrackedAccount) {
+  if (a.status === "paused") return "paused";
+  const cadence = TIER_CADENCE_MIN[a.tier as Tier] ?? 30;
+  const last = a.last_scan_at ? new Date(a.last_scan_at).getTime() : Date.now();
+  const next = last + cadence * 60_000;
+  const s = Math.max(0, (next - Date.now()) / 1000);
+  if (s < 60) return "imminent";
+  if (s < 3600) return `in ${Math.ceil(s / 60)} min`;
+  return `in ${Math.ceil(s / 3600)} hr`;
 }
 
 function AccountsPage() {
   const { data: dbRows = [], isLoading } = useTrackedAccounts();
+  const { data: watchlists = [] } = useWatchlists();
+  const { data: assignments = [] } = useWatchlistAssignments();
+  const { data: assetCounts = {} } = useAccountAssetCounts();
+
   const createAccount = useCreateTrackedAccount();
   const updateAccount = useUpdateTrackedAccount();
   const deleteAccount = useDeleteTrackedAccount();
+  const setAssignment = useSetWatchlistAssignment();
 
-  const rows: Row[] = dbRows.map(toRow);
+  const assignmentMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const a of assignments) m[a.account_id] = a.watchlist_id;
+    return m;
+  }, [assignments]);
+
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
-  const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<TrackedAccount | null>(null);
 
-  const filtered = rows.filter((a) => {
+  const filtered = dbRows.filter((a) => {
     if (filter !== "all" && a.status !== filter) return false;
     if (q && !a.username.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
 
-  function handleAdd(row: Row) {
+  function handleCreate(input: {
+    username: string;
+    displayName: string;
+    tier: Tier;
+    watchlistId: string | null;
+    monitoring: boolean;
+    notes?: string;
+  }) {
     createAccount.mutate(
       {
-        username: row.username,
-        display_name: row.displayName,
-        followers: row.followers,
-        status: "active",
-        notes: row.notes ?? null,
+        username: input.username,
+        display_name: input.displayName,
+        tier: input.tier,
+        status: input.monitoring ? "active" : "paused",
+        notes: input.notes ?? null,
       },
       {
-        onSuccess: () => toast.success(`@${row.username} is now being monitored`),
-        onError: (e: unknown) =>
-          toast.error(e instanceof Error ? e.message : "Failed to add account"),
+        onSuccess: async (row) => {
+          if (input.watchlistId) {
+            await setAssignment.mutateAsync({
+              accountId: row.id,
+              watchlistId: input.watchlistId,
+            });
+          }
+          toast.success(`@${row.username} is now being monitored`);
+          setAddOpen(false);
+        },
+        onError: (e: unknown) => {
+          const msg = e instanceof Error ? e.message : "Failed to add account";
+          if (/duplicate key|unique/i.test(msg)) {
+            toast.error("Already tracking this account");
+          } else {
+            toast.error(msg);
+          }
+        },
       },
     );
   }
 
-  function togglePause(id: string) {
-    const current = rows.find((x) => x.id === id);
-    if (!current) return;
+  function handleEdit(
+    id: string,
+    input: {
+      displayName: string;
+      tier: Tier;
+      watchlistId: string | null;
+      monitoring: boolean;
+      notes?: string;
+    },
+  ) {
+    updateAccount.mutate(
+      {
+        id,
+        patch: {
+          display_name: input.displayName,
+          tier: input.tier,
+          status: input.monitoring ? "active" : "paused",
+          notes: input.notes ?? null,
+        },
+      },
+      {
+        onSuccess: async () => {
+          await setAssignment.mutateAsync({
+            accountId: id,
+            watchlistId: input.watchlistId,
+          });
+          toast.success("Account updated");
+          setEditing(null);
+        },
+        onError: (e: unknown) =>
+          toast.error(e instanceof Error ? e.message : "Update failed"),
+      },
+    );
+  }
+
+  function toggleMonitoring(a: TrackedAccount) {
     updateAccount.mutate({
-      id,
-      patch: { status: current.status === "active" ? "paused" : "active" },
+      id: a.id,
+      patch: { status: a.status === "active" ? "paused" : "active" },
     });
   }
 
-  function rescan(id: string) {
-    updateAccount.mutate({ id, patch: { last_scan_at: new Date().toISOString() } });
-    toast("Rescan queued");
-  }
-
-  function remove(id: string) {
-    const gone = rows.find((x) => x.id === id);
-    deleteAccount.mutate(id, {
-      onSuccess: () => gone && toast(`Removed @${gone.username}`),
+  function remove(a: TrackedAccount) {
+    deleteAccount.mutate(a.id, {
+      onSuccess: () => toast(`Removed @${a.username}`),
       onError: (e: unknown) =>
         toast.error(e instanceof Error ? e.message : "Failed to remove"),
     });
   }
 
-  void isLoading;
-
+  const watchlistNameById = useMemo(() => {
+    const m: Record<string, Watchlist> = {};
+    for (const w of watchlists) m[w.id] = w;
+    return m;
+  }, [watchlists]);
 
   return (
     <div className="p-6 md:p-8">
       <PageHeader
         title="Tracked Accounts"
-        description={`${rows.length} accounts under active surveillance.`}
+        description={`${dbRows.length} accounts under active surveillance.`}
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button className="gap-1.5">
                 <Plus className="h-4 w-4" /> Add Account
               </Button>
             </DialogTrigger>
-            <AddAccountDialog
-              existing={rows}
-              onAdd={(row) => {
-                handleAdd(row);
-                setOpen(false);
-              }}
+            <AccountFormDialog
+              mode="create"
+              existingUsernames={dbRows.map((a) => a.username)}
+              watchlists={watchlists}
+              submitting={createAccount.isPending}
+              onSubmit={handleCreate}
             />
           </Dialog>
         }
@@ -215,45 +276,60 @@ function AccountsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[36%]">Account</TableHead>
-              <TableHead>Tier</TableHead>
+              <TableHead className="w-[28%]">Account</TableHead>
+              <TableHead>Priority</TableHead>
+              <TableHead>Watchlist</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Scan</TableHead>
-              <TableHead className="text-right">Assets Today</TableHead>
-              <TableHead>Followers</TableHead>
+              <TableHead>Next Scan</TableHead>
+              <TableHead className="text-right">Total Assets</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((a) => (
-              <TableRow
-                key={a.id}
-                className={cn(a.optimistic && "animate-fade-in bg-primary/[0.03]")}
-              >
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={getAvatar(a.username)}
-                      alt=""
-                      className="h-9 w-9 rounded-full ring-1 ring-border"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">@{a.username}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {a.displayName}
+            {filtered.map((a) => {
+              const wl = assignmentMap[a.id]
+                ? watchlistNameById[assignmentMap[a.id]]
+                : null;
+              return (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={a.avatar_url || getAvatar(a.username)}
+                        alt=""
+                        className="h-9 w-9 rounded-full ring-1 ring-border bg-muted"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          @{a.username}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {a.display_name}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <TierChip tier={tierFor(a.username)} size="sm" showLabel />
-                </TableCell>
-                <TableCell>
-                  {a.optimistic ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-2 py-0.5 text-[11px]">
-                      <Loader2 className="h-3 w-3 animate-spin" /> syncing
-                    </span>
-                  ) : (
+                  </TableCell>
+                  <TableCell>
+                    <TierChip tier={a.tier as Tier} size="sm" showLabel />
+                  </TableCell>
+                  <TableCell>
+                    {wl ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground"
+                        style={
+                          wl.color
+                            ? { boxShadow: `inset 3px 0 0 ${wl.color}` }
+                            : undefined
+                        }
+                      >
+                        {wl.name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <span
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]",
@@ -265,121 +341,171 @@ function AccountsPage() {
                       <span
                         className={cn(
                           "h-1.5 w-1.5 rounded-full",
-                          a.status === "active" ? "bg-success" : "bg-muted-foreground",
+                          a.status === "active"
+                            ? "bg-success"
+                            : "bg-muted-foreground",
                         )}
                       />
                       {a.status}
                     </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{a.lastScan}</TableCell>
-                <TableCell className="text-right tabular-nums text-sm">
-                  {a.assetsToday > 0 ? (
-                    <span className="text-primary">{a.assetsToday}</span>
-                  ) : (
-                    <span className="text-muted-foreground">0</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground tabular-nums">
-                  {a.followers}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => rescan(a.id)}>
-                        Rescan now
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => togglePause(a.id)}>
-                        {a.status === "active" ? "Pause" : "Resume"}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={() => remove(a.id)}
-                      >
-                        Remove
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {timeAgo(a.last_scan_at)}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {nextScanLabel(a)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-sm">
+                    {assetCounts[a.id] ?? 0}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setEditing(a)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => toggleMonitoring(a)}>
+                          {a.status === "active"
+                            ? "Disable monitoring"
+                            : "Enable monitoring"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => remove(a)}
+                        >
+                          Remove
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="h-24 text-center text-sm text-muted-foreground"
                 >
-                  No accounts match your filters.
+                  {isLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                    </span>
+                  ) : (
+                    "No accounts match your filters."
+                  )}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        {editing && (
+          <AccountFormDialog
+            mode="edit"
+            initial={{
+              username: editing.username,
+              displayName: editing.display_name,
+              tier: (editing.tier as Tier) ?? "B",
+              watchlistId: assignmentMap[editing.id] ?? null,
+              monitoring: editing.status === "active",
+              notes: editing.notes ?? "",
+            }}
+            existingUsernames={dbRows
+              .filter((a) => a.id !== editing.id)
+              .map((a) => a.username)}
+            watchlists={watchlists}
+            submitting={updateAccount.isPending}
+            onSubmit={(v) => handleEdit(editing.id, v)}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
 
-function AddAccountDialog({
-  existing,
-  onAdd,
+function AccountFormDialog({
+  mode,
+  initial,
+  existingUsernames,
+  watchlists,
+  submitting,
+  onSubmit,
 }: {
-  existing: Row[];
-  onAdd: (row: Row) => void;
+  mode: "create" | "edit";
+  initial?: {
+    username: string;
+    displayName: string;
+    tier: Tier;
+    watchlistId: string | null;
+    monitoring: boolean;
+    notes: string;
+  };
+  existingUsernames: string[];
+  watchlists: Watchlist[];
+  submitting: boolean;
+  onSubmit: (input: {
+    username: string;
+    displayName: string;
+    tier: Tier;
+    watchlistId: string | null;
+    monitoring: boolean;
+    notes?: string;
+  }) => void;
 }) {
-  const [username, setUsername] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [followers, setFollowers] = useState("");
-  const [category, setCategory] = useState<Category>("brand");
-  const [notify, setNotify] = useState(true);
-  const [notes, setNotes] = useState("");
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [displayName, setDisplayName] = useState(initial?.displayName ?? "");
+  const [tier, setTier] = useState<Tier>(initial?.tier ?? "B");
+  const [watchlistId, setWatchlistId] = useState<string>(
+    initial?.watchlistId ?? "__none__",
+  );
+  const [monitoring, setMonitoring] = useState(initial?.monitoring ?? true);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const cleanUsername = username.trim().replace(/^@/, "").toLowerCase();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!cleanUsername) {
-      setError("Username is required");
-      return;
+    if (mode === "create") {
+      if (!cleanUsername) return setError("Username is required");
+      if (!USERNAME_RE.test(cleanUsername))
+        return setError("Only letters, numbers, dots and underscores");
+      if (existingUsernames.includes(cleanUsername))
+        return setError("You are already tracking this account");
     }
-    if (!/^[a-z0-9._]{1,30}$/.test(cleanUsername)) {
-      setError("Only letters, numbers, dots and underscores");
-      return;
-    }
-    if (existing.some((r) => r.username === cleanUsername)) {
-      setError("You are already tracking this account");
-      return;
-    }
+    if (!displayName.trim().length && !cleanUsername)
+      return setError("Display name required");
 
-    const row: Row = {
-      id: `new-${Date.now()}`,
+    onSubmit({
       username: cleanUsername,
       displayName: displayName.trim() || cleanUsername,
-      status: "active",
-      lastScan: "queued",
-      assetsToday: 0,
-      followers: followers.trim() || "—",
-      category,
-      notify,
+      tier,
+      watchlistId: watchlistId === "__none__" ? null : watchlistId,
+      monitoring,
       notes: notes.trim() || undefined,
-      optimistic: true,
-    };
-    onAdd(row);
+    });
   }
 
   return (
-    <DialogContent className="sm:max-w-[460px]">
+    <DialogContent className="sm:max-w-[480px]">
       <DialogHeader>
-        <DialogTitle>Add Instagram account</DialogTitle>
+        <DialogTitle>
+          {mode === "create" ? "Add Instagram account" : "Edit account"}
+        </DialogTitle>
         <DialogDescription>
-          The scanner will begin monitoring this account on the next cycle.
+          {mode === "create"
+            ? "The scanner will begin monitoring this account on the next cycle."
+            : "Update priority, watchlist and monitoring for this account."}
         </DialogDescription>
       </DialogHeader>
 
@@ -393,52 +519,63 @@ function AddAccountDialog({
             <Input
               id="username"
               value={username}
+              disabled={mode === "edit"}
               onChange={(e) => {
                 setUsername(e.target.value);
                 setError(null);
               }}
               placeholder="username"
               className="pl-7"
-              autoFocus
+              autoFocus={mode === "create"}
+              maxLength={30}
             />
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="displayName">Display name</Label>
-            <Input
-              id="displayName"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Nike"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="followers">Followers</Label>
-            <Input
-              id="followers"
-              value={followers}
-              onChange={(e) => setFollowers(e.target.value)}
-              placeholder="e.g. 12.4M"
-            />
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="displayName">Display name</Label>
+          <Input
+            id="displayName"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="e.g. Nike"
+            maxLength={80}
+          />
         </div>
 
-        <div className="space-y-1.5">
-          <Label>Category</Label>
-          <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="brand">Brand</SelectItem>
-              <SelectItem value="creator">Creator</SelectItem>
-              <SelectItem value="competitor">Competitor</SelectItem>
-              <SelectItem value="reference">Reference</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Priority</Label>
+            <Select value={tier} onValueChange={(v) => setTier(v as Tier)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIERS.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {TIER_LABEL[t]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Watchlist</Label>
+            <Select value={watchlistId} onValueChange={setWatchlistId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Unassigned</SelectItem>
+                {watchlists.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="space-y-1.5">
@@ -449,17 +586,20 @@ function AddAccountDialog({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Optional internal note"
             rows={2}
+            maxLength={500}
           />
         </div>
 
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <div>
-            <div className="text-sm font-medium">Notify on new assets</div>
+            <div className="text-sm font-medium">Monitoring</div>
             <div className="text-xs text-muted-foreground">
-              Alert both operators when this account delivers new assets.
+              {monitoring
+                ? "Scanner will include this account in each cycle."
+                : "Scanner will skip this account until re-enabled."}
             </div>
           </div>
-          <Switch checked={notify} onCheckedChange={setNotify} />
+          <Switch checked={monitoring} onCheckedChange={setMonitoring} />
         </div>
 
         <DialogFooter>
@@ -468,8 +608,17 @@ function AddAccountDialog({
               Cancel
             </Button>
           </DialogClose>
-          <Button type="submit" disabled={!username.trim()}>
-            Add account
+          <Button type="submit" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />{" "}
+                {mode === "create" ? "Adding…" : "Saving…"}
+              </>
+            ) : mode === "create" ? (
+              "Add account"
+            ) : (
+              "Save changes"
+            )}
           </Button>
         </DialogFooter>
       </form>

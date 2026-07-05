@@ -85,6 +85,68 @@ export function useWatchlists() {
   });
 }
 
+export function useSetWatchlistAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      accountId,
+      watchlistId,
+    }: {
+      accountId: string;
+      watchlistId: string | null;
+    }) => {
+      // Replace: remove existing links for the account, then add the new one.
+      const { error: delErr } = await supabase
+        .from("watchlist_accounts")
+        .delete()
+        .eq("account_id", accountId);
+      if (delErr) throw delErr;
+      if (watchlistId) {
+        const { error } = await supabase
+          .from("watchlist_accounts")
+          .insert({ account_id: accountId, watchlist_id: watchlistId });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["watchlist_accounts"] });
+      qc.invalidateQueries({ queryKey: trackedAccountsKey });
+    },
+  });
+}
+
+export function useWatchlistAssignments() {
+  return useQuery({
+    queryKey: ["watchlist_accounts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("watchlist_accounts")
+        .select("account_id, watchlist_id");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useAccountAssetCounts() {
+  return useQuery({
+    queryKey: ["account_asset_counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("assets")
+        .select("account_id");
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) {
+        const key = (row as { account_id: string }).account_id;
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+      return counts;
+    },
+  });
+}
+
+
 // ---------- Assets ----------
 export type AssetRow = Tables<"assets">;
 
