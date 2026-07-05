@@ -2,11 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Plus, MoreHorizontal, Search, Loader2, Radar } from "lucide-react";
+import { Plus, MoreHorizontal, Search, Loader2, Radar, X } from "lucide-react";
 import { toast } from "sonner";
 import { scanAccountNowFn } from "@/lib/scanner.functions";
 import { trackedAccountsKey } from "@/lib/db-queries";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
