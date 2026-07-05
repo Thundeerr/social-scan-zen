@@ -185,12 +185,6 @@ async function downloadOne(
   const filenameBase = `${target.username}-${target.id}`;
 
   startProgress(target, batchId);
-
-  if (!url) {
-    const filename = `${filenameBase}.${fallbackExt}`;
-    completeProgress(target.id, false, filename, "No media URL available");
-    return { ok: false, filename, url: null, error: "No media URL available" };
-  }
   try {
     const prepared = await prepareAssetDownloadFn({ data: { assetId: target.id } });
     updateProgress(target.id, {
