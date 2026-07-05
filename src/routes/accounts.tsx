@@ -166,7 +166,7 @@ function AccountsPage() {
               <TableHead className="w-[40%]">Account</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Scan</TableHead>
-              <TableHead className="text-right">Posts Today</TableHead>
+              <TableHead className="text-right">Assets Today</TableHead>
               <TableHead>Followers</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
@@ -218,8 +218,8 @@ function AccountsPage() {
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{a.lastScan}</TableCell>
                 <TableCell className="text-right tabular-nums text-sm">
-                  {a.postsToday > 0 ? (
-                    <span className="text-primary">{a.postsToday}</span>
+                  {a.assetsToday > 0 ? (
+                    <span className="text-primary">{a.assetsToday}</span>
                   ) : (
                     <span className="text-muted-foreground">0</span>
                   )}
@@ -308,7 +308,7 @@ function AddAccountDialog({
       displayName: displayName.trim() || cleanUsername,
       status: "active",
       lastScan: "queued",
-      postsToday: 0,
+      assetsToday: 0,
       followers: followers.trim() || "—",
       category,
       notify,
@@ -398,9 +398,9 @@ function AddAccountDialog({
 
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <div>
-            <div className="text-sm font-medium">Notify on new posts</div>
+            <div className="text-sm font-medium">Notify on new assets</div>
             <div className="text-xs text-muted-foreground">
-              Alert both operators when this account posts.
+              Alert both operators when this account delivers new assets.
             </div>
           </div>
           <Switch checked={notify} onCheckedChange={setNotify} />

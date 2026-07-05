@@ -11,8 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ScannerRouteImport } from './routes/scanner'
-import { Route as PostsRouteImport } from './routes/posts'
 import { Route as DownloadsRouteImport } from './routes/downloads'
+import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -26,14 +26,14 @@ const ScannerRoute = ScannerRouteImport.update({
   path: '/scanner',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PostsRoute = PostsRouteImport.update({
-  id: '/posts',
-  path: '/posts',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DownloadsRoute = DownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsRoute = AssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountsRoute = AccountsRouteImport.update({
@@ -50,16 +50,16 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
+  '/assets': typeof AssetsRoute
   '/downloads': typeof DownloadsRoute
-  '/posts': typeof PostsRoute
   '/scanner': typeof ScannerRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
+  '/assets': typeof AssetsRoute
   '/downloads': typeof DownloadsRoute
-  '/posts': typeof PostsRoute
   '/scanner': typeof ScannerRoute
   '/settings': typeof SettingsRoute
 }
@@ -67,8 +67,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
+  '/assets': typeof AssetsRoute
   '/downloads': typeof DownloadsRoute
-  '/posts': typeof PostsRoute
   '/scanner': typeof ScannerRoute
   '/settings': typeof SettingsRoute
 }
@@ -77,18 +77,18 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/accounts'
+    | '/assets'
     | '/downloads'
-    | '/posts'
     | '/scanner'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/accounts' | '/downloads' | '/posts' | '/scanner' | '/settings'
+  to: '/' | '/accounts' | '/assets' | '/downloads' | '/scanner' | '/settings'
   id:
     | '__root__'
     | '/'
     | '/accounts'
+    | '/assets'
     | '/downloads'
-    | '/posts'
     | '/scanner'
     | '/settings'
   fileRoutesById: FileRoutesById
@@ -96,8 +96,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountsRoute: typeof AccountsRoute
+  AssetsRoute: typeof AssetsRoute
   DownloadsRoute: typeof DownloadsRoute
-  PostsRoute: typeof PostsRoute
   ScannerRoute: typeof ScannerRoute
   SettingsRoute: typeof SettingsRoute
 }
@@ -118,18 +118,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScannerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/posts': {
-      id: '/posts'
-      path: '/posts'
-      fullPath: '/posts'
-      preLoaderRoute: typeof PostsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/downloads': {
       id: '/downloads'
       path: '/downloads'
       fullPath: '/downloads'
       preLoaderRoute: typeof DownloadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets': {
+      id: '/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AssetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/accounts': {
@@ -152,8 +152,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountsRoute: AccountsRoute,
+  AssetsRoute: AssetsRoute,
   DownloadsRoute: DownloadsRoute,
-  PostsRoute: PostsRoute,
   ScannerRoute: ScannerRoute,
   SettingsRoute: SettingsRoute,
 }

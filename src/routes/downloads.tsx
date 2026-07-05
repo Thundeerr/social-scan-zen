@@ -18,14 +18,14 @@ function DownloadsPage() {
               <Download className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <h2 className="text-lg font-semibold tracking-tight">No downloads yet</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Archive is empty</h2>
           <p className="text-sm text-muted-foreground mt-2">
-            Approved posts you download will appear here, organized by account and date.
+            Synchronized assets will appear here, organized by account and date.
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
             <Button asChild variant="secondary" className="gap-1.5">
-              <Link to="/posts">
-                <Images className="h-4 w-4" /> Browse new posts
+              <Link to="/assets" search={{ day: "all", status: "all" }}>
+                <Images className="h-4 w-4" /> Review new assets
               </Link>
             </Button>
           </div>
