@@ -11,6 +11,9 @@ import {
   Download,
   Search,
   Database,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { PageHeader } from "@/components/page-header";
@@ -20,7 +23,10 @@ import {
   useScannerStats,
 } from "@/lib/db-queries";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
@@ -467,6 +473,9 @@ function ScannerPage() {
         />
       </div>
 
+      {/* Provider status + test scan */}
+      <ProviderStatusPanel />
+
       {/* Live scans — the "visible process" */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -582,6 +591,143 @@ function ScannerPage() {
             </ul>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Provider status + on-demand test scan
+// -----------------------------------------------------------------------------
+
+function ProviderStatusPanel() {
+  const qc = useQueryClient();
+  const health = useServerFn(providerHealthFn);
+  const scan = useServerFn(scanSingleAccountFn);
+
+  const healthQ = useQuery({
+    queryKey: ["provider-health"],
+    queryFn: () => health(),
+    refetchInterval: 30_000,
+  });
+
+  const [username, setUsername] = useState("");
+
+  const mut = useMutation({
+    mutationFn: (u: string) => scan({ data: { username: u } }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success(
+          `@${res.username} · ${res.inserted} new · ${res.duplicates} already archived`,
+        );
+      } else {
+        toast.error(`@${res.username} scan failed: ${res.error ?? "unknown"}`);
+      }
+      // Refresh all scanner surfaces.
+      qc.invalidateQueries({ queryKey: ["scanner_runs", 20] });
+      qc.invalidateQueries({ queryKey: ["scanner_queue"] });
+      qc.invalidateQueries({ queryKey: ["scanner_stats"] });
+      qc.invalidateQueries({ queryKey: ["provider-health"] });
+      setUsername("");
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : "Scan failed");
+    },
+  });
+
+  const h = healthQ.data;
+  const state: "loading" | "ok" | "warn" | "down" = !h
+    ? "loading"
+    : !h.configured
+      ? "down"
+      : h.lastError && (!h.lastSuccessAt || (h.lastErrorAt ?? "") > h.lastSuccessAt)
+        ? "warn"
+        : "ok";
+
+  const stateStyles = {
+    loading: "border-border text-muted-foreground",
+    ok: "border-success/40 text-success",
+    warn: "border-yellow-500/40 text-yellow-500",
+    down: "border-destructive/40 text-destructive",
+  }[state];
+
+  const StateIcon =
+    state === "loading" ? Loader2 : state === "ok" ? ShieldCheck : ShieldAlert;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+      <div className="flex items-start gap-4 flex-wrap">
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs uppercase tracking-[0.18em]",
+            stateStyles,
+          )}
+        >
+          <StateIcon className={cn("h-3.5 w-3.5", state === "loading" && "animate-spin")} />
+          {state === "loading"
+            ? "Checking provider…"
+            : state === "ok"
+              ? "Provider online"
+              : state === "warn"
+                ? "Provider degraded"
+                : "Provider unavailable"}
+        </div>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="text-sm font-medium">Instagram provider</div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {h?.host ? `via ${h.host}` : "endpoint hidden — configure RAPIDAPI_HOST"} ·{" "}
+            {h?.message ?? "…"}
+          </div>
+          {h?.lastError && (
+            <div className="text-[11px] text-destructive/80 truncate">
+              Last error: {h.lastError.slice(0, 140)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="flex-1 min-w-[220px]">
+          <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Test scan · single account
+          </label>
+          <div className="mt-1 flex items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-2">
+            <span className="text-muted-foreground text-sm">@</span>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && username && !mut.isPending) {
+                  mut.mutate(username);
+                }
+              }}
+              placeholder="instagram_handle"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              className="bg-transparent outline-none flex-1 text-sm font-mono"
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => mut.mutate(username)}
+          disabled={!username || mut.isPending || state === "down"}
+          className={cn(
+            "h-10 px-4 rounded-md border text-xs uppercase tracking-[0.18em] transition-colors",
+            mut.isPending || state === "down"
+              ? "border-border text-muted-foreground cursor-not-allowed"
+              : "border-primary/50 text-primary hover:bg-primary/10",
+          )}
+        >
+          {mut.isPending ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Scanning…
+            </span>
+          ) : (
+            "Run scan"
+          )}
+        </button>
       </div>
     </div>
   );
