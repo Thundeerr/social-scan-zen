@@ -529,14 +529,14 @@ function AccountsPage() {
                   }}
                 />
               </TableHead>
-              <TableHead className="w-[28%]">Account</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Watchlist</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Scan</TableHead>
-              <TableHead>Next Scan</TableHead>
-              <TableHead className="text-right">Total Assets</TableHead>
-              <TableHead className="w-[160px] text-right">Actions</TableHead>
+              <TableHead className="min-w-[10rem] md:w-[28%]">Account</TableHead>
+              <TableHead className="hidden lg:table-cell">Priority</TableHead>
+              <TableHead className="hidden xl:table-cell">Watchlist</TableHead>
+              <TableHead className="hidden md:table-cell">Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Last Scan</TableHead>
+              <TableHead className="hidden xl:table-cell">Next Scan</TableHead>
+              <TableHead className="hidden md:table-cell text-right">Total Assets</TableHead>
+              <TableHead className="w-[92px] md:w-[160px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
