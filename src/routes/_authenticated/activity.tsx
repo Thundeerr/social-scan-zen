@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import {
   useActivityFeed,
@@ -120,32 +121,12 @@ function ActivityPage() {
 
   return (
     <div className="p-6 md:p-8 space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Immutable audit
-          </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            Activity log
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Every operator action and autonomous event, newest first. Entries
-            cannot be edited or removed.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium",
-              "border-success/30 bg-success/10 text-success",
-            )}
-          >
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inset-0 animate-ping rounded-full bg-success/60" />
-              <span className="relative h-1.5 w-1.5 rounded-full bg-success" />
-            </span>
-            Realtime
-          </span>
+      <PageHeader
+        eyebrow="Immutable audit"
+        title="Activity log"
+        description="Every operator action and autonomous event, newest first. Entries cannot be edited or removed."
+        status={{ label: "Realtime", tone: "success", live: true }}
+        actions={
           <Button
             variant="outline"
             size="sm"
@@ -154,8 +135,9 @@ function ActivityPage() {
           >
             <RefreshCcw className="h-3.5 w-3.5" /> Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
+
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Total events" value={kpi.total.toLocaleString()} />
