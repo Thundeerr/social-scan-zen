@@ -245,3 +245,236 @@ export async function sendAssetHandoff(
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Detection card — rich per-asset notification with inline action buttons.
+//
+// Fired when a new asset is detected from an S/A-tier tracked account. The
+// message carries the thumbnail (photo) or media (video), the metadata block,
+// and a keyboard whose callback_data is handled by the public Telegram
+// webhook route.
+// ---------------------------------------------------------------------------
+
+export type DetectionCardInput = {
+  assetId: string;
+  handle: string;
+  displayName?: string | null;
+  caption: string | null;
+  postedAt: string | null;   // ISO
+  detectedAt: string | null; // ISO
+  mediaType: string;         // image | video | reel | story | carousel
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  sourceUrl: string | null;
+  aiVerdict: string | null;
+  aiConfidence: number | null; // 0..1
+  aiReasons: string[];         // treated as AI tags when available
+  adminUrl: string;            // deep link into the InstaScanner admin panel
+};
+
+function fmtDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+}
+
+function truncate(s: string, max: number): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > max ? t.slice(0, max - 1) + "…" : t;
+}
+
+function buildDetectionCaption(input: DetectionCardInput): string {
+  const lines: string[] = [];
+  const display = input.displayName ? ` · ${escapeHtml(input.displayName)}` : "";
+  lines.push(`🛰 <b>New asset</b> · @${escapeHtml(input.handle)}${display}`);
+  lines.push("");
+
+  if (input.caption) {
+    lines.push(`<i>${escapeHtml(truncate(input.caption, 220))}</i>`);
+    lines.push("");
+  }
+
+  const posted = fmtDate(input.postedAt);
+  const detected = fmtDate(input.detectedAt);
+  if (posted) lines.push(`📅 Posted: ${escapeHtml(posted)}`);
+  if (detected) lines.push(`🛰 Detected: ${escapeHtml(detected)}`);
+
+  if (input.aiVerdict) {
+    const conf = input.aiConfidence != null ? ` ${Math.round(input.aiConfidence * 100)}%` : "";
+    lines.push(`🤖 AI: <b>${escapeHtml(input.aiVerdict)}</b>${conf}`);
+  }
+  if (input.aiConfidence != null) {
+    // Reported separately as "Quality" — a proxy operators recognise. Luxury
+    // score is only shown when we actually have that column populated.
+    lines.push(`✨ Quality: ${Math.round(input.aiConfidence * 100)}%`);
+  }
+  if (input.aiReasons.length > 0) {
+    const tags = input.aiReasons
+      .slice(0, 4)
+      .map((t) => `#${escapeHtml(t.replace(/[^\w-]+/g, "_").slice(0, 24))}`)
+      .join(" ");
+    lines.push(`🏷 ${tags}`);
+  }
+
+  lines.push("");
+  if (input.sourceUrl) lines.push(`<a href="${escapeHtml(input.sourceUrl)}">Original on Instagram →</a>`);
+  lines.push(`<a href="${escapeHtml(input.adminUrl)}">Open in Admin →</a>`);
+
+  return lines.join("\n");
+}
+
+function buildDetectionKeyboard(assetId: string, adminUrl: string, sourceUrl: string | null) {
+  const cb = (action: string) => ({ text: action.label, callback_data: `${action.key}:${assetId}` });
+  const A = {
+    download:  cb({ key: "dl",  label: "⬇️ Download" }),
+    send:      cb({ key: "snd", label: "📤 Send Media to Me" }),
+    copy:      cb({ key: "cap", label: "📋 Copy Caption" }),
+    reviewed:  cb({ key: "rev", label: "✅ Mark Reviewed" }),
+    ignore:    cb({ key: "ign", label: "🚫 Ignore" }),
+    repost:    cb({ key: "rep", label: "♻️ Add to Repost Queue" }),
+  };
+  const row3: Array<Record<string, unknown>> = [{ text: "🛠 Open in Admin", url: adminUrl }];
+  if (sourceUrl) row3.push({ text: "🔗 Instagram", url: sourceUrl });
+  return {
+    inline_keyboard: [
+      [A.download, A.send],
+      [A.copy, A.reviewed],
+      [A.repost, A.ignore],
+      row3,
+    ],
+  };
+}
+
+/**
+ * Sends a rich detection card with inline action buttons. Falls back to a
+ * text-only message if media attachment fails (Telegram can't fetch some
+ * IG CDN URLs).
+ */
+export async function sendDetectionCard(
+  chatId: string,
+  input: DetectionCardInput,
+): Promise<TelegramSendResult> {
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  const connKey = process.env.TELEGRAM_API_KEY;
+  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
+  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
+  if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
+
+  const caption = buildDetectionCaption(input);
+  const keyboard = buildDetectionKeyboard(input.assetId, input.adminUrl, input.sourceUrl);
+  const isVideo = ["video", "reel", "story"].includes(input.mediaType);
+  const isImage = input.mediaType === "image";
+  const mediaSrc = input.thumbnailUrl ?? input.mediaUrl;
+
+  const sendText = async () => {
+    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": connKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId.trim(),
+        text: caption,
+        parse_mode: "HTML",
+        disable_web_page_preview: false,
+        reply_markup: keyboard,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean; description?: string; result?: { message_id?: number };
+    };
+    if (!res.ok || data.ok === false) {
+      return { ok: false as const, error: data.description ?? `HTTP ${res.status}` };
+    }
+    return { ok: true as const, messageId: data.result?.message_id ?? 0 };
+  };
+
+  if (!mediaSrc || (!isVideo && !isImage)) return sendText();
+
+  const endpoint = isVideo && input.mediaUrl ? "sendVideo" : "sendPhoto";
+  const payloadKey = endpoint === "sendVideo" ? "video" : "photo";
+  const source = endpoint === "sendVideo" ? input.mediaUrl! : mediaSrc;
+
+  try {
+    const res = await fetch(`${GATEWAY_URL}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": connKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId.trim(),
+        [payloadKey]: source,
+        caption,
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean; description?: string; result?: { message_id?: number };
+    };
+    if (!res.ok || data.ok === false) return sendText();
+    return { ok: true, messageId: data.result?.message_id ?? 0 };
+  } catch {
+    return sendText();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bot API helpers used by the webhook route to answer inline-button taps.
+// ---------------------------------------------------------------------------
+
+async function botCall(method: string, body: Record<string, unknown>): Promise<{
+  ok: boolean; description?: string; result?: unknown;
+}> {
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  const connKey = process.env.TELEGRAM_API_KEY;
+  if (!lovableKey || !connKey) return { ok: false, description: "telegram keys missing" };
+  try {
+    const res = await fetch(`${GATEWAY_URL}/${method}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": connKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    return (await res.json().catch(() => ({ ok: false }))) as {
+      ok: boolean; description?: string; result?: unknown;
+    };
+  } catch (err) {
+    return { ok: false, description: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function answerCallbackQuery(
+  callbackQueryId: string,
+  text: string,
+  showAlert = false,
+) {
+  return botCall("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    text: text.slice(0, 200),
+    show_alert: showAlert,
+  });
+}
+
+export function editMessageReplyMarkup(
+  chatId: string | number,
+  messageId: number,
+  replyMarkup: Record<string, unknown> | null,
+) {
+  return botCall("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: replyMarkup ?? { inline_keyboard: [] },
+  });
+}
+
+export { escapeHtml as _escapeHtml };
+
