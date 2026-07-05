@@ -25,6 +25,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { useAssets, assetActions } from "@/lib/assets-store";
+import { useDownloads } from "@/lib/downloads-store";
 import { useGlobalQuery, matchesQuery, setGlobalQuery } from "@/lib/search-store";
 import { useFavorites, toggleFavorite } from "@/lib/favorites-store";
 import {
@@ -130,6 +131,8 @@ function AssetInbox() {
   const navigate = useNavigate({ from: "/assets" });
   const assets = useAssets();
   const favorites = useFavorites();
+  const { countByAsset: downloadCounts } = useDownloads();
+  const downloadedIds = downloadCounts;
 
   const setSearch = (patch: Partial<{ day: Day; status: Status }>) =>
     navigate({
@@ -401,6 +404,7 @@ function AssetInbox() {
             setGlobalQuery("");
           }}
           query={q}
+          downloadedIds={downloadedIds}
         />
 
         <section className="relative flex min-w-0 flex-col border-x border-border/60 bg-background/40">
@@ -458,6 +462,7 @@ function InboxRail({
   onSelect,
   onReset,
   query,
+  downloadedIds,
 }: {
   assets: Asset[];
   allAssets: Asset[];
@@ -470,6 +475,7 @@ function InboxRail({
   onSelect: (id: string) => void;
   onReset: () => void;
   query: string;
+  downloadedIds: Map<string, number>;
 }) {
   const awaiting = allAssets.filter((a) => a.status === "new").length;
   return (
@@ -585,6 +591,14 @@ function InboxRail({
                       {a.video && (
                         <div className="absolute bottom-0.5 right-0.5 rounded-sm bg-black/70 px-1 py-[1px] text-[8px] font-medium uppercase text-white">
                           Vid
+                        </div>
+                      )}
+                      {downloadedIds.has(a.id) && (
+                        <div
+                          className="absolute top-0.5 left-0.5 grid h-4 w-4 place-items-center rounded-sm bg-success/90 text-[9px] text-success-foreground shadow"
+                          title="Synchronized to archive"
+                        >
+                          <Download className="h-2.5 w-2.5" />
                         </div>
                       )}
                     </div>
