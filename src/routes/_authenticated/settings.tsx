@@ -45,7 +45,7 @@ function SettingRow({
 
 function SettingsPage() {
   const [provider, setProvider] = useState("instagram-looter");
-  const [interval, setIntervalValue] = useState<ScanIntervalValue>(DEFAULT_SCAN_INTERVAL);
+  const [interval, setIntervalValue] = useScanInterval();
   const [emailNotif, setEmailNotif] = useState(true);
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
