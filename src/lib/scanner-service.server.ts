@@ -20,11 +20,11 @@ import {
 
 type DB = SupabaseClient<Database>;
 
-// Autonomous cadence: every ~60 minutes, with ±5min jitter so a large fleet
-// doesn't stampede the provider on the hour. On-demand scans bypass this
-// schedule entirely via `scanAccountNow`.
-const MIN_INTERVAL_MIN = 55;
-const MAX_INTERVAL_MIN = 65;
+// Autonomous cadence: 4 scans per day per account = every ~6 hours, with
+// ±15min jitter so a large fleet doesn't stampede the provider. On-demand
+// scans bypass this schedule entirely via `scanAccountNow`.
+const MIN_INTERVAL_MIN = 345; // 5h 45m
+const MAX_INTERVAL_MIN = 375; // 6h 15m
 const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MIN = 5; // 5, 10, 20, 40, 80 min
 
