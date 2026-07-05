@@ -103,6 +103,14 @@ export async function executeScan(
       duplicates = rows.length - inserted;
     }
 
+    if (inserted > 0) {
+      await db.from("activity_log").insert({
+        event_type: "asset_detected",
+        description: `Detected ${inserted} new asset${inserted === 1 ? "" : "s"} for @${username}`,
+        metadata: { account_id: accountId, run_id: runId, inserted },
+      });
+    }
+
     await db
       .from("scanner_runs")
       .update({
