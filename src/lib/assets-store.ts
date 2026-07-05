@@ -92,7 +92,6 @@ function rowToAsset(r: Row): Asset {
 
 let assets: Asset[] = [];
 let loaded = false;
-let loading: Promise<void> | null = null;
 let channel: ReturnType<typeof supabase.channel> | null = null;
 const listeners = new Set<() => void>();
 
