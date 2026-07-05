@@ -142,9 +142,14 @@ function AccountsPage() {
           },
         });
       } else {
-        toast(`@${a.username} is up to date`, {
+        toast(`No new assets from @${a.username}`, {
           id: t,
-          description: r.detected > 0 ? `${r.detected} posts checked, no new ones` : "Provider returned no posts",
+          description:
+            r.duplicates > 0
+              ? `${r.duplicates} already in archive · last seen refreshed`
+              : r.detected > 0
+                ? `${r.detected} posts checked, all already archived`
+                : "Provider returned no posts",
         });
       }
     } catch (err) {

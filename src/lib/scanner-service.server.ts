@@ -136,6 +136,9 @@ export async function executeScan(
     let inserted = 0;
     let duplicates = 0;
     if (rows.length) {
+      // Insert only truly new records. `ignoreDuplicates` skips any row that
+      // conflicts on (account_id, external_id), so `data` is exactly the set
+      // of freshly-created assets — never previously-seen ones.
       const { data, error } = await db
         .from("assets")
         .upsert(rows, { onConflict: "account_id,external_id", ignoreDuplicates: true })
@@ -143,6 +146,22 @@ export async function executeScan(
       if (error) throw error;
       inserted = data?.length ?? 0;
       duplicates = rows.length - inserted;
+
+      // Refresh `last_seen_at` for every asset the provider returned this
+      // scan — inserted rows already have it via the default, so this
+      // primarily bumps the timestamp on duplicates so the operator can see
+      // that the archive is still current.
+      if (duplicates > 0) {
+        const nowIso = new Date().toISOString();
+        await db
+          .from("assets")
+          .update({ last_seen_at: nowIso })
+          .eq("account_id", accountId)
+          .in(
+            "external_id",
+            rows.map((r) => r.external_id).filter((x): x is string => Boolean(x)),
+          );
+      }
     }
 
     if (inserted > 0) {

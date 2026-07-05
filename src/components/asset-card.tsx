@@ -43,12 +43,22 @@ export function AssetCard({ asset }: { asset: Asset }) {
       data-asset-url={sourceUrl}
       onClick={() => selectAsset(asset.id)}
       className={cn(
-        "soft-shadow group rounded-xl border bg-card overflow-hidden transition-colors cursor-pointer",
+        "soft-shadow group rounded-xl border bg-card overflow-hidden transition-colors cursor-pointer relative",
         selected
           ? "border-primary/60 ring-1 ring-primary/40"
           : "border-border hover:border-primary/30",
+        asset.justDetected && "asset-just-detected",
       )}
     >
+      {asset.justDetected && (
+        <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 text-[9px] font-mono uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
+          <span className="relative inline-flex h-1.5 w-1.5">
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/70" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+          </span>
+          New signal
+        </div>
+      )}
       <div className="flex items-center gap-3 px-4 py-3">
         <img src={asset.avatar} alt="" className="h-8 w-8 rounded-full ring-1 ring-border" />
         <div className="flex-1 min-w-0">

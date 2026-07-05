@@ -75,6 +75,8 @@ function rowToAsset(r: Row): Asset {
     : r.asset_status?.state;
   const status: Status = state ? STATE_TO_STATUS[state] : "new";
   const isVideo = r.media_type === "video";
+  const detectedMs = new Date(r.detected_at).getTime();
+  const justDetected = Number.isFinite(detectedMs) && Date.now() - detectedMs < 90_000;
   return {
     id: r.id,
     username,
@@ -86,6 +88,7 @@ function rowToAsset(r: Row): Asset {
     status,
     day: dayBucket(r.posted_at ?? r.detected_at),
     likes: formatLikes(r.likes ?? 0),
+    justDetected,
   };
 }
 
@@ -131,6 +134,17 @@ async function refreshOne(id: string) {
   if (idx === -1) assets = [mapped, ...assets];
   else assets[idx] = mapped;
   emit();
+
+  // Decay the "just detected" highlight after 90s without a full reload.
+  if (mapped.justDetected) {
+    setTimeout(() => {
+      const i = assets.findIndex((a) => a.id === id);
+      if (i !== -1 && assets[i].justDetected) {
+        assets[i] = { ...assets[i], justDetected: false };
+        emit();
+      }
+    }, 90_000);
+  }
 }
 
 function ensureChannel() {
