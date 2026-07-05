@@ -12,7 +12,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { getInstagramProviderFromEnv, type ProviderPost } from "./instagram-provider.server";
+import {
+  getInstagramProviderFromEnv,
+  describeProviderRequest,
+  type ProviderPost,
+} from "./instagram-provider.server";
 
 type DB = SupabaseClient<Database>;
 
@@ -46,6 +50,19 @@ export type ScanOutcome = {
   error?: string;
 };
 
+async function setPhase(
+  db: DB,
+  runId: string,
+  phase: string,
+  detail: string,
+  extra: Record<string, unknown> = {},
+) {
+  await db
+    .from("scanner_runs")
+    .update({ phase, phase_detail: detail, ...extra })
+    .eq("id", runId);
+}
+
 export async function executeScan(
   db: DB,
   runId: string,
@@ -53,10 +70,16 @@ export async function executeScan(
   username: string,
   attempt: number,
 ): Promise<ScanOutcome> {
-  // Mark running
+  // Mark running + first visible phase
   await db
     .from("scanner_runs")
-    .update({ status: "running", started_at: new Date().toISOString() })
+    .update({
+      status: "running",
+      started_at: new Date().toISOString(),
+      phase: "connecting",
+      phase_detail: `Establishing session with provider`,
+      assets_found: 0,
+    })
     .eq("id", runId);
 
   await db.from("activity_log").insert({
@@ -65,10 +88,19 @@ export async function executeScan(
     metadata: { account_id: accountId, run_id: runId, attempt },
   });
 
-
   try {
     const provider = getInstagramProviderFromEnv();
+
+    await setPhase(db, runId, "fetching", describeProviderRequest(username));
     const result = await provider.fetchAccount(username);
+
+    await setPhase(
+      db,
+      runId,
+      "parsing",
+      `Normalising ${result.posts.length} item${result.posts.length === 1 ? "" : "s"}`,
+      { assets_found: result.posts.length },
+    );
 
     // Sync account metadata (avatar/display) when new info is present.
     const meta: { display_name?: string; avatar_url?: string } = {};
@@ -90,6 +122,13 @@ export async function executeScan(
       comments: p.comments,
       posted_at: p.posted_at,
     }));
+
+    await setPhase(
+      db,
+      runId,
+      "storing",
+      `Reconciling ${rows.length} record${rows.length === 1 ? "" : "s"} against archive`,
+    );
 
     let inserted = 0;
     let duplicates = 0;
@@ -118,6 +157,12 @@ export async function executeScan(
         completed_at: new Date().toISOString(),
         accounts_scanned: 1,
         assets_detected: inserted,
+        assets_found: rows.length,
+        phase: "completed",
+        phase_detail:
+          inserted > 0
+            ? `${inserted} new · ${duplicates} already archived`
+            : `No new assets · ${duplicates} already archived`,
       })
       .eq("id", runId);
 
@@ -157,6 +202,8 @@ export async function executeScan(
         status: "failed",
         completed_at: new Date().toISOString(),
         error: message.slice(0, 500),
+        phase: "failed",
+        phase_detail: message.slice(0, 200),
       })
       .eq("id", runId);
 

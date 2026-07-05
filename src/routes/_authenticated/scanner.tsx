@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Layers,
   Zap,
@@ -7,6 +7,10 @@ import {
   Clock,
   Radio,
   AlertTriangle,
+  Plug,
+  Download,
+  Search,
+  Database,
 } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { PageHeader } from "@/components/page-header";
@@ -26,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/scanner")({
       {
         name: "description",
         content:
-          "Autonomous scanner queue, retries and next scheduled scans across the tracked network.",
+          "Live operations view of the autonomous scanner — current account, phase, request, and queue in real time.",
       },
     ],
   }),
@@ -34,7 +38,7 @@ export const Route = createFileRoute("/_authenticated/scanner")({
 });
 
 // -----------------------------------------------------------------------------
-// Helpers
+// Time helpers
 // -----------------------------------------------------------------------------
 
 function timeUntil(iso: string | null): string {
@@ -63,10 +67,40 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const AVG_SCAN_SECONDS = 6; // rough estimate; used only for completion display
+function fmtElapsed(ms: number): string {
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  if (s < 60) return `${s}.${cs.toString().padStart(2, "0")}s`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  return `${m}m ${rs.toString().padStart(2, "0")}s`;
+}
+
+const AVG_SCAN_SECONDS = 6;
 
 // -----------------------------------------------------------------------------
-// Page
+// Phase definitions — the visible states of a scan
+// -----------------------------------------------------------------------------
+
+const PHASES = [
+  { id: "connecting", label: "Connecting", icon: Plug },
+  { id: "fetching", label: "Fetching", icon: Download },
+  { id: "parsing", label: "Parsing", icon: Search },
+  { id: "storing", label: "Reconciling", icon: Database },
+  { id: "completed", label: "Complete", icon: CheckCircle2 },
+] as const;
+
+type PhaseId = (typeof PHASES)[number]["id"];
+
+function phaseIndex(phase: string | null | undefined): number {
+  if (!phase) return 0;
+  const i = PHASES.findIndex((p) => p.id === phase);
+  return i < 0 ? 0 : i;
+}
+
+// -----------------------------------------------------------------------------
+// Row types
 // -----------------------------------------------------------------------------
 
 type QueueRow = {
@@ -75,7 +109,13 @@ type QueueRow = {
   attempt: number | null;
   scheduled_for: string | null;
   started_at: string | null;
+  completed_at: string | null;
   account_id: string | null;
+  phase: string | null;
+  phase_detail: string | null;
+  assets_found: number | null;
+  assets_detected: number;
+  error: string | null;
   tracked_accounts: {
     username: string;
     display_name: string | null;
@@ -83,11 +123,240 @@ type QueueRow = {
   } | null;
 };
 
-type RunRow = QueueRow & {
-  completed_at: string | null;
-  assets_detected: number;
-  error: string | null;
-};
+// -----------------------------------------------------------------------------
+// Live elapsed tick — one interval for the whole page
+// -----------------------------------------------------------------------------
+
+function useTick(intervalMs = 200) {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setN((n) => (n + 1) & 0xffff), intervalMs);
+    return () => clearInterval(t);
+  }, [intervalMs]);
+}
+
+// -----------------------------------------------------------------------------
+// Live scan card — the "visible process" surface
+// -----------------------------------------------------------------------------
+
+function ActiveScanCard({ run }: { run: QueueRow }) {
+  const acc = run.tracked_accounts;
+  const startedMs = run.started_at ? new Date(run.started_at).getTime() : Date.now();
+  const elapsed = Date.now() - startedMs;
+  const idx = phaseIndex(run.phase);
+  const activePhase = PHASES[Math.min(idx, PHASES.length - 1)];
+
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-xl border bg-card p-5",
+        "border-primary/40 soft-shadow",
+      )}
+    >
+      {/* Scanline — a soft moving beam signalling live work */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent scanline-sweep"
+      />
+
+      <div className="flex items-start gap-4">
+        {acc?.avatar_url ? (
+          <img
+            src={acc.avatar_url}
+            alt=""
+            className="h-12 w-12 rounded-full object-cover ring-2 ring-primary/40"
+          />
+        ) : (
+          <div className="h-12 w-12 rounded-full bg-muted ring-2 ring-primary/40" />
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-primary">
+              Scanning
+            </span>
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+          </div>
+          <div className="mt-0.5 text-lg font-semibold truncate">
+            @{acc?.username ?? "—"}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {acc?.display_name ?? "Live intelligence acquisition"}
+            {run.attempt && run.attempt > 1 ? ` · retry ${run.attempt}` : ""}
+          </div>
+        </div>
+
+        <div className="text-right shrink-0">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Elapsed
+          </div>
+          <div className="font-mono text-lg tabular-nums text-foreground">
+            {fmtElapsed(elapsed)}
+          </div>
+        </div>
+      </div>
+
+      {/* Phase strip */}
+      <div className="mt-5 grid grid-cols-5 gap-1.5">
+        {PHASES.map((p, i) => {
+          const isActive = i === idx && run.status === "running";
+          const isDone = i < idx || run.status === "completed";
+          const isFailed = run.status === "failed" && i === idx;
+          const Icon = p.icon;
+          return (
+            <div
+              key={p.id}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] uppercase tracking-wider transition-colors duration-500",
+                isFailed
+                  ? "border-destructive/50 bg-destructive/10 text-destructive"
+                  : isActive
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : isDone
+                      ? "border-success/40 bg-success/5 text-success"
+                      : "border-border bg-background/40 text-muted-foreground",
+              )}
+            >
+              <Icon
+                className={cn("h-3 w-3", isActive && "animate-pulse")}
+              />
+              <span className="truncate">{p.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Current request line */}
+      <div className="mt-4 rounded-lg border border-border/70 bg-background/60 p-3">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span>{activePhase.label} · signal</span>
+          <span className="font-mono">
+            {run.assets_found ?? 0} asset{(run.assets_found ?? 0) === 1 ? "" : "s"} found
+          </span>
+        </div>
+        <div className="mt-1 font-mono text-[12px] text-foreground/90 break-all leading-relaxed">
+          {run.phase_detail ?? "Awaiting response…"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Queue row (queued or running-but-shown-secondary or recently completed)
+// -----------------------------------------------------------------------------
+
+function QueueLine({
+  row,
+  variant,
+  position,
+}: {
+  row: QueueRow;
+  variant: "queued" | "running" | "completed" | "failed";
+  position?: number;
+}) {
+  const acc = row.tracked_accounts;
+  const idx = phaseIndex(row.phase);
+  const progress =
+    variant === "completed"
+      ? 1
+      : variant === "failed"
+        ? 1
+        : Math.min(idx / (PHASES.length - 1), 0.98);
+
+  return (
+    <li
+      className={cn(
+        "group relative overflow-hidden rounded-lg border px-3 py-2 transition-all duration-500",
+        variant === "running"
+          ? "border-primary/40 bg-primary/[0.05]"
+          : variant === "completed"
+            ? "border-success/30 bg-success/[0.04] animate-fade-in"
+            : variant === "failed"
+              ? "border-destructive/40 bg-destructive/[0.04] animate-fade-in"
+              : "border-border bg-background/40",
+      )}
+    >
+      {/* Progress bar layer */}
+      <div
+        aria-hidden
+        className={cn(
+          "absolute inset-y-0 left-0 transition-all duration-700 ease-out",
+          variant === "completed"
+            ? "bg-success/10"
+            : variant === "failed"
+              ? "bg-destructive/10"
+              : variant === "running"
+                ? "bg-primary/10"
+                : "bg-muted/10",
+        )}
+        style={{ width: `${progress * 100}%` }}
+      />
+
+      <div className="relative flex items-center gap-3">
+        {variant === "queued" && position !== undefined ? (
+          <span className="w-6 text-center font-mono text-[11px] text-muted-foreground tabular-nums">
+            {String(position).padStart(2, "0")}
+          </span>
+        ) : variant === "running" ? (
+          <span className="w-6 flex justify-center">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          </span>
+        ) : variant === "completed" ? (
+          <span className="w-6 flex justify-center">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+          </span>
+        ) : (
+          <span className="w-6 flex justify-center">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          </span>
+        )}
+
+        {acc?.avatar_url ? (
+          <img
+            src={acc.avatar_url}
+            alt=""
+            className="h-7 w-7 rounded-full object-cover"
+          />
+        ) : (
+          <div className="h-7 w-7 rounded-full bg-muted" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate">
+            @{acc?.username ?? "—"}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">
+            {variant === "running"
+              ? row.phase_detail ?? "Working…"
+              : variant === "completed"
+                ? `${row.assets_detected} new · ${timeAgo(row.completed_at)}`
+                : variant === "failed"
+                  ? row.error?.slice(0, 90) ?? "failed"
+                  : `Queued · attempt ${row.attempt ?? 1}`}
+          </div>
+        </div>
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 border",
+            variant === "running"
+              ? "text-primary bg-primary/10 border-primary/30"
+              : variant === "completed"
+                ? "text-success bg-success/10 border-success/30"
+                : variant === "failed"
+                  ? "text-destructive bg-destructive/10 border-destructive/30"
+                  : "text-muted-foreground bg-muted/20 border-border",
+          )}
+        >
+          {variant}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Page
+// -----------------------------------------------------------------------------
 
 function ScannerPage() {
   const qc = useQueryClient();
@@ -95,7 +364,10 @@ function ScannerPage() {
   const { data: runs = [] } = useScannerRuns(20);
   const { data: stats } = useScannerStats();
 
-  // Subscribe to scanner_runs changes — the queue view feels instant.
+  // Live ticking clock for elapsed / next-scan countdowns.
+  useTick(200);
+
+  // Realtime — queue changes must feel instant, no page reloads.
   useEffect(() => {
     const ch = supabase
       .channel("scanner-page")
@@ -128,8 +400,27 @@ function ScannerPage() {
     [queue],
   );
 
-  const estCompletionSec = (running.length + queued.length) * AVG_SCAN_SECONDS;
+  // "Just completed" — recently finished runs that appear in the live rail
+  // for a moment so operators can watch rows animate into their finished
+  // state before falling into the recent-runs archive.
+  const recentlyCompleted = useMemo(() => {
+    const cutoff = Date.now() - 20_000;
+    return (runs as QueueRow[]).filter(
+      (r) =>
+        (r.status === "completed" || r.status === "failed") &&
+        r.completed_at &&
+        new Date(r.completed_at).getTime() >= cutoff,
+    );
+  }, [runs]);
 
+  // Track which run ids have already been "seen" as running so we can flash
+  // them the first time they flip to completed.
+  const seenCompleted = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    recentlyCompleted.forEach((r) => seenCompleted.current.add(r.id));
+  }, [recentlyCompleted]);
+
+  const estCompletionSec = (running.length + queued.length) * AVG_SCAN_SECONDS;
   const successCount = runs.filter((r) => r.status === "completed").length;
   const successRate = runs.length
     ? Math.round((successCount / runs.length) * 100)
@@ -139,7 +430,7 @@ function ScannerPage() {
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
         title="Scanner"
-        description="Autonomous monitoring — the network scans every tracked account every 60–90 minutes."
+        description="Live operations — the network scans every tracked account every 60–90 minutes."
       />
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -147,7 +438,7 @@ function ScannerPage() {
           label="Queue Size"
           value={queue.length}
           icon={Layers}
-          hint={running.length ? `${running.length} running` : "standby"}
+          hint={running.length ? `${running.length} in flight` : "standby"}
           accent={running.length > 0}
         />
         <KpiCard
@@ -176,83 +467,76 @@ function ScannerPage() {
         />
       </div>
 
+      {/* Live scans — the "visible process" */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Live Operations</h3>
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            {running.length} active · {queued.length} queued
+          </span>
+        </div>
+
+        {running.length === 0 && queued.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-pulse" />
+              <span className="uppercase tracking-[0.18em] text-[10px]">Network active</span>
+            </div>
+            <div className="mt-2">
+              Scanner is on standby — every tracked account is on schedule.
+              Next dispatch in {timeUntil(stats?.nextScanAt ?? null)}.
+            </div>
+          </div>
+        ) : running.length > 0 ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {running.map((r) => (
+              <ActiveScanCard key={r.id} run={r} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+            Queue primed · dispatching in seconds.
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Current queue */}
+        {/* Queue */}
         <div className="soft-shadow rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold">Current Queue</h3>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-sm font-semibold">Queue</h3>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Est. completion {Math.max(estCompletionSec, 0)}s
             </span>
           </div>
-          {queue.length === 0 ? (
+          {queue.length === 0 && recentlyCompleted.length === 0 ? (
             <div className="text-sm text-muted-foreground py-6 text-center">
               Network on standby — no accounts due right now.
             </div>
           ) : (
             <ul className="space-y-2">
-              {(queue as QueueRow[]).map((r) => {
-                const isRunning = r.status === "running";
-                const acc = r.tracked_accounts;
-                return (
-                  <li
-                    key={r.id}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg border",
-                      isRunning
-                        ? "border-primary/40 bg-primary/[0.06]"
-                        : "border-border bg-background/40",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        isRunning
-                          ? "bg-primary animate-pulse"
-                          : "bg-muted-foreground/50",
-                      )}
-                    />
-                    {acc?.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={acc.avatar_url}
-                        alt=""
-                        className="h-7 w-7 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-7 w-7 rounded-full bg-muted" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        @{acc?.username ?? "—"}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {isRunning ? "Scanning now" : "Queued"} · attempt{" "}
-                        {r.attempt ?? 1}
-                      </div>
-                    </div>
-                    <span
-                      className={cn(
-                        "text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 border",
-                        isRunning
-                          ? "text-primary bg-primary/10 border-primary/30"
-                          : "text-muted-foreground bg-muted/20 border-border",
-                      )}
-                    >
-                      {r.status}
-                    </span>
-                  </li>
-                );
-              })}
+              {running.map((r) => (
+                <QueueLine key={r.id} row={r} variant="running" />
+              ))}
+              {queued.map((r, i) => (
+                <QueueLine key={r.id} row={r} variant="queued" position={i + 1} />
+              ))}
+              {recentlyCompleted.map((r) => (
+                <QueueLine
+                  key={r.id}
+                  row={r}
+                  variant={r.status === "completed" ? "completed" : "failed"}
+                />
+              ))}
             </ul>
           )}
         </div>
 
-        {/* Recent runs */}
+        {/* Recent runs archive */}
         <div className="soft-shadow rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold">Recent Runs</h3>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               last {runs.length}
             </span>
           </div>
@@ -262,7 +546,7 @@ function ScannerPage() {
             </div>
           ) : (
             <ul className="space-y-2">
-              {(runs as RunRow[]).map((r) => {
+              {(runs as QueueRow[]).map((r) => {
                 const acc = r.tracked_accounts;
                 const failed = r.status === "failed";
                 return (
@@ -286,7 +570,7 @@ function ScannerPage() {
                           ? `${r.assets_detected} new · ${timeAgo(r.completed_at)}`
                           : failed
                             ? r.error?.slice(0, 80) ?? "failed"
-                            : `attempt ${r.attempt ?? 1}`}
+                            : r.phase_detail ?? `attempt ${r.attempt ?? 1}`}
                       </div>
                     </div>
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
