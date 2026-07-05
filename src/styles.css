@@ -190,6 +190,20 @@
   opacity: calc(var(--net-opacity) * 1.15);
 }
 
+/* Mission complete — the network calms down. Nothing turns off; monitoring
+   never stops. Traces soften, particles slow and fade. */
+.net-bg--calm {
+  opacity: calc(var(--net-opacity) * 0.55);
+  transition: opacity 2400ms ease-out;
+}
+.net-bg--calm .net-bg__particles {
+  opacity: 0.35;
+  transition: opacity 2400ms ease-out;
+}
+.net-bg--calm .net-bg__particles * {
+  animation-duration: 90s !important;
+}
+
 .net-bg__base {
   position: absolute;
   inset: 0;

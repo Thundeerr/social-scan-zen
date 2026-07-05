@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useScanSim } from "@/lib/scan-simulator";
+import { useAmbientCalm } from "@/lib/ambient-store";
 
 /**
  * Pauses SMIL animations on the SVG while the tab is hidden or the window
@@ -106,6 +107,7 @@ export function AnimatedCircuitBackground() {
 
   const sim = useScanSim();
   const isScanning = sim.isScanning;
+  const isCalm = useAmbientCalm();
   const isLow = tier === "low";
 
   // Trace network. Organic-but-orthogonal routes across a huge board.
@@ -159,7 +161,7 @@ export function AnimatedCircuitBackground() {
 
   return (
     <div
-      className={`net-bg${isLow ? " net-bg--low" : ""}${isScanning ? " net-bg--active" : ""}`}
+      className={`net-bg${isLow ? " net-bg--low" : ""}${isScanning ? " net-bg--active" : ""}${isCalm ? " net-bg--calm" : ""}`}
       aria-hidden="true"
     >
       {/* Layer 1: darkening base — sinks the app background toward black */}
