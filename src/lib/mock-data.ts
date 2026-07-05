@@ -14,6 +14,7 @@ export type Asset = {
   detectedAt: string;
   caption: string;
   thumbnail: string;
+  video?: string;
   avatar: string;
   status: "new" | "approved" | "ignored" | "downloaded";
   day: "today" | "yesterday";
@@ -100,6 +101,12 @@ const captions = [
   "Weekend inspiration from the Dolomites.",
 ];
 
+const sampleVideos = [
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+];
+
 export const recentAssets: Asset[] = Array.from({ length: 24 }).map((_, i) => {
   const [u] = brands[i % brands.length];
   return {
@@ -111,6 +118,7 @@ export const recentAssets: Asset[] = Array.from({ length: 24 }).map((_, i) => {
     ][i % 8],
     caption: captions[i % captions.length],
     thumbnail: seed(`${u}-${i}`),
+    video: i % 5 === 2 ? sampleVideos[i % sampleVideos.length] : undefined,
     avatar: avatar(u),
     status: (["new", "new", "new", "approved", "ignored", "downloaded"] as const)[i % 6],
     day: i < 14 ? "today" : "yesterday",
