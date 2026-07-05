@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedTelegramRouteImport } from './routes/_authenticated/telegram'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
 import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
@@ -32,6 +33,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTelegramRoute = AuthenticatedTelegramRouteImport.update({
+  id: '/telegram',
+  path: '/telegram',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/telegram': typeof AuthenticatedTelegramRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
 }
 export interface FileRoutesByTo {
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/telegram': typeof AuthenticatedTelegramRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
 }
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_authenticated/downloads': typeof AuthenticatedDownloadsRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
 }
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/scanner'
     | '/settings'
+    | '/telegram'
     | '/api/public/hooks/scanner-tick'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/scanner'
     | '/settings'
+    | '/telegram'
     | '/'
     | '/api/public/hooks/scanner-tick'
   id:
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authenticated/downloads'
     | '/_authenticated/scanner'
     | '/_authenticated/settings'
+    | '/_authenticated/telegram'
     | '/_authenticated/'
     | '/api/public/hooks/scanner-tick'
   fileRoutesById: FileRoutesById
@@ -170,6 +182,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/telegram': {
+      id: '/_authenticated/telegram'
+      path: '/telegram'
+      fullPath: '/telegram'
+      preLoaderRoute: typeof AuthenticatedTelegramRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -231,6 +250,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDownloadsRoute: typeof AuthenticatedDownloadsRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedTelegramRoute: typeof AuthenticatedTelegramRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
@@ -241,6 +261,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDownloadsRoute: AuthenticatedDownloadsRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedTelegramRoute: AuthenticatedTelegramRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
