@@ -284,10 +284,10 @@ export function AnimatedCircuitBackground() {
           {/* Scanner-driven extras: only rendered while running */}
           {!isLow &&
             Array.from({ length: scanningExtras }).map((_, k) => {
-              const i = (k * 2) % paths.length;
+              const i = k % paths.length;
               const d = paths[i];
-              const dur = 28 + (k % 4) * 5;
-              const delay = -(k * 7);
+              const dur = 26 + (k % 5) * 4;
+              const delay = -(k * 4);
               return (
                 <circle key={`x-${k}`} r={1.1} fill="var(--net-blue)" opacity={0.55}>
                   <animateMotion
