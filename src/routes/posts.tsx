@@ -72,17 +72,53 @@ function PostsPage() {
                   </div>
                   <p className="text-[11px] text-white/90 line-clamp-2 mb-2">{p.caption}</p>
                   <div className="flex items-center gap-1">
-                    <IconBtn><ExternalLink className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn><Download className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn className="text-success"><Check className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn className="text-destructive"><X className="h-3.5 w-3.5" /></IconBtn>
+                    <IconBtn
+                      as="a"
+                      href={`https://instagram.com/${p.username}`}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title="View"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </IconBtn>
+                    {p.status === "new" ? (
+                      <>
+                        <IconBtn
+                          onClick={() => postActions.download(p.id)}
+                          title="Download"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </IconBtn>
+                        <IconBtn
+                          className="text-success"
+                          onClick={() => postActions.approve(p.id)}
+                          title="Approve"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </IconBtn>
+                        <IconBtn
+                          className="text-destructive"
+                          onClick={() => postActions.ignore(p.id)}
+                          title="Ignore"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </IconBtn>
+                      </>
+                    ) : (
+                      <IconBtn
+                        onClick={() => postActions.reset(p.id)}
+                        title="Reset to new"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </IconBtn>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="px-3 py-2 flex items-center justify-between">
                 <span className="text-xs font-medium truncate">@{p.username}</span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {p.detectedAt}
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground capitalize">
+                  {p.status === "new" ? p.detectedAt : p.status}
                 </span>
               </div>
             </div>
