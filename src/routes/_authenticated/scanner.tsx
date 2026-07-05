@@ -473,6 +473,9 @@ function ScannerPage() {
         />
       </div>
 
+      {/* Provider status + test scan */}
+      <ProviderStatusPanel />
+
       {/* Live scans — the "visible process" */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
