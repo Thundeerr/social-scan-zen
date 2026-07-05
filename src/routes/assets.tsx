@@ -136,10 +136,13 @@ function AssetInbox() {
       replace: true,
     });
 
-  const filtered = useMemo(
-    () => assets.filter((a) => matches(a, day, status, q)),
-    [assets, day, status, q],
-  );
+  // Rank by Operator Score, then apply filters. Sorting first would drop
+  // filtered-out assets from the ranking; sorting after keeps the visible
+  // queue ordered by "what deserves attention first".
+  const filtered = useMemo(() => {
+    const matched = assets.filter((a) => matches(a, day, status, q));
+    return rankByOperatorScore(matched, favorites);
+  }, [assets, day, status, q, favorites]);
 
   // Register visible assets for the global selection store (keeps command
   // palette, favorites, etc. in sync). Order defines J/K navigation.
