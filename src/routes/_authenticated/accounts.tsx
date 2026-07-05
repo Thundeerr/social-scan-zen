@@ -40,10 +40,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
-import { trackedAccounts, getAvatar, type Account } from "@/lib/mock-data";
+import { getAvatar } from "@/lib/mock-data";
 import { tierFor } from "@/lib/priority";
 import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
+import {
+  useTrackedAccounts,
+  useCreateTrackedAccount,
+  useUpdateTrackedAccount,
+  useDeleteTrackedAccount,
+  type TrackedAccount,
+} from "@/lib/db-queries";
+
+function timeAgo(iso: string | null) {
+  if (!iso) return "—";
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
+  return `${Math.floor(s / 86400)} d ago`;
+}
 
 export const Route = createFileRoute("/_authenticated/accounts")({
   head: () => ({ meta: [{ title: "Tracked Accounts — InstaScanner" }] }),
