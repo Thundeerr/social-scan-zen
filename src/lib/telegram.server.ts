@@ -96,3 +96,60 @@ export async function detectLatestTelegramChatId(): Promise<
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Smart signal digest — the ONLY notification shape the scanner emits.
+//
+// Silence is the default. A digest is sent only when the just-finished scan
+// produced ≥1 asset that passes every filter: S/A-tier source, AI verdict
+// KEEP, confidence ≥80%, currently in the Priority review queue.
+// ---------------------------------------------------------------------------
+
+export type PrioritySignal = {
+  tier: "S" | "A";
+  handle: string;
+  confidencePct: number; // 0–100, rounded
+  gist: string;          // ≤ ~40 chars, no HTML
+};
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * Build the digest HTML body. Kept pure so `sendTelegramTestFn` can render a
+ * sample without touching the network.
+ */
+export function formatPrioritySignalDigest(input: {
+  signals: PrioritySignal[];  // already sorted, at most 3 previewed
+  totalCount: number;
+  inboxUrl: string;
+  scanLabel: string;          // short human window e.g. "just now" or "14:32 UTC"
+}): string {
+  const preview = input.signals.slice(0, 3);
+  const lines: string[] = [];
+  lines.push(
+    `🛰 <b>${input.totalCount} priority signal${input.totalCount === 1 ? "" : "s"}</b> — <i>${escapeHtml(input.scanLabel)}</i>`,
+  );
+  lines.push("");
+  preview.forEach((s, i) => {
+    const gist = s.gist ? ` · ${escapeHtml(s.gist)}` : "";
+    lines.push(
+      `${i + 1}. <b>${s.tier}</b> · @${escapeHtml(s.handle)} — KEEP ${s.confidencePct}%${gist}`,
+    );
+  });
+  const overflow = input.totalCount - preview.length;
+  if (overflow > 0) {
+    lines.push("");
+    lines.push(`<i>+${overflow} more in Priority queue</i>`);
+  }
+  lines.push("");
+  lines.push(`<a href="${input.inboxUrl}">Open Inbox →</a>`);
+  return lines.join("\n");
+}
+
+export async function sendPrioritySignalDigest(
+  chatId: string,
+  input: Parameters<typeof formatPrioritySignalDigest>[0],
+): Promise<TelegramSendResult> {
+  return sendTelegramMessage(chatId, formatPrioritySignalDigest(input));
+}

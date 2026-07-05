@@ -89,16 +89,16 @@ export const sendTelegramTestFn = createServerFn({ method: "POST" })
     if (!parsed.success) {
       throw new Error("Enter a numeric Telegram chat ID first");
     }
-    const { sendTelegramMessage } = await import("@/lib/telegram.server");
-    const result = await sendTelegramMessage(
-      chatId,
-      [
-        "<b>InstaScanner</b> — test signal",
-        "",
-        "The autonomous network is patched into this chat.",
-        "You'll receive an alert here whenever a scan turns up new assets.",
-      ].join("\n"),
-    );
+    const { sendPrioritySignalDigest } = await import("@/lib/telegram.server");
+    const result = await sendPrioritySignalDigest(chatId, {
+      signals: [
+        { tier: "S", handle: "sample_operator", confidencePct: 94, gist: "novel product reveal" },
+        { tier: "A", handle: "field_source_02", confidencePct: 88, gist: "policy signal" },
+      ],
+      totalCount: 2,
+      inboxUrl: "https://social-scan-zen.lovable.app/assets",
+      scanLabel: "test signal",
+    });
     if (!result.ok) throw new Error(result.error);
     return { ok: true as const };
   });

@@ -282,38 +282,76 @@ export async function executeScan(
       metadata: { account_id: accountId, run_id: runId, inserted, duplicates },
     });
 
-    // Telegram notification — fire-and-forget. Only when new assets landed
-    // and the account owner has opted in. Failures are logged, never thrown,
-    // so a bot outage cannot fail the scan.
+    // Smart notification — fire-and-forget. Filters to genuine signals only:
+    // S/A-tier source, AI verdict KEEP, confidence ≥80%, currently in the
+    // operator's Priority review queue. If nothing passes, we stay silent —
+    // silence is the default, the operator sees a filled queue in-app.
     if (inserted > 0) {
       try {
         const { data: acct } = await db
           .from("tracked_accounts")
-          .select("created_by")
+          .select("created_by, tier")
           .eq("id", accountId)
           .maybeSingle();
         const ownerId = acct?.created_by;
-        if (ownerId) {
+        const tier = acct?.tier;
+        // Only S/A-tier sources are eligible for push at all.
+        if (ownerId && (tier === "S" || tier === "A")) {
           const { data: prefs } = await db
             .from("profiles")
             .select("telegram_chat_id, telegram_enabled")
             .eq("id", ownerId)
             .maybeSingle();
           if (prefs?.telegram_enabled && prefs.telegram_chat_id) {
-            const { sendTelegramMessage } = await import("@/lib/telegram.server");
-            const msg = [
-              `<b>${inserted} new asset${inserted === 1 ? "" : "s"}</b> — @${username}`,
-              duplicates > 0
-                ? `<i>${duplicates} already archived</i>`
-                : "",
-              "",
-              "Open InstaScanner to review.",
-            ]
-              .filter(Boolean)
-              .join("\n");
-            const result = await sendTelegramMessage(prefs.telegram_chat_id, msg);
-            if (!result.ok) {
-              console.warn("[telegram] send failed", result.error);
+            // Pull the freshly-inserted assets that also pass AI + Priority filters.
+            const { data: signalRows } = await db
+              .from("assets")
+              .select(
+                "id, ai_verdict, ai_confidence, ai_reasons, caption, asset_status!inner(state)",
+              )
+              .eq("account_id", accountId)
+              .eq("ai_verdict", "KEEP")
+              .gte("ai_confidence", 0.8)
+              .eq("asset_status.state", "priority")
+              .gte("detected_at", new Date(Date.now() - 10 * 60_000).toISOString())
+              .order("ai_confidence", { ascending: false })
+              .limit(50);
+
+            const rowsArr = signalRows ?? [];
+            if (rowsArr.length > 0) {
+              const { data: acctFull } = await db
+                .from("tracked_accounts")
+                .select("username")
+                .eq("id", accountId)
+                .maybeSingle();
+              const handle = acctFull?.username ?? username;
+              const gistFor = (r: (typeof rowsArr)[number]): string => {
+                const reasons = Array.isArray(r.ai_reasons)
+                  ? (r.ai_reasons as unknown[]).filter((x): x is string => typeof x === "string")
+                  : [];
+                const raw = reasons[0] ?? r.caption ?? "";
+                const trimmed = raw.replace(/\s+/g, " ").trim();
+                return trimmed.length > 42 ? trimmed.slice(0, 40) + "…" : trimmed;
+              };
+              const signals = rowsArr.slice(0, 3).map((r) => ({
+                tier: tier as "S" | "A",
+                handle,
+                confidencePct: Math.round((r.ai_confidence ?? 0) * 100),
+                gist: gistFor(r),
+              }));
+              const origin =
+                process.env.LOVABLE_PUBLISHED_URL ??
+                "https://social-scan-zen.lovable.app";
+              const inboxUrl = `${origin}/assets`;
+              const scanLabel = new Date().toISOString().slice(11, 16) + " UTC";
+              const { sendPrioritySignalDigest } = await import("@/lib/telegram.server");
+              const result = await sendPrioritySignalDigest(prefs.telegram_chat_id, {
+                signals,
+                totalCount: rowsArr.length,
+                inboxUrl,
+                scanLabel,
+              });
+              if (!result.ok) console.warn("[telegram] send failed", result.error);
             }
           }
         }
