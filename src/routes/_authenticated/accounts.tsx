@@ -161,6 +161,146 @@ function AccountsPage() {
     }
   }
 
+  // ---- Batch scan queue ---------------------------------------------------
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [queue, setQueue] = useState<null | {
+    ids: string[];
+    index: number; // index of the account currently scanning
+    startedAt: number;
+    nowTick: number; // triggers re-render for the elapsed clock
+    results: Array<{
+      id: string;
+      username: string;
+      status: "pending" | "running" | "ok" | "failed";
+      inserted: number;
+      error?: string;
+    }>;
+    cancelled: boolean;
+  }>(null);
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function runQueue(ids: string[]) {
+    if (!ids.length || queue) return;
+    const usernameById = new Map(dbRows.map((a) => [a.id, a.username]));
+    const initialResults = ids.map((id) => ({
+      id,
+      username: usernameById.get(id) ?? id.slice(0, 6),
+      status: "pending" as const,
+      inserted: 0,
+    }));
+    setQueue({
+      ids,
+      index: 0,
+      startedAt: Date.now(),
+      nowTick: Date.now(),
+      results: initialResults,
+      cancelled: false,
+    });
+
+    // 1Hz ticker so elapsed / ETA update while scanning.
+    const ticker = window.setInterval(() => {
+      setQueue((q) => (q ? { ...q, nowTick: Date.now() } : q));
+    }, 1000);
+
+    let totalInserted = 0;
+    let failed = 0;
+
+    for (let i = 0; i < ids.length; i++) {
+      // Read latest cancel state.
+      let cancelled = false;
+      setQueue((q) => {
+        if (!q) return q;
+        cancelled = q.cancelled;
+        return { ...q, index: i, results: q.results.map((r, idx) => idx === i ? { ...r, status: "running" } : r) };
+      });
+      if (cancelled) break;
+
+      try {
+        const r = await scanNow({ data: { accountId: ids[i] } });
+        if (r.status === "failed") {
+          failed++;
+          setQueue((q) =>
+            q
+              ? {
+                  ...q,
+                  results: q.results.map((row, idx) =>
+                    idx === i
+                      ? { ...row, status: "failed", error: r.error ?? "Provider error" }
+                      : row,
+                  ),
+                }
+              : q,
+          );
+        } else {
+          totalInserted += r.inserted;
+          setQueue((q) =>
+            q
+              ? {
+                  ...q,
+                  results: q.results.map((row, idx) =>
+                    idx === i ? { ...row, status: "ok", inserted: r.inserted } : row,
+                  ),
+                }
+              : q,
+          );
+        }
+      } catch (err) {
+        failed++;
+        setQueue((q) =>
+          q
+            ? {
+                ...q,
+                results: q.results.map((row, idx) =>
+                  idx === i
+                    ? { ...row, status: "failed", error: err instanceof Error ? err.message : String(err) }
+                    : row,
+                ),
+              }
+            : q,
+        );
+        // Continue with the next account — one failure must not stop the queue.
+      }
+    }
+
+    window.clearInterval(ticker);
+    qc.invalidateQueries({ queryKey: trackedAccountsKey });
+
+    if (totalInserted > 0) {
+      toast.success(
+        `Queue complete · ${totalInserted} new asset${totalInserted === 1 ? "" : "s"}`,
+        {
+          description: failed ? `${failed} account${failed === 1 ? "" : "s"} failed` : undefined,
+          action: {
+            label: "View in Inbox",
+            onClick: () =>
+              navigate({ to: "/assets", search: { day: "all", status: "all" } }),
+          },
+        },
+      );
+    } else if (failed) {
+      toast.error(`Queue finished · ${failed} failed, no new assets`);
+    } else {
+      toast(`Queue complete · no new assets`);
+    }
+  }
+
+  function cancelQueue() {
+    setQueue((q) => (q ? { ...q, cancelled: true } : q));
+  }
+
+  function closeQueue() {
+    setQueue(null);
+    setSelected(new Set());
+  }
+
   const assignmentMap = useMemo(() => {
     const m: Record<string, string> = {};
     for (const a of assignments) m[a.account_id] = a.watchlist_id;
