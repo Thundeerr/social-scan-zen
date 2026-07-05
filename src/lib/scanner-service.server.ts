@@ -6,7 +6,7 @@
  *  - `scanAccount` → run a single account (used by manual "Scan Now")
  *
  * Every scan is idempotent per-account (asset upsert on (account_id,
- * external_id)) and schedules the next run 60–90 minutes ahead with
+ * external_id)) and schedules the next run ~8 hours ahead with
  * exponential backoff on failure.
  */
 
