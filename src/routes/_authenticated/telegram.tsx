@@ -68,7 +68,7 @@ function TelegramPage() {
   });
 
   const testMutation = useMutation({
-    mutationFn: (chatId: string) => sendTest({ data: { chatId } }),
+    mutationFn: () => sendTest(),
     onSuccess: () => toast.success("Test signal delivered to Telegram"),
     onError: (err: unknown) =>
       toast.error(err instanceof Error ? err.message : "Failed to send test"),
