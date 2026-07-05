@@ -74,11 +74,17 @@ function ScannerPage() {
       <div className="soft-shadow rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold">Scan log</h3>
-          <span className="text-[10px] uppercase tracking-wider text-success bg-success/10 border border-success/30 rounded-full px-2 py-0.5">
-            Running
+          <span
+            className={
+              sim.isScanning
+                ? "text-[10px] uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-2 py-0.5"
+                : "text-[10px] uppercase tracking-wider text-success bg-success/10 border border-success/30 rounded-full px-2 py-0.5"
+            }
+          >
+            {sim.isScanning ? "Running" : "Idle"}
           </span>
         </div>
-        <ActivityTimeline events={scannerActivity} />
+        <ActivityTimeline events={sim.events} />
       </div>
     </div>
   );
