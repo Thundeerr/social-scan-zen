@@ -120,7 +120,7 @@ function ActivityPage() {
   }, [rows]);
 
   return (
-    <div className="p-6 md:p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         eyebrow="Immutable audit"
         title="Activity log"
@@ -152,14 +152,14 @@ function ActivityPage() {
 
       {/* Filter bar */}
       <div className="soft-shadow rounded-2xl border border-border bg-card p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/20 p-0.5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="-mx-1 flex items-center gap-1 overflow-x-auto rounded-md border border-border bg-muted/20 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(Object.keys(KIND_LABELS) as FilterKind[]).map((k) => (
               <button
                 key={k}
                 onClick={() => setKind(k)}
                 className={cn(
-                  "rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors",
+                  "shrink-0 whitespace-nowrap rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors",
                   kind === k
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:text-foreground",
@@ -170,14 +170,14 @@ function ActivityPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Filter className="h-3.5 w-3.5" />
+          <div className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+            <Filter className="h-3.5 w-3.5 shrink-0" />
             <select
               value={type}
               onChange={(e) =>
                 setType(e.target.value as ActivityEventType | "all")
               }
-              className="rounded-md border border-border bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/40"
+              className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-primary/40 sm:flex-none"
             >
               <option value="all">Every event type</option>
               {ACTIVITY_TYPES.map((t) => (
@@ -188,7 +188,7 @@ function ActivityPage() {
             </select>
           </div>
 
-          <div className="relative ml-auto min-w-[220px]">
+          <div className="relative w-full sm:ml-auto sm:w-auto sm:min-w-[220px]">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q}
@@ -271,7 +271,7 @@ function ActivityItem({ row }: { row: ActivityRow }) {
   const tone = toneForType(row.event_type);
   const Icon = iconForType(row.event_type);
   return (
-    <li className="flex items-start gap-3 px-4 py-3 hover:bg-muted/20">
+    <li className="flex items-start gap-3 px-3 py-3 hover:bg-muted/20 sm:px-4">
       <div
         className={cn(
           "mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg border",
@@ -283,8 +283,8 @@ function ActivityItem({ row }: { row: ActivityRow }) {
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm text-foreground">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
             {row.description}
           </span>
           <span
@@ -304,7 +304,7 @@ function ActivityItem({ row }: { row: ActivityRow }) {
         ) : null}
       </div>
       <div
-        className="shrink-0 text-[11px] tabular-nums text-muted-foreground"
+        className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground"
         title={new Date(row.created_at).toLocaleString()}
       >
         {formatTime(row.created_at)}
