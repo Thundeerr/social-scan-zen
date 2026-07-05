@@ -129,15 +129,31 @@ function PostsPage() {
   );
 }
 
-function IconBtn({ children, className }: { children: React.ReactNode; className?: string }) {
+const iconBtnClass =
+  "h-7 w-7 rounded-md bg-white/10 hover:bg-white/20 backdrop-blur flex items-center justify-center text-white transition-colors";
+
+function IconBtn({
+  children,
+  className,
+  as,
+  ...rest
+}: {
+  children: React.ReactNode;
+  className?: string;
+  as?: "a" | "button";
+} & React.HTMLAttributes<HTMLElement> &
+  Partial<React.AnchorHTMLAttributes<HTMLAnchorElement>>) {
+  if (as === "a") {
+    return (
+      <a className={cn(iconBtnClass, className)} {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>
+        {children}
+      </a>
+    );
+  }
   return (
-    <button
-      className={cn(
-        "h-7 w-7 rounded-md bg-white/10 hover:bg-white/20 backdrop-blur flex items-center justify-center text-white transition-colors",
-        className,
-      )}
-    >
+    <button className={cn(iconBtnClass, className)} {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
       {children}
     </button>
   );
 }
+
