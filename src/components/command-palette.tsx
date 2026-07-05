@@ -127,7 +127,12 @@ export function CommandPalette() {
             onSelect={() =>
               requireSelected((id) => {
                 assetActions.approve(id);
-                toast.success("Asset approved");
+                toast.success("Asset approved", {
+                  action: {
+                    label: "Undo",
+                    onClick: () => void assetActions.undoLast(),
+                  },
+                });
               }, "Select an asset first")
             }
           >
@@ -138,7 +143,12 @@ export function CommandPalette() {
             onSelect={() =>
               requireSelected((id) => {
                 assetActions.download(id);
-                toast.success("Asset synchronized");
+                toast.success("Asset synchronized", {
+                  action: {
+                    label: "Undo",
+                    onClick: () => void assetActions.undoLast(),
+                  },
+                });
               }, "Select an asset first")
             }
           >
@@ -148,13 +158,33 @@ export function CommandPalette() {
           <CommandItem
             onSelect={() =>
               requireSelected((id) => {
-                assetActions.ignore(id);
-                toast("Asset archived");
+                assetActions.archive(id);
+                toast("Asset archived", {
+                  action: {
+                    label: "Undo",
+                    onClick: () => void assetActions.undoLast(),
+                  },
+                });
               }, "Select an asset first")
             }
           >
             <X /> Archive asset
             <CommandShortcut>I</CommandShortcut>
+          </CommandItem>
+          <CommandItem
+            onSelect={() =>
+              run(async () => {
+                const entry = await assetActions.undoLast();
+                if (entry) {
+                  toast.success(`Reverted "${entry.label}" on @${entry.username}`);
+                } else {
+                  toast("Nothing to undo");
+                }
+              })
+            }
+          >
+            <Undo2 /> Undo last review
+            <CommandShortcut>⌘ Z</CommandShortcut>
           </CommandItem>
           <CommandItem
             onSelect={() =>
