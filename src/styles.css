@@ -168,7 +168,15 @@
   overflow: hidden;
   opacity: var(--circuit-opacity);
   contain: strict;
+  will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
+
+.circuit-bg--low {
+  opacity: calc(var(--circuit-opacity) * 0.85);
+}
+
 
 .circuit-bg__svg {
   position: absolute;
