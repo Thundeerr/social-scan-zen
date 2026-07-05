@@ -190,8 +190,13 @@ function AssetInbox() {
 
   // Session tally — powers the mission-complete panel. Reset once the panel
   // finishes so a subsequent batch of new assets can trigger it again.
-  const [session, setSession] = useState({ approved: 0, dismissed: 0 });
+  const [session, setSession] = useState<{
+    approved: number;
+    dismissed: number;
+    approvedIds: string[];
+  }>({ approved: 0, dismissed: 0, approvedIds: [] });
   const [complete, setComplete] = useState(false);
+  const sendSessionSummary = useServerFn(sendApprovedSessionSummaryFn);
 
   const undoLast = async () => {
     const entry = await assetActions.undoLast();
