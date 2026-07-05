@@ -2,10 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useMemo } from "react";
-import { Check, X, Download, ExternalLink, RotateCcw, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Check, X, Download, ExternalLink, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { usePosts, postActions } from "@/lib/posts-store";
+import { useGlobalQuery, setGlobalQuery, matchesQuery } from "@/lib/search-store";
 import type { Post } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
