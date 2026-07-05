@@ -224,7 +224,11 @@ function AssetInbox() {
   const keep = (a: Asset | null) => {
     if (!a) return;
     assetActions.approve(a.id);
-    setSession((s) => ({ ...s, approved: s.approved + 1 }));
+    setSession((s) => ({
+      ...s,
+      approved: s.approved + 1,
+      approvedIds: [...s.approvedIds, a.id],
+    }));
     withUndo("Kept");
     advance(1);
   };
