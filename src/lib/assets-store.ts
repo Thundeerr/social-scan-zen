@@ -134,6 +134,17 @@ async function refreshOne(id: string) {
   if (idx === -1) assets = [mapped, ...assets];
   else assets[idx] = mapped;
   emit();
+
+  // Decay the "just detected" highlight after 90s without a full reload.
+  if (mapped.justDetected) {
+    setTimeout(() => {
+      const i = assets.findIndex((a) => a.id === id);
+      if (i !== -1 && assets[i].justDetected) {
+        assets[i] = { ...assets[i], justDetected: false };
+        emit();
+      }
+    }, 90_000);
+  }
 }
 
 function ensureChannel() {
