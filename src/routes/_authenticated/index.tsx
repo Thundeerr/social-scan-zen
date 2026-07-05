@@ -37,7 +37,24 @@ function DashboardPage() {
   const allAssets = useAssets();
   const sim = useScanSim();
   const { data: trackedAccounts = [] } = useTrackedAccounts();
+  const { data: activityRows = [] } = useActivityLog(20);
   void sim.nowTick;
+
+  const activityEvents = useMemo(
+    () =>
+      activityRows.map((r) => {
+        const kind: "info" | "success" | "muted" =
+          r.event_type === "scan_completed" || r.event_type === "asset_downloaded"
+            ? "success"
+            : r.event_type === "scan_failed"
+            ? "muted"
+            : "info";
+        const d = new Date(r.created_at as string);
+        const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        return { id: r.id as string, time, label: (r.description as string) ?? r.event_type, kind };
+      }),
+    [activityRows],
+  );
 
   const newAssets = useMemo(
     () => allAssets.filter((a) => a.status === "new"),
