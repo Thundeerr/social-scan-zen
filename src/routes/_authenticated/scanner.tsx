@@ -474,7 +474,8 @@ function ScannerPage() {
         />
       </div>
 
-      {/* Provider status + test scan */}
+      {/* Provider request budget + provider status */}
+      <ProviderBudgetPanel />
       <ProviderStatusPanel />
 
       {/* Live scans — the "visible process" */}
