@@ -8,6 +8,7 @@ import {
   Settings,
   Activity,
   Send,
+  Flame,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/BrandMark";
@@ -18,6 +19,7 @@ const items = [
   { to: "/assets", label: "New Assets", icon: Images, hint: "G A" },
   { to: "/downloads", label: "Archive", icon: Download, hint: null as string | null },
   { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
+  { to: "/burn", label: "Token Burn Rate", icon: Flame, hint: null as string | null },
   { to: "/activity", label: "Activity", icon: Activity, hint: null as string | null },
   { to: "/telegram", label: "Telegram", icon: Send, hint: null as string | null },
   { to: "/settings", label: "Settings", icon: Settings, hint: null as string | null },
