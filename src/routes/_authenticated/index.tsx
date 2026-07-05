@@ -198,7 +198,7 @@ function DashboardPage() {
         <StatusTile
           label="Next Scan"
           value={nextScan}
-          hint="Auto every 15 s"
+          hint="Auto every 60 min"
           icon={Timer}
         />
       </div>
