@@ -458,6 +458,16 @@ function ScannerPage() {
     ? Math.round((successCount / runs.length) * 100)
     : 100;
 
+  // Estimated next scan — prefer the scheduler's real `next_scan_at`
+  // (soonest across all active accounts), otherwise derive it from the
+  // last successful scan + the operator's selected interval.
+  const intervalMs = Number(scanInterval) * 60 * 1000;
+  const estimatedNextScanAt =
+    stats?.nextScanAt ??
+    (stats?.lastSuccessAt
+      ? new Date(new Date(stats.lastSuccessAt).getTime() + intervalMs).toISOString()
+      : new Date(Date.now() + intervalMs).toISOString());
+
   return (
     <div className="p-6 md:p-8 space-y-6">
       <PageHeader
