@@ -196,6 +196,9 @@ function AccountsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
+                  <TierChip tier={tierFor(a.username)} size="sm" showLabel />
+                </TableCell>
+                <TableCell>
                   {a.optimistic ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary px-2 py-0.5 text-[11px]">
                       <Loader2 className="h-3 w-3 animate-spin" /> syncing
