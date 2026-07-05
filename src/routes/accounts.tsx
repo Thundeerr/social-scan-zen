@@ -262,7 +262,7 @@ function AccountsPage() {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-24 text-center text-sm text-muted-foreground"
                 >
                   No accounts match your filters.
