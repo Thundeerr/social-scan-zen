@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
 
 /**
  * Proxy for tracked-account avatars.
@@ -21,11 +19,7 @@ export const Route = createFileRoute("/api/public/avatar")({
           return new Response("bad username", { status: 400 });
         }
 
-        const supabase = createClient<Database>(
-          process.env.SUPABASE_URL!,
-          process.env.SUPABASE_PUBLISHABLE_KEY!,
-          { auth: { persistSession: false, autoRefreshToken: false, storage: undefined } },
-        );
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data } = await supabase
           .from("tracked_accounts")
           .select("avatar_url")
