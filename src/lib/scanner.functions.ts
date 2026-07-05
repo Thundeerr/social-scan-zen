@@ -199,3 +199,18 @@ export const providerHealthFn = createServerFn({ method: "GET" })
       message,
     };
   });
+
+// ---------- Provider budget ---------------------------------------------------
+
+/**
+ * Returns the current-month RapidAPI request budget so the UI can show a
+ * live gauge and warn before the cap is hit. `used` counts every scanner_run
+ * (completed OR failed) created since the first of the current UTC month —
+ * failed runs still consume provider quota, so they count.
+ */
+export const providerBudgetFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { getBudgetStatus } = await import("@/lib/scanner-service.server");
+    return getBudgetStatus(context.supabase);
+  });

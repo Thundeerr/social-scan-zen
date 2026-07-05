@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
+import { providerBudgetFn, providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
@@ -474,7 +474,8 @@ function ScannerPage() {
         />
       </div>
 
-      {/* Provider status + test scan */}
+      {/* Provider request budget + provider status */}
+      <ProviderBudgetPanel />
       <ProviderStatusPanel />
 
       {/* Live scans — the "visible process" */}
@@ -731,5 +732,131 @@ function ProviderStatusPanel() {
         </button>
       </div>
     </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Provider budget — RapidAPI has a hard 40k/month request cap. This panel
+// gives the operator continuous read-out of month-to-date consumption and
+// the scanner refuses to fire once the budget is exhausted.
+// -----------------------------------------------------------------------------
+
+function ProviderBudgetPanel() {
+  const budget = useServerFn(providerBudgetFn);
+  const budgetQ = useQuery({
+    queryKey: ["provider-budget"],
+    queryFn: () => budget(),
+    refetchInterval: 30_000,
+  });
+
+  const b = budgetQ.data;
+  const pct = b ? Math.max(0, Math.min(100, b.percentUsed)) : 0;
+  const state: "ok" | "warn" | "block" = !b
+    ? "ok"
+    : b.exhausted
+      ? "block"
+      : b.warning
+        ? "warn"
+        : "ok";
+  const barTone =
+    state === "block"
+      ? "bg-destructive"
+      : state === "warn"
+        ? "bg-warning"
+        : "bg-primary";
+  const chipTone =
+    state === "block"
+      ? "text-destructive border-destructive/40 bg-destructive/10"
+      : state === "warn"
+        ? "text-warning border-warning/40 bg-warning/10"
+        : "text-primary border-primary/30 bg-primary/10";
+  const label =
+    state === "block"
+      ? "Cap reached"
+      : state === "warn"
+        ? "Approaching cap"
+        : "Within budget";
+
+  const resetOn = b
+    ? new Date(b.periodEnd).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 md:p-5 soft-shadow">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Provider request budget
+            </div>
+            <div className="text-sm font-medium truncate">
+              RapidAPI · monthly cap
+            </div>
+          </div>
+        </div>
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-[0.14em] font-mono rounded-full border px-2 py-0.5",
+            chipTone,
+          )}
+        >
+          {label}
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between font-mono text-xs">
+          <span className="text-foreground">
+            {(b?.used ?? 0).toLocaleString()}{" "}
+            <span className="text-muted-foreground">/ {(b?.monthlyCap ?? 0).toLocaleString()}</span>
+          </span>
+          <span className="text-muted-foreground">{pct.toFixed(1)}%</span>
+        </div>
+        <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn("h-full rounded-full transition-all", barTone)}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+          <div>
+            <span className="uppercase tracking-[0.14em] text-[9px] block">Remaining</span>
+            <span className="font-mono text-foreground/90">
+              {(b?.remaining ?? 0).toLocaleString()}
+            </span>
+          </div>
+          <div>
+            <span className="uppercase tracking-[0.14em] text-[9px] block">Warn at</span>
+            <span className="font-mono text-foreground/90">{b?.warnAtPercent ?? 85}%</span>
+          </div>
+          <div>
+            <span className="uppercase tracking-[0.14em] text-[9px] block">Resets</span>
+            <span className="font-mono text-foreground/90">{resetOn}</span>
+          </div>
+        </div>
+      </div>
+
+      {state !== "ok" && (
+        <div
+          className={cn(
+            "mt-4 flex items-start gap-2 rounded-md border px-3 py-2 text-[12px]",
+            state === "block"
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : "border-warning/40 bg-warning/5 text-warning",
+          )}
+        >
+          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            {state === "block"
+              ? `Autonomous scans and manual "Scan Now" are paused until ${resetOn} to keep the fleet under the monthly request cap.`
+              : `You've spent ${pct.toFixed(0)}% of this month's request budget. The scanner will automatically stop when the cap is reached.`}
+          </span>
+        </div>
+      )}
+    </section>
   );
 }

@@ -53,6 +53,83 @@ export type ScanOutcome = {
   error?: string;
 };
 
+// ---------- Provider request budget --------------------------------------------------
+//
+// Every RapidAPI call counts against a monthly cap (default 40,000). We
+// approximate "one scanner_run = one provider request", which matches how
+// executeScan is structured (single fetchAccount call per run). Manual and
+// autonomous scans both consult this budget before spending a request, so a
+// runaway cadence can never overshoot the plan.
+
+export type BudgetStatus = {
+  monthlyCap: number;
+  warnAtPercent: number;
+  used: number;
+  remaining: number;
+  percentUsed: number;
+  periodStart: string; // ISO — first day of current month, UTC
+  periodEnd: string;   // ISO — first day of next month, UTC (exclusive)
+  exhausted: boolean;
+  warning: boolean;
+};
+
+function currentPeriod(): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { start, end };
+}
+
+/**
+ * Read the current monthly budget status. `used` counts every scanner_run
+ * created in the current UTC month — including failed runs, since a failed
+ * request still consumes provider quota.
+ */
+export async function getBudgetStatus(db: DB): Promise<BudgetStatus> {
+  const { start, end } = currentPeriod();
+  const { data: cfg } = await db
+    .from("provider_budget")
+    .select("monthly_cap, warn_at_percent")
+    .eq("id", true)
+    .maybeSingle();
+  const monthlyCap = cfg?.monthly_cap ?? 40_000;
+  const warnAtPercent = cfg?.warn_at_percent ?? 85;
+
+  const { count } = await db
+    .from("scanner_runs")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString());
+  const used = count ?? 0;
+  const remaining = Math.max(0, monthlyCap - used);
+  const percentUsed = monthlyCap > 0 ? Math.min(100, (used / monthlyCap) * 100) : 100;
+
+  return {
+    monthlyCap,
+    warnAtPercent,
+    used,
+    remaining,
+    percentUsed,
+    periodStart: start.toISOString(),
+    periodEnd: end.toISOString(),
+    exhausted: remaining <= 0,
+    warning: percentUsed >= warnAtPercent,
+  };
+}
+
+async function logBudgetBlocked(db: DB, budget: BudgetStatus, reason: string) {
+  await db.from("activity_log").insert({
+    event_type: "provider_budget_blocked",
+    description: `Provider budget reached · ${budget.used}/${budget.monthlyCap} · ${reason}`,
+    metadata: {
+      used: budget.used,
+      monthly_cap: budget.monthlyCap,
+      period_start: budget.periodStart,
+      period_end: budget.periodEnd,
+    },
+  });
+}
+
 async function setPhase(
   db: DB,
   runId: string,
@@ -271,6 +348,17 @@ export async function executeScan(
 export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> {
   const now = new Date().toISOString();
 
+  // ---- Provider budget guard ----
+  // Every scanner_run counts against the monthly RapidAPI cap. If the fleet
+  // would blow past the cap, we simply do not spend more requests this tick.
+  const budget = await getBudgetStatus(db);
+  if (budget.exhausted) {
+    await logBudgetBlocked(db, budget, "autonomous tick skipped");
+    return [];
+  }
+  const budgetCap = Math.max(0, Math.min(maxPerTick, budget.remaining));
+  if (budgetCap === 0) return [];
+
   // Accounts whose next_scan_at has passed and status = active.
   const { data: due, error: dueErr } = await db
     .from("tracked_accounts")
@@ -278,7 +366,7 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
     .eq("status", "active")
     .lte("next_scan_at", now)
     .order("next_scan_at", { ascending: true })
-    .limit(maxPerTick * 3);
+    .limit(budgetCap * 3);
   if (dueErr) throw dueErr;
   if (!due?.length) return [];
 
@@ -294,7 +382,7 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
     .in("status", ["queued", "running"]);
   const busyIds = new Set((busy ?? []).map((r) => r.account_id));
 
-  const picks = shuffled.filter((a) => !busyIds.has(a.id)).slice(0, maxPerTick);
+  const picks = shuffled.filter((a) => !busyIds.has(a.id)).slice(0, budgetCap);
   if (!picks.length) return [];
 
   // Create queued runs
@@ -323,8 +411,17 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
 /**
  * Manual scan trigger. Creates a run and executes immediately, bypassing the
  * next_scan_at schedule but still respecting the duplicate-scan guard.
+ * Refuses the request when the monthly provider budget is exhausted.
  */
 export async function scanAccountNow(db: DB, accountId: string): Promise<ScanOutcome> {
+  const budget = await getBudgetStatus(db);
+  if (budget.exhausted) {
+    await logBudgetBlocked(db, budget, "manual scan refused");
+    throw new Error(
+      `Monthly API budget reached (${budget.used}/${budget.monthlyCap}). Scans resume ${new Date(budget.periodEnd).toUTCString().slice(0, 16)}.`,
+    );
+  }
+
   const { data: account, error } = await db
     .from("tracked_accounts")
     .select("id, username, consecutive_failures")
