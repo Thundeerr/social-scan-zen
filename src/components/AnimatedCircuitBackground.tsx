@@ -142,6 +142,11 @@ export function AnimatedCircuitBackground() {
 
   const traceFilter = isLow ? undefined : `url(#${glowId})`;
 
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  useAnimationsWhileVisible(svgRef);
+
+
+
   // Idle particles: one slow light per trace. When scanning, add ~20% more
   // trailing lights on a subset of traces. All motion is slow (30-60s per loop).
   const scanningExtras = isScanning ? Math.max(1, Math.round(paths.length * 0.2)) : 0;
