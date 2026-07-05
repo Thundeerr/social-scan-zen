@@ -3,7 +3,8 @@ import { Layers, Zap, CheckCircle2, Timer, Clock } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { PageHeader } from "@/components/page-header";
-import { scannerActivity, scannerHealth } from "@/lib/mock-data";
+import { scannerHealth } from "@/lib/mock-data";
+import { useScanSim } from "@/lib/scan-simulator";
 
 export const Route = createFileRoute("/scanner")({
   head: () => ({ meta: [{ title: "Scanner — InstaScanner" }] }),
