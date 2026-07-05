@@ -243,7 +243,8 @@ export function AnimatedCircuitBackground() {
                       ? "var(--net-purple)"
                       : "var(--net-blue)"
                 }
-                opacity={amber ? 0.55 : 0.4}
+                opacity={(amber ? 0.55 : 0.4) + nodeBoost}
+                style={{ transition: "opacity 1600ms ease-out" }}
               />
             );
           })}
