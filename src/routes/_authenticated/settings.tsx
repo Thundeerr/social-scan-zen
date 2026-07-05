@@ -203,30 +203,59 @@ function SettingsPage() {
           <div className="divide-y divide-border">
             <SettingRow
               title="Telegram bot"
-              description="Route alerts to a Telegram chat. Message @InstaScannerBot with /start, then paste your chat ID here."
+              description="Route alerts to a Telegram chat. Message the bot with /start, tap Detect, then flip the switch."
             >
-              <div className="flex w-full items-center gap-2 sm:w-auto">
-                <div className="relative flex-1 sm:w-56 sm:flex-none">
-                  <Send className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={telegramChatId}
-                    onChange={(e) => setTelegramChatId(e.target.value)}
-                    placeholder="Chat ID (e.g. 123456789)"
-                    inputMode="numeric"
-                    className="h-9 pl-7 text-xs font-mono"
-                    disabled={!telegramNotif}
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[320px]">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Send className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      onBlur={handleTelegramBlur}
+                      placeholder="Chat ID (e.g. 123456789)"
+                      inputMode="numeric"
+                      className="h-9 pl-7 text-xs font-mono"
+                    />
+                  </div>
+                  <Switch
+                    checked={telegramNotif}
+                    onCheckedChange={handleTelegramToggle}
+                    disabled={saveMutation.isPending || prefsQuery.isLoading}
                   />
                 </div>
-                <Switch
-                  checked={telegramNotif}
-                  onCheckedChange={(next) => {
-                    if (next && !telegramChatId.trim()) {
-                      toast.error("Enter a Telegram chat ID first");
-                      return;
-                    }
-                    setTelegramNotif(next);
-                  }}
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 flex-1 gap-1.5 text-[11px]"
+                    onClick={() => detectMutation.mutate()}
+                    disabled={detectMutation.isPending}
+                  >
+                    {detectMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Radar className="h-3.5 w-3.5" />
+                    )}
+                    Detect chat
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 flex-1 gap-1.5 text-[11px]"
+                    onClick={() => testMutation.mutate(telegramChatId)}
+                    disabled={testMutation.isPending || !telegramChatId.trim()}
+                  >
+                    {testMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    Send test
+                  </Button>
+                </div>
               </div>
             </SettingRow>
             <SettingRow title="Desktop notifications" description="Show a native notification when scans complete.">
