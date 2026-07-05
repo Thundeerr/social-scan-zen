@@ -187,7 +187,19 @@ async function recordDownload(
     filename: result.filename,
     file_size: result.blob?.size ?? null,
   });
-  if (error) console.error("[downloads-store] record failed", error);
+  if (error) {
+    console.error("[downloads-store] record failed", error);
+    return;
+  }
+  void logActivity(
+    "asset_downloaded",
+    `Downloaded ${result.filename} from @${target.username}`,
+    {
+      asset_id: target.id,
+      filename: result.filename,
+      file_size: result.blob?.size ?? null,
+    },
+  );
 }
 
 export async function downloadAsset(target: DownloadTarget): Promise<boolean> {
