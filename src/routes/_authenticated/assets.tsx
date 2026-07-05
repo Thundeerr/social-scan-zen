@@ -206,13 +206,13 @@ function AssetInbox() {
     toast.success(`Reverted "${entry.label}" on @${entry.username}`);
   };
 
-  const withUndo = (msg: string, kind: "success" | "info" = "success") => {
-    const opts = {
-      action: { label: "Undo", onClick: () => void undoLast() },
-    } as const;
-    if (kind === "success") toast.success(msg, opts);
-    else toast(msg, opts);
+  const withUndo = (_msg: string, _kind: "success" | "info" = "success") => {
+    // Toast intentionally suppressed — swipe overlays already confirm the action.
+    // Undo remains available via the U shortcut and command palette.
+    void _msg;
+    void _kind;
   };
+
 
   const keep = (a: Asset | null) => {
     if (!a) return;
