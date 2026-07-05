@@ -230,8 +230,16 @@ async function triggerDownload(a: Asset) {
 }
 
 export const assetActions = {
-  approve: (id: string) => void setState(id, "approved"),
-  ignore: (id: string) => void setState(id, "dismissed"),
+  approve: (id: string) => {
+    const a = assets.find((x) => x.id === id);
+    void setState(id, "approved");
+    if (a) void logActivity("asset_kept", `Kept asset from @${a.username}`, { asset_id: id });
+  },
+  ignore: (id: string) => {
+    const a = assets.find((x) => x.id === id);
+    void setState(id, "dismissed");
+    if (a) void logActivity("asset_dismissed", `Dismissed asset from @${a.username}`, { asset_id: id });
+  },
   download: (id: string) => {
     const a = assets.find((x) => x.id === id);
     if (a) void triggerDownload(a);
