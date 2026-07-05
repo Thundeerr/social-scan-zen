@@ -1,4 +1,5 @@
 import { Search, X, Command as CommandIcon, LogOut } from "lucide-react";
+import { MobileNav } from "./MobileNav";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
