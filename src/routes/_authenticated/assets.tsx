@@ -54,6 +54,8 @@ import { MissionComplete } from "@/components/mission-complete";
 import { NetworkSummary } from "@/components/network-summary";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { sendApprovedSessionSummaryFn } from "@/lib/telegram-handoff.functions";
 
 const DAYS = ["all", "today", "yesterday"] as const;
 const STATUSES = ["all", "new", "approved", "ignored", "downloaded"] as const;
@@ -188,8 +190,13 @@ function AssetInbox() {
 
   // Session tally — powers the mission-complete panel. Reset once the panel
   // finishes so a subsequent batch of new assets can trigger it again.
-  const [session, setSession] = useState({ approved: 0, dismissed: 0 });
+  const [session, setSession] = useState<{
+    approved: number;
+    dismissed: number;
+    approvedIds: string[];
+  }>({ approved: 0, dismissed: 0, approvedIds: [] });
   const [complete, setComplete] = useState(false);
+  const sendSessionSummary = useServerFn(sendApprovedSessionSummaryFn);
 
   const undoLast = async () => {
     const entry = await assetActions.undoLast();
@@ -217,7 +224,11 @@ function AssetInbox() {
   const keep = (a: Asset | null) => {
     if (!a) return;
     assetActions.approve(a.id);
-    setSession((s) => ({ ...s, approved: s.approved + 1 }));
+    setSession((s) => ({
+      ...s,
+      approved: s.approved + 1,
+      approvedIds: [...s.approvedIds, a.id],
+    }));
     withUndo("Kept");
     advance(1);
   };
@@ -305,12 +316,18 @@ function AssetInbox() {
     if (session.approved + session.dismissed === 0) return;
     setComplete(true);
     setAmbientCalm(true);
-  }, [totalAwaiting, session, complete]);
+    // Fire the Telegram session summary once, when the mission wraps.
+    if (session.approvedIds.length > 0) {
+      void sendSessionSummary({ data: { assetIds: session.approvedIds } }).catch(
+        (err) => console.error("[telegram-summary] failed", err),
+      );
+    }
+  }, [totalAwaiting, session, complete, sendSessionSummary]);
 
   const handleCompletionDone = () => {
     setComplete(false);
     setAmbientCalm(false);
-    setSession({ approved: 0, dismissed: 0 });
+    setSession({ approved: 0, dismissed: 0, approvedIds: [] });
   };
 
   // If the operator leaves the inbox while calm is still active, release it —

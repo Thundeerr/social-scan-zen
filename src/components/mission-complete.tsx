@@ -26,8 +26,8 @@ export function MissionComplete({
       return;
     }
     setPhase("in");
-    const hold = window.setTimeout(() => setPhase("out"), 5500);
-    const done = window.setTimeout(() => onDone(), 7200);
+    const hold = window.setTimeout(() => setPhase("out"), 10000);
+    const done = window.setTimeout(() => onDone(), 11700);
     return () => {
       window.clearTimeout(hold);
       window.clearTimeout(done);
