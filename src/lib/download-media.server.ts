@@ -108,7 +108,8 @@ export async function prepareAssetDownload(input: {
 
   const fallbackContentType = isVideoType(asset.media_type) ? "video/mp4" : "image/jpeg";
   const contentType = res.headers.get("content-type") ?? fallbackContentType;
-  const bytes = new Uint8Array(await res.arrayBuffer());
+  const arrayBuffer = await res.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
   if (bytes.byteLength === 0) throw new Error("Media fetch returned an empty file");
 
   const fallbackExt = isVideoType(asset.media_type) ? "mp4" : "jpg";
@@ -119,7 +120,7 @@ export async function prepareAssetDownload(input: {
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const bucket = supabaseAdmin.storage.from("ig-publish");
-  const { error: uploadError } = await bucket.upload(storagePath, bytes, {
+  const { error: uploadError } = await bucket.upload(storagePath, arrayBuffer, {
     contentType,
     cacheControl: "31536000",
     upsert: true,
