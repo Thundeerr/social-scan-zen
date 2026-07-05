@@ -12,7 +12,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { getInstagramProviderFromEnv, type ProviderPost } from "./instagram-provider.server";
+import {
+  getInstagramProviderFromEnv,
+  describeProviderRequest,
+  type ProviderPost,
+} from "./instagram-provider.server";
 
 type DB = SupabaseClient<Database>;
 
