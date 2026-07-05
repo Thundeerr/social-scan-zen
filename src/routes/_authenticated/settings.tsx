@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
+import { Send, Loader2, Radar } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -18,6 +21,12 @@ import {
   scanIntervalSchema,
   useScanInterval,
 } from "@/lib/scan-interval";
+import {
+  detectTelegramChatIdFn,
+  getTelegramPrefsFn,
+  saveTelegramPrefsFn,
+  sendTelegramTestFn,
+} from "@/lib/telegram.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
