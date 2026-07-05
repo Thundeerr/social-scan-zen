@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { z } from "zod";
+import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -11,10 +13,30 @@ import {
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 
+// Allowed scan-interval presets (minutes). Anything outside this set is rejected.
+export const SCAN_INTERVAL_OPTIONS = [
+  { value: "240", label: "Every 4 hours" },
+  { value: "480", label: "Every 8 hours" },
+  { value: "720", label: "Every 12 hours" },
+  { value: "1440", label: "Every 24 hours" },
+  { value: "2160", label: "Every 36 hours" },
+  { value: "4320", label: "Every 72 hours" },
+] as const;
+
+export type ScanIntervalValue = (typeof SCAN_INTERVAL_OPTIONS)[number]["value"];
+
+export const scanIntervalSchema = z.enum(
+  SCAN_INTERVAL_OPTIONS.map((o) => o.value) as [ScanIntervalValue, ...ScanIntervalValue[]],
+  { errorMap: () => ({ message: "Unsupported scan interval" }) },
+);
+
+const DEFAULT_SCAN_INTERVAL: ScanIntervalValue = "480";
+
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
   component: SettingsPage,
 });
+
 
 function SettingRow({
   title,
@@ -38,10 +60,20 @@ function SettingRow({
 
 function SettingsPage() {
   const [provider, setProvider] = useState("instagram-looter");
-  const [interval, setInterval] = useState("15");
+  const [interval, setIntervalValue] = useState<ScanIntervalValue>(DEFAULT_SCAN_INTERVAL);
   const [emailNotif, setEmailNotif] = useState(true);
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
+
+  const handleIntervalChange = (next: string) => {
+    const parsed = scanIntervalSchema.safeParse(next);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Unsupported scan interval");
+      return;
+    }
+    setIntervalValue(parsed.data);
+  };
+
 
   return (
     <div className="p-6 md:p-8 space-y-6">
