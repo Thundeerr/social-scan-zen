@@ -131,6 +131,8 @@ function AssetInbox() {
   const navigate = useNavigate({ from: "/assets" });
   const assets = useAssets();
   const favorites = useFavorites();
+  const { countByAsset: downloadCounts } = useDownloads();
+  const downloadedIds = downloadCounts;
 
   const setSearch = (patch: Partial<{ day: Day; status: Status }>) =>
     navigate({
