@@ -10,6 +10,7 @@ import {
   Activity,
   Send,
   Menu,
+  Flame,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ const items = [
   { to: "/assets", label: "New Assets", icon: Images },
   { to: "/downloads", label: "Archive", icon: Download },
   { to: "/scanner", label: "Scanner", icon: Radar },
+  { to: "/burn", label: "Token Burn Rate", icon: Flame },
   { to: "/activity", label: "Activity", icon: Activity },
   { to: "/telegram", label: "Telegram", icon: Send },
   { to: "/settings", label: "Settings", icon: Settings },
