@@ -63,11 +63,17 @@ function DashboardPage() {
         <aside className="soft-shadow rounded-xl border border-border bg-card p-5 h-fit xl:sticky xl:top-20">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold">Scanner Activity</h2>
-            <span className="text-[10px] uppercase tracking-wider text-success bg-success/10 border border-success/30 rounded-full px-2 py-0.5">
-              Live
+            <span
+              className={
+                sim.isScanning
+                  ? "text-[10px] uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-2 py-0.5"
+                  : "text-[10px] uppercase tracking-wider text-success bg-success/10 border border-success/30 rounded-full px-2 py-0.5"
+              }
+            >
+              {sim.isScanning ? "Live" : "Idle"}
             </span>
           </div>
-          <ActivityTimeline events={scannerActivity} />
+          <ActivityTimeline events={sim.events} />
         </aside>
       </div>
     </div>
