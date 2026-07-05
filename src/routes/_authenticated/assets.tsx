@@ -587,6 +587,14 @@ function InboxRail({
                           Vid
                         </div>
                       )}
+                      {downloadedIds.has(a.id) && (
+                        <div
+                          className="absolute top-0.5 left-0.5 grid h-4 w-4 place-items-center rounded-sm bg-success/90 text-[9px] text-success-foreground shadow"
+                          title="Synchronized to archive"
+                        >
+                          <Download className="h-2.5 w-2.5" />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
