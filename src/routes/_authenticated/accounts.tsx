@@ -559,7 +559,7 @@ function AccountsPage() {
                       <img
                         src={a.avatar_url || getAvatar(a.username)}
                         alt=""
-                        className="h-9 w-9 rounded-full ring-1 ring-border bg-muted"
+                        className="h-9 w-9 shrink-0 rounded-full ring-1 ring-border bg-muted"
                       />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">
@@ -568,13 +568,36 @@ function AccountsPage() {
                         <div className="text-xs text-muted-foreground truncate">
                           {a.display_name}
                         </div>
+                        {/* Mobile-only compact meta row */}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 md:hidden">
+                          <TierChip tier={a.tier as Tier} size="sm" />
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]",
+                              a.status === "active"
+                                ? "border-success/30 bg-success/10 text-success"
+                                : "border-muted-foreground/30 bg-muted text-muted-foreground",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "h-1 w-1 rounded-full",
+                                a.status === "active" ? "bg-success" : "bg-muted-foreground",
+                              )}
+                            />
+                            {a.status}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">
+                            {assetCounts[a.id] ?? 0} assets · {timeAgo(a.last_scan_at)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     <TierChip tier={a.tier as Tier} size="sm" showLabel />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden xl:table-cell">
                     {wl ? (
                       <span
                         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground"
@@ -590,7 +613,7 @@ function AccountsPage() {
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <span
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]",
@@ -610,13 +633,13 @@ function AccountsPage() {
                       {a.status}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                     {timeAgo(a.last_scan_at)}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                     {nextScanLabel(a)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-sm">
+                  <TableCell className="hidden md:table-cell text-right tabular-nums text-sm">
                     {assetCounts[a.id] ?? 0}
                   </TableCell>
                   <TableCell>
@@ -624,19 +647,20 @@ function AccountsPage() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="h-8 gap-1.5"
+                        className="h-8 gap-1.5 px-2 md:px-3"
                         disabled={!!scanning[a.id] || !!queue}
                         onClick={() => void handleScanNow(a)}
+                        aria-label="Scan now"
                       >
                         {scanning[a.id] ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Scanning
+                            <span className="hidden md:inline">Scanning</span>
                           </>
                         ) : (
                           <>
                             <Radar className="h-3.5 w-3.5" />
-                            Scan Now
+                            <span className="hidden md:inline">Scan Now</span>
                           </>
                         )}
                       </Button>
