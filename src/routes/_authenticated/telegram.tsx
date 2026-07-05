@@ -177,7 +177,7 @@ function TelegramPage() {
                     size="sm"
                     variant="outline"
                     className="h-8 flex-1 gap-1.5 text-[11px]"
-                    onClick={() => testMutation.mutate(telegramChatId)}
+                    onClick={() => testMutation.mutate()}
                     disabled={testMutation.isPending || !telegramChatId.trim()}
                   >
                     {testMutation.isPending ? (
