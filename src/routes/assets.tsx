@@ -359,6 +359,16 @@ function AssetInbox() {
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] w-full">
+      <NetworkSummary
+        visible={showNetworkSummary}
+        processed={awaitingBreakdown.processed}
+        highPriority={awaitingBreakdown.high}
+        worthReviewing={awaitingBreakdown.review}
+        lowPriority={awaitingBreakdown.low}
+        onReviewRecommended={reviewRecommended}
+        onReviewEverything={() => setBriefingDismissed(true)}
+      />
+
       {/* MOBILE — swipe deck */}
       <div className="md:hidden">
         <MobileHeader
