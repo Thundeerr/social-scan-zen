@@ -28,6 +28,15 @@ import {
   useSelection,
 } from "@/lib/selection-store";
 import type { Asset } from "@/lib/mock-data";
+import {
+  computeOperatorScore,
+  rankByOperatorScore,
+  scoreToneClasses,
+  scoreConfidenceLabel,
+  tierFor,
+  TIER_META,
+} from "@/lib/priority";
+import { ScoreRing, TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
