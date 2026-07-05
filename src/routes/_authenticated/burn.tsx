@@ -1,5 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useQuery, useServerFn } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { AlertTriangle, Flame, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { burnForecastFn } from "@/lib/scanner.functions";
 import { PageHeader } from "@/components/page-header";
