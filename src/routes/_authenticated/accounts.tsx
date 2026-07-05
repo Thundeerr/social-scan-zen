@@ -617,7 +617,7 @@ function AccountsPage() {
                         size="sm"
                         variant="secondary"
                         className="h-8 gap-1.5"
-                        disabled={!!scanning[a.id]}
+                        disabled={!!scanning[a.id] || !!queue}
                         onClick={() => void handleScanNow(a)}
                       >
                         {scanning[a.id] ? (
