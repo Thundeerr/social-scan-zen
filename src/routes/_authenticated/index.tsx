@@ -14,9 +14,10 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { kpis, scannerHealth, trackedAccounts, recentAssets } from "@/lib/mock-data";
+import { kpis, scannerHealth, recentAssets } from "@/lib/mock-data";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
+import { useTrackedAccounts } from "@/lib/db-queries";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
