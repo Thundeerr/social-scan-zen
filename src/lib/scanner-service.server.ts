@@ -64,7 +64,7 @@ export async function executeScan(
     const result = await provider.fetchAccount(username);
 
     // Sync account metadata (avatar/display) when new info is present.
-    const meta: Record<string, unknown> = {};
+    const meta: { display_name?: string; avatar_url?: string } = {};
     if (result.display_name) meta.display_name = result.display_name;
     if (result.avatar_url) meta.avatar_url = result.avatar_url;
     if (Object.keys(meta).length) {
