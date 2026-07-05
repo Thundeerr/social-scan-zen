@@ -41,6 +41,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 import { trackedAccounts, getAvatar, type Account } from "@/lib/mock-data";
+import { tierFor } from "@/lib/priority";
+import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/accounts")({
@@ -163,7 +165,8 @@ function AccountsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[40%]">Account</TableHead>
+              <TableHead className="w-[36%]">Account</TableHead>
+              <TableHead>Tier</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Scan</TableHead>
               <TableHead className="text-right">Assets Today</TableHead>
@@ -191,6 +194,9 @@ function AccountsPage() {
                       </div>
                     </div>
                   </div>
+                </TableCell>
+                <TableCell>
+                  <TierChip tier={tierFor(a.username)} size="sm" showLabel />
                 </TableCell>
                 <TableCell>
                   {a.optimistic ? (
@@ -256,7 +262,7 @@ function AccountsPage() {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="h-24 text-center text-sm text-muted-foreground"
                 >
                   No accounts match your filters.

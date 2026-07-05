@@ -28,6 +28,15 @@ import {
   useSelection,
 } from "@/lib/selection-store";
 import type { Asset } from "@/lib/mock-data";
+import {
+  computeOperatorScore,
+  rankByOperatorScore,
+  scoreToneClasses,
+  scoreConfidenceLabel,
+  tierFor,
+  TIER_META,
+} from "@/lib/priority";
+import { ScoreRing, TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -127,10 +136,13 @@ function AssetInbox() {
       replace: true,
     });
 
-  const filtered = useMemo(
-    () => assets.filter((a) => matches(a, day, status, q)),
-    [assets, day, status, q],
-  );
+  // Rank by Operator Score, then apply filters. Sorting first would drop
+  // filtered-out assets from the ranking; sorting after keeps the visible
+  // queue ordered by "what deserves attention first".
+  const filtered = useMemo(() => {
+    const matched = assets.filter((a) => matches(a, day, status, q));
+    return rankByOperatorScore(matched, favorites);
+  }, [assets, day, status, q, favorites]);
 
   // Register visible assets for the global selection store (keeps command
   // palette, favorites, etc. in sync). Order defines J/K navigation.
@@ -439,6 +451,15 @@ function InboxRail({
         )}
       </div>
 
+      {/* Ranking indicator */}
+      <div className="flex items-center justify-between border-b border-border/60 bg-background/40 px-5 py-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-1 w-1 rounded-full bg-primary" />
+          Ranked by Operator Score
+        </span>
+        <span>{assets.length}</span>
+      </div>
+
       {/* Queue list */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {assets.length === 0 ? (
@@ -447,8 +468,13 @@ function InboxRail({
           </div>
         ) : (
           <ol className="py-1">
-            {assets.map((a, i) => {
+            {assets.map((a) => {
               const active = a.id === currentId;
+              const tier = tierFor(a.username);
+              const { score } = computeOperatorScore(a, {
+                isFavorite: false, // rank already accounts for favorites
+              });
+              const tone = scoreToneClasses(score);
               return (
                 <li key={a.id}>
                   <button
@@ -457,9 +483,7 @@ function InboxRail({
                     data-asset-url={`https://instagram.com/${a.username}`}
                     className={cn(
                       "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors",
-                      active
-                        ? "bg-primary/10"
-                        : "hover:bg-muted/40",
+                      active ? "bg-primary/10" : "hover:bg-muted/40",
                     )}
                   >
                     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -477,6 +501,7 @@ function InboxRail({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
+                        <TierChip tier={tier} size="xs" />
                         <span
                           className={cn(
                             "truncate text-xs font-medium",
@@ -491,8 +516,16 @@ function InboxRail({
                         {watchlistFor(a.username)} · {a.detectedAt}
                       </div>
                     </div>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
-                      {String(i + 1).padStart(2, "0")}
+                    <span
+                      className={cn(
+                        "inline-flex h-6 shrink-0 items-center rounded-md border px-1.5 text-[10px] font-semibold tabular-nums",
+                        tone.border,
+                        tone.bg,
+                        tone.text,
+                      )}
+                      title={`Operator Score · ${scoreConfidenceLabel(score)}`}
+                    >
+                      {score}
                     </span>
                   </button>
                 </li>
@@ -561,7 +594,7 @@ function AssetStage({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Stage header */}
-      <div className="flex items-center justify-between border-b border-border/60 px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <img
             src={asset.avatar}
@@ -569,30 +602,36 @@ function AssetStage({
             className="h-8 w-8 shrink-0 rounded-full border border-border"
           />
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium">@{asset.username}</div>
+            <div className="flex min-w-0 items-center gap-2">
+              <TierChip tier={tierFor(asset.username)} size="xs" />
+              <span className="truncate text-sm font-medium">@{asset.username}</span>
+            </div>
             <div className="truncate text-[11px] text-muted-foreground">
               {watchlistFor(asset.username)} · {asset.detectedAt}
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-          <button
-            onClick={onPrev}
-            className="grid h-7 w-7 place-items-center rounded-md border border-border bg-background/60 hover:border-primary/40 hover:text-foreground"
-            title="Previous asset (↑)"
-          >
-            <ChevronUp className="h-3.5 w-3.5" />
-          </button>
-          <span className="min-w-[52px] px-1 text-center tabular-nums">
-            {index} / {total}
-          </span>
-          <button
-            onClick={onNext}
-            className="grid h-7 w-7 place-items-center rounded-md border border-border bg-background/60 hover:border-primary/40 hover:text-foreground"
-            title="Next asset (↓)"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <ScoreRing score={computeOperatorScore(asset).score} size={40} showLabel />
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <button
+              onClick={onPrev}
+              className="grid h-7 w-7 place-items-center rounded-md border border-border bg-background/60 hover:border-primary/40 hover:text-foreground"
+              title="Previous asset (↑)"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-[52px] px-1 text-center tabular-nums">
+              {index} / {total}
+            </span>
+            <button
+              onClick={onNext}
+              className="grid h-7 w-7 place-items-center rounded-md border border-border bg-background/60 hover:border-primary/40 hover:text-foreground"
+              title="Next asset (↓)"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -814,10 +853,15 @@ function IntelligencePanel({
         </IntelField>
 
         <IntelField label="Watchlist" icon={Tag}>
-          <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
-            {watchlistFor(asset.username)}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <TierChip tier={tierFor(asset.username)} size="sm" showLabel />
+            <span className="text-[11px] text-muted-foreground">
+              · {watchlistFor(asset.username)}
+            </span>
+          </div>
         </IntelField>
+
+        <OperatorScoreField asset={asset} isFavorite={isFavorite} />
 
         <IntelField label="Published" icon={Clock}>
           <span className="text-sm tabular-nums">{asset.detectedAt}</span>
@@ -867,6 +911,60 @@ function IntelField({
         {label}
       </div>
       <div className="mt-1.5">{children}</div>
+    </div>
+  );
+}
+
+function OperatorScoreField({
+  asset,
+  isFavorite,
+}: {
+  asset: Asset;
+  isFavorite: boolean;
+}) {
+  const { score, factors } = computeOperatorScore(asset, { isFavorite });
+  const tone = scoreToneClasses(score);
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-primary">
+        <Sparkles className="h-3 w-3" />
+        Operator Score
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <ScoreRing score={score} size={56} />
+        <div className="min-w-0">
+          <div className={cn("text-xs font-medium", tone.text)}>
+            {scoreConfidenceLabel(score)}
+          </div>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            Confidence · updated live
+          </div>
+        </div>
+      </div>
+      <ul className="mt-3 space-y-1.5">
+        {factors.map((f) => (
+          <li key={f.key}>
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="uppercase tracking-wider">{f.label}</span>
+              <span className="tabular-nums text-foreground/70">
+                {Math.round(f.value)}
+                <span className="text-muted-foreground/60"> · {f.weight}%</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted/40">
+              <div
+                className={cn("h-full", tone.text.replace("text-", "bg-"))}
+                style={{ width: `${Math.max(2, Math.round(f.value))}%` }}
+              />
+            </div>
+            {f.note && (
+              <div className="mt-0.5 truncate text-[10px] text-muted-foreground/70">
+                {f.note}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -1112,6 +1210,13 @@ function SwipeCard({
         </div>
       </div>
 
+      {/* Score badge — top-right */}
+      <div className="absolute right-3 top-3">
+        <div className="rounded-lg border border-white/25 bg-black/40 p-1 backdrop-blur">
+          <ScoreRing score={computeOperatorScore(asset).score} size={40} />
+        </div>
+      </div>
+
       {/* Info footer */}
       <div className="absolute inset-x-0 bottom-0 p-4 text-white">
         <div className="flex items-center gap-2">
@@ -1120,8 +1225,11 @@ function SwipeCard({
             alt=""
             className="h-8 w-8 shrink-0 rounded-full border border-white/40"
           />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">@{asset.username}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <TierChip tier={tierFor(asset.username)} size="xs" />
+              <span className="truncate text-sm font-semibold">@{asset.username}</span>
+            </div>
             <div className="truncate text-[11px] text-white/70">
               {watchlistFor(asset.username)} · {asset.detectedAt}
             </div>
