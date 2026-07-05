@@ -55,15 +55,43 @@ function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold">Recent Posts</h2>
-            <span className="text-xs text-muted-foreground">Showing last 24h</span>
+            <h2 className="text-sm font-semibold">
+              {searching ? `Search results for “${q}”` : "Recent Posts"}
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              {searching
+                ? `${results.length} match${results.length === 1 ? "" : "es"}`
+                : "Showing last 24h"}
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
-            {recentPosts.slice(0, 6).map((p) => (
-              <PostCard key={p.id} post={p} />
-            ))}
-          </div>
+          {results.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card/30 p-12 text-center">
+              <p className="text-sm text-muted-foreground">
+                No posts match “{q}”.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
+                {results.slice(0, 6).map((p) => (
+                  <PostCard key={p.id} post={p} />
+                ))}
+              </div>
+              {searching && results.length > 6 && (
+                <div className="mt-4 text-center">
+                  <Link
+                    to="/posts"
+                    search={{ day: "all", status: "all" }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View all {results.length} matches →
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
         </section>
+
 
         <aside className="soft-shadow rounded-xl border border-border bg-card p-5 h-fit xl:sticky xl:top-20">
           <div className="flex items-center justify-between mb-4">
