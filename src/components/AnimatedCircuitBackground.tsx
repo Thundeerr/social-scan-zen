@@ -211,14 +211,15 @@ export function AnimatedCircuitBackground() {
           {paths.map((d, i) => {
             const purple = i % 4 === 0;
             const baseOpacity = purple ? 0.18 : 0.22;
-            const activeBoost = isScanning && i % 3 === 0 ? 0.08 : 0;
+            // While scanning, brighten a wider subset (every other path)
+            const activeBoost = isScanning ? (i % 2 === 0 ? 0.1 : 0.05) : 0;
             return (
               <path
                 key={i}
                 d={d}
                 stroke={purple ? "var(--net-purple)" : "var(--net-blue)"}
                 strokeOpacity={baseOpacity + activeBoost}
-                style={{ transition: "stroke-opacity 1200ms ease-out" }}
+                style={{ transition: "stroke-opacity 1600ms ease-out" }}
               />
             );
           })}
