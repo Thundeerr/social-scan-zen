@@ -238,7 +238,7 @@ function DashboardPage() {
               {sim.isScanning ? "Live" : "Standby"}
             </span>
           </div>
-          <ActivityTimeline events={sim.events} />
+          <ActivityTimeline events={activityEvents.length ? activityEvents : [{ time: "—", label: "No scanner activity yet", kind: "muted" }]} />
         </aside>
       </div>
     </div>
