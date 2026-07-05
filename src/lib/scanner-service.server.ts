@@ -59,6 +59,13 @@ export async function executeScan(
     .update({ status: "running", started_at: new Date().toISOString() })
     .eq("id", runId);
 
+  await db.from("activity_log").insert({
+    event_type: "scan_started",
+    description: `Scanning @${username}${attempt > 1 ? ` (attempt ${attempt})` : ""}`,
+    metadata: { account_id: accountId, run_id: runId, attempt },
+  });
+
+
   try {
     const provider = getInstagramProviderFromEnv();
     const result = await provider.fetchAccount(username);
@@ -94,6 +101,14 @@ export async function executeScan(
       if (error) throw error;
       inserted = data?.length ?? 0;
       duplicates = rows.length - inserted;
+    }
+
+    if (inserted > 0) {
+      await db.from("activity_log").insert({
+        event_type: "asset_detected",
+        description: `Detected ${inserted} new asset${inserted === 1 ? "" : "s"} for @${username}`,
+        metadata: { account_id: accountId, run_id: runId, inserted },
+      });
     }
 
     await db

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { logActivity } from "./activity-log";
 
 // ---------- Tracked accounts ----------
 export type TrackedAccount = Tables<"tracked_accounts">;
@@ -35,7 +36,14 @@ export function useCreateTrackedAccount() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: trackedAccountsKey }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: trackedAccountsKey });
+      void logActivity(
+        "account_added",
+        `Tracking @${data.username}`,
+        { account_id: data.id },
+      );
+    },
   });
 }
 
@@ -50,9 +58,16 @@ export function useUpdateTrackedAccount() {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return { data, patch };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: trackedAccountsKey }),
+    onSuccess: ({ data, patch }) => {
+      qc.invalidateQueries({ queryKey: trackedAccountsKey });
+      void logActivity(
+        "account_edited",
+        `Updated @${data.username}`,
+        { account_id: data.id, changes: patch as Record<string, unknown> },
+      );
+    },
   });
 }
 
@@ -60,11 +75,23 @@ export function useDeleteTrackedAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: prev } = await supabase
+        .from("tracked_accounts")
+        .select("id,username")
+        .eq("id", id)
+        .maybeSingle();
       const { error } = await supabase.from("tracked_accounts").delete().eq("id", id);
       if (error) throw error;
-      return id;
+      return { id, username: prev?.username ?? "account" };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: trackedAccountsKey }),
+    onSuccess: ({ id, username }) => {
+      qc.invalidateQueries({ queryKey: trackedAccountsKey });
+      void logActivity(
+        "account_removed",
+        `Stopped tracking @${username}`,
+        { account_id: id },
+      );
+    },
   });
 }
 
