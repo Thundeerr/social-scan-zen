@@ -23,6 +23,9 @@ export type Asset = {
   status: "new" | "approved" | "ignored" | "downloaded";
   day: "today" | "yesterday";
   likes: string;
+  /** True when this asset was detected within the last ~90 seconds. Drives
+   *  the "just landed" highlight in the Asset Inbox. */
+  justDetected?: boolean;
 };
 
 export type ActivityEvent = {
