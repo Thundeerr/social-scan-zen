@@ -316,12 +316,18 @@ function AssetInbox() {
     if (session.approved + session.dismissed === 0) return;
     setComplete(true);
     setAmbientCalm(true);
-  }, [totalAwaiting, session, complete]);
+    // Fire the Telegram session summary once, when the mission wraps.
+    if (session.approvedIds.length > 0) {
+      void sendSessionSummary({ data: { assetIds: session.approvedIds } }).catch(
+        (err) => console.error("[telegram-summary] failed", err),
+      );
+    }
+  }, [totalAwaiting, session, complete, sendSessionSummary]);
 
   const handleCompletionDone = () => {
     setComplete(false);
     setAmbientCalm(false);
-    setSession({ approved: 0, dismissed: 0 });
+    setSession({ approved: 0, dismissed: 0, approvedIds: [] });
   };
 
   // If the operator leaves the inbox while calm is still active, release it —
