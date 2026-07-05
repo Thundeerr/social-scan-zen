@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/avatar")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data } = await supabase
+        const { data } = await supabaseAdmin
           .from("tracked_accounts")
           .select("avatar_url")
           .eq("username", username)
