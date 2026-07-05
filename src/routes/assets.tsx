@@ -232,6 +232,12 @@ function AssetInbox() {
     setSession({ approved: 0, dismissed: 0 });
   };
 
+  // If the operator leaves the inbox while calm is still active, release it —
+  // the Dashboard should remain fully alive.
+  useEffect(() => {
+    return () => setAmbientCalm(false);
+  }, []);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [muted, setMuted] = useState(true);
