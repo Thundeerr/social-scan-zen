@@ -840,6 +840,7 @@ function IntelligencePanel({
 
       <div className="flex flex-col gap-5 px-5 py-5">
         <RecommendationCard asset={asset} isFavorite={isFavorite} />
+        <OperatorInsightCard asset={asset} />
 
         <IntelField label="Account" icon={Users}>
           <div className="flex items-center gap-2">
