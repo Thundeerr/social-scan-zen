@@ -30,6 +30,8 @@ import {
 import type { Asset } from "@/lib/mock-data";
 import {
   computeOperatorScore,
+  computeRecommendation,
+  verdictToneClasses,
   rankByOperatorScore,
   scoreToneClasses,
   scoreConfidenceLabel,
