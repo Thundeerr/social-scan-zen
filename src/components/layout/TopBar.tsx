@@ -93,11 +93,61 @@ export function TopBar() {
             <span className="text-muted-foreground tabular-nums">{rel}</span>
           </div>
 
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/40 ring-1 ring-primary/40 flex items-center justify-center text-[11px] font-semibold text-primary-foreground">
-            OW
-          </div>
+          <OperatorBadge />
         </div>
       </div>
     </header>
+  );
+}
+
+function OperatorBadge() {
+  const { user, profile } = useCurrentOperator();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  if (!user) return null;
+
+  const initials = operatorInitials(profile, user);
+  const label = profile?.display_name ?? user.email ?? "Operator";
+
+  const handleSignOut = async () => {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    toast("Session closed");
+    navigate({ to: "/login", replace: true });
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded-full border border-border/60 bg-card/60 pl-1 pr-3 py-1 text-xs text-foreground/90 transition hover:border-border hover:bg-card"
+          aria-label="Operator menu"
+        >
+          <span className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-primary/40 ring-1 ring-primary/40 flex items-center justify-center text-[10px] font-semibold text-primary-foreground">
+            {initials}
+          </span>
+          <span className="hidden sm:inline max-w-[140px] truncate">{label}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="font-normal">
+          <div className="text-xs text-muted-foreground uppercase tracking-[0.18em]">
+            Operator
+          </div>
+          <div className="mt-1 truncate text-sm text-foreground">{label}</div>
+          {profile?.email && profile.email !== label && (
+            <div className="truncate text-xs text-muted-foreground">{profile.email}</div>
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+          <LogOut className="h-3.5 w-3.5 mr-2" />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
