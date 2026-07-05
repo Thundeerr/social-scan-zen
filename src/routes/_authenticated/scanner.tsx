@@ -393,6 +393,8 @@ function ScannerPage() {
   const { data: queue = [] } = useScannerQueue();
   const { data: runs = [] } = useScannerRuns(20);
   const { data: stats } = useScannerStats();
+  const [scanInterval] = useScanInterval();
+  const intervalLabel = intervalShortLabel(scanInterval);
 
   // Live ticking clock for elapsed / next-scan countdowns.
   useTick(200);
