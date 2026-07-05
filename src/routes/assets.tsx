@@ -219,6 +219,43 @@ function AssetInbox() {
     [assets],
   );
 
+  // AI verdict breakdown across the awaiting queue. Powers the calm
+  // Network Summary briefing — it never hides assets, only reframes them.
+  const awaitingBreakdown = useMemo(() => {
+    const awaiting = assets.filter((a) => a.status === "new");
+    let high = 0;
+    let review = 0;
+    let low = 0;
+    for (const a of awaiting) {
+      const v = computeRecommendation(a).verdict;
+      if (v === "KEEP") high++;
+      else if (v === "REVIEW") review++;
+      else low++;
+    }
+    return { processed: awaiting.length, high, review, low };
+  }, [assets]);
+
+  // Operator can dismiss the briefing to enter full review mode. Reset the
+  // dismissal whenever a fresh batch of awaiting assets arrives.
+  const [briefingDismissed, setBriefingDismissed] = useState(false);
+  useEffect(() => {
+    setBriefingDismissed(false);
+  }, [totalAwaiting === 0]);
+
+  const showNetworkSummary =
+    !briefingDismissed &&
+    awaitingBreakdown.processed > 0 &&
+    awaitingBreakdown.high === 0;
+
+  const reviewRecommended = () => {
+    const firstReview = filtered.find(
+      (a) => a.status === "new" && computeRecommendation(a).verdict === "REVIEW",
+    );
+    if (firstReview) selectAsset(firstReview.id);
+    setBriefingDismissed(true);
+  };
+
+
   useEffect(() => {
     if (complete) return;
     if (totalAwaiting !== 0) return;
