@@ -56,17 +56,19 @@ export async function sendTelegramMessage(
 }
 
 /**
- * Calls `getUpdates` and returns the most recent chat.id seen by the bot.
- * Used by the "Detect chat ID" helper on the Settings page — the operator
- * messages the bot with /start, we surface the ID for them to save.
+ * Calls `getUpdates` and returns the most recent chat.id from a message
+ * whose text contains the caller's own per-user token (typically sent as
+ * `/start <userToken>`). This prevents one operator from capturing a chat
+ * ID that belongs to a different operator mid-setup.
  */
-export async function detectLatestTelegramChatId(): Promise<
-  { ok: true; chatId: string | null } | { ok: false; error: string }
-> {
+export async function detectLatestTelegramChatIdForToken(
+  userToken: string,
+): Promise<{ ok: true; chatId: string | null } | { ok: false; error: string }> {
   const lovableKey = process.env.LOVABLE_API_KEY;
   const connKey = process.env.TELEGRAM_API_KEY;
   if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
   if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
+  if (!userToken?.trim()) return { ok: false, error: "Missing per-user setup token" };
 
   try {
     const res = await fetch(`${GATEWAY_URL}/getUpdates`, {
@@ -76,20 +78,25 @@ export async function detectLatestTelegramChatId(): Promise<
         "X-Connection-Api-Key": connKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ limit: 20, allowed_updates: ["message"] }),
+      body: JSON.stringify({ limit: 50, allowed_updates: ["message"] }),
     });
     const data = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
       description?: string;
-      result?: Array<{ message?: { chat?: { id?: number } } }>;
+      result?: Array<{ message?: { text?: string; chat?: { id?: number } } }>;
     };
     if (!res.ok || data.ok === false) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` };
     }
+    const token = userToken.trim();
     const updates = data.result ?? [];
     for (let i = updates.length - 1; i >= 0; i--) {
-      const id = updates[i]?.message?.chat?.id;
-      if (typeof id === "number") return { ok: true, chatId: String(id) };
+      const msg = updates[i]?.message;
+      const text = msg?.text ?? "";
+      const id = msg?.chat?.id;
+      if (typeof id === "number" && text.includes(token)) {
+        return { ok: true, chatId: String(id) };
+      }
     }
     return { ok: true, chatId: null };
   } catch (err) {
