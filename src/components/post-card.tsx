@@ -1,8 +1,19 @@
-import { Check, X, Download, ExternalLink, Heart } from "lucide-react";
+import { Check, X, Download, ExternalLink, Heart, RotateCcw } from "lucide-react";
 import type { Post } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
+import { postActions } from "@/lib/posts-store";
+import { cn } from "@/lib/utils";
+
+const statusStyles: Record<Post["status"], string> = {
+  new: "text-primary bg-primary/10 border-primary/20",
+  approved: "text-success bg-success/10 border-success/30",
+  ignored: "text-muted-foreground bg-muted/40 border-border",
+  downloaded: "text-foreground bg-foreground/10 border-foreground/20",
+};
 
 export function PostCard({ post }: { post: Post }) {
+  const isActioned = post.status !== "new";
+
   return (
     <article className="soft-shadow group rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-colors">
       <div className="flex items-center gap-3 px-4 py-3">
@@ -11,7 +22,12 @@ export function PostCard({ post }: { post: Post }) {
           <div className="text-sm font-medium truncate">@{post.username}</div>
           <div className="text-[11px] text-muted-foreground">detected {post.detectedAt}</div>
         </div>
-        <span className="text-[10px] uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+        <span
+          className={cn(
+            "text-[10px] uppercase tracking-wider border rounded-full px-2 py-0.5 capitalize",
+            statusStyles[post.status],
+          )}
+        >
           {post.status}
         </span>
       </div>
@@ -31,19 +47,63 @@ export function PostCard({ post }: { post: Post }) {
       <div className="px-4 py-3 space-y-3">
         <p className="text-sm text-foreground/90 line-clamp-2">{post.caption}</p>
         <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="secondary" className="h-8 gap-1.5">
-            <ExternalLink className="h-3.5 w-3.5" /> View
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 gap-1.5"
+            asChild
+          >
+            <a
+              href={`https://instagram.com/${post.username}`}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> View
+            </a>
           </Button>
-          <Button size="sm" variant="secondary" className="h-8 gap-1.5">
-            <Download className="h-3.5 w-3.5" /> Download
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 gap-1.5"
+            onClick={() => postActions.download(post.id)}
+            disabled={post.status === "downloaded"}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {post.status === "downloaded" ? "Downloaded" : "Download"}
           </Button>
           <div className="flex-1" />
-          <Button size="icon" variant="ghost" className="h-8 w-8 text-success hover:text-success">
-            <Check className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-            <X className="h-4 w-4" />
-          </Button>
+          {isActioned ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => postActions.reset(post.id)}
+              title="Reset"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          ) : (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-success hover:text-success"
+                onClick={() => postActions.approve(post.id)}
+                title="Approve"
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={() => postActions.ignore(post.id)}
+                title="Ignore"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </article>
