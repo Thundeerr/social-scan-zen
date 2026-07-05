@@ -62,8 +62,12 @@ export function AnimatedCircuitBackground() {
   const fadeId = `circuit-fade-${uid}`;
 
 
-  // A handful of hand-drawn "trace" paths particles will travel along.
-  const paths = [
+  const isLow = tier === "low";
+
+  // Full path set. On low-power devices we render fewer traces and skip the
+  // secondary trailing particle per trace — cuts SMIL animateMotion work
+  // roughly in half and drops the glow filter (biggest paint cost).
+  const allPaths = [
     "M -20 120 L 260 120 L 260 260 L 520 260 L 520 180 L 900 180 L 900 340 L 1220 340 L 1260 340",
     "M 1260 60 L 980 60 L 980 220 L 720 220 L 720 380 L 420 380 L 420 520 L 120 520 L -20 520",
     "M -20 720 L 200 720 L 200 620 L 460 620 L 460 780 L 780 780 L 780 660 L 1080 660 L 1260 660",
@@ -72,9 +76,9 @@ export function AnimatedCircuitBackground() {
     "M -20 340 L 160 340 L 160 460 L 380 460 L 380 340 L 620 340 L 620 460 L 820 460",
     "M 1260 460 L 1060 460 L 1060 560 L 820 560 L 820 720 L 560 720 L 560 860 L 320 860 L 320 900",
   ];
+  const paths = isLow ? allPaths.slice(0, 4) : allPaths;
 
-  // Static "node" dots at path junctions.
-  const nodes = [
+  const allNodes: Array<[number, number]> = [
     [260, 120], [520, 260], [900, 180], [1220, 340],
     [980, 60], [720, 220], [420, 380], [120, 520],
     [200, 720], [460, 620], [780, 780], [1080, 660],
@@ -83,9 +87,13 @@ export function AnimatedCircuitBackground() {
     [160, 340], [380, 460], [620, 340],
     [1060, 460], [820, 560], [560, 720], [320, 860],
   ];
+  const nodes = isLow ? allNodes.filter((_, i) => i % 2 === 0) : allNodes;
+
+  // Glow (SVG feGaussianBlur + feMerge) is the most expensive part; skip on low tier.
+  const traceFilter = isLow ? undefined : `url(#${glowId})`;
 
   return (
-    <div className="circuit-bg" aria-hidden="true">
+    <div className={`circuit-bg${isLow ? " circuit-bg--low" : ""}`} aria-hidden="true">
       <svg
         className="circuit-bg__svg"
         viewBox="0 0 1280 900"
@@ -102,13 +110,15 @@ export function AnimatedCircuitBackground() {
               strokeWidth="0.5"
             />
           </pattern>
-          <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1.4" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
+          {!isLow && (
+            <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="1.4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          )}
           <radialGradient id={fadeId} cx="75%" cy="15%" r="90%">
             <stop offset="0%" stopColor="var(--circuit-blue)" stopOpacity="0.35" />
             <stop offset="55%" stopColor="var(--circuit-purple)" stopOpacity="0.12" />
@@ -116,19 +126,15 @@ export function AnimatedCircuitBackground() {
           </radialGradient>
         </defs>
 
-        {/* base grid */}
         <rect width="1280" height="900" fill={`url(#${gridId})`} />
-
-        {/* soft top-right glow */}
         <rect width="1280" height="900" fill={`url(#${fadeId})`} />
 
-        {/* circuit traces */}
         <g
           fill="none"
           stroke="var(--circuit-blue)"
           strokeOpacity="0.35"
           strokeWidth="1"
-          filter={`url(#${glowId})`}
+          filter={traceFilter}
         >
           {paths.map((d, i) => (
             <path
@@ -140,8 +146,7 @@ export function AnimatedCircuitBackground() {
           ))}
         </g>
 
-        {/* junction nodes */}
-        <g filter={`url(#${glowId})`}>
+        <g filter={traceFilter}>
           {nodes.map(([x, y], i) => (
             <circle
               key={i}
@@ -160,8 +165,7 @@ export function AnimatedCircuitBackground() {
           ))}
         </g>
 
-        {/* traveling particles along traces */}
-        <g className="circuit-bg__particles" filter={`url(#${glowId})`}>
+        <g className="circuit-bg__particles" filter={traceFilter}>
           {paths.map((d, i) => {
             const color =
               i % 5 === 0
@@ -169,7 +173,7 @@ export function AnimatedCircuitBackground() {
                 : i % 3 === 0
                   ? "var(--circuit-purple)"
                   : "var(--circuit-blue)";
-            const dur = 18 + (i % 4) * 6; // 18s..36s
+            const dur = 18 + (i % 4) * 6;
             const delay = -(i * 3);
             return (
               <g key={i}>
@@ -182,7 +186,7 @@ export function AnimatedCircuitBackground() {
                     rotate="auto"
                   />
                 </circle>
-                {i % 2 === 0 && (
+                {!isLow && i % 2 === 0 && (
                   <circle r={1.1} fill={color} opacity={0.6}>
                     <animateMotion
                       dur={`${dur + 4}s`}
@@ -198,8 +202,8 @@ export function AnimatedCircuitBackground() {
         </g>
       </svg>
 
-      {/* dark vignette / overlay so UI stays readable */}
       <div className="circuit-bg__overlay" />
     </div>
   );
 }
+
