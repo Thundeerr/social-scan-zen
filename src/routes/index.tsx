@@ -3,8 +3,9 @@ import { Users, Sparkles, Clock, Activity, Plug } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { PostCard } from "@/components/post-card";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { kpis, scannerActivity } from "@/lib/mock-data";
+import { kpis } from "@/lib/mock-data";
 import { usePosts } from "@/lib/posts-store";
+import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -15,6 +16,9 @@ export const Route = createFileRoute("/")({
 
 function DashboardPage() {
   const recentPosts = usePosts();
+  const sim = useScanSim();
+  void sim.nowTick;
+  const lastScan = sim.isScanning ? "scanning…" : formatLastScan(sim);
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div>
