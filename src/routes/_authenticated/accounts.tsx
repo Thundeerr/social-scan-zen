@@ -336,7 +336,7 @@ function AccountsPage() {
               <TableHead>Last Scan</TableHead>
               <TableHead>Next Scan</TableHead>
               <TableHead className="text-right">Total Assets</TableHead>
-              <TableHead className="w-10"></TableHead>
+              <TableHead className="w-[160px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
