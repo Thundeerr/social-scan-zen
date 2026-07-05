@@ -21,6 +21,7 @@ export function useTrackedAccounts() {
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 30_000,
   });
 }
 
@@ -273,5 +274,6 @@ export function useActivityLog(limit = 50) {
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 10_000,
   });
 }

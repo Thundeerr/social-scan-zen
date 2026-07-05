@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { RefreshIndicator } from "@/components/RefreshIndicator";
 // Provider is static configuration, not simulation data.
 const API_PROVIDER = "Instagram Looter";
 import { useAssets } from "@/lib/assets-store";
@@ -107,7 +108,10 @@ function DashboardPage() {
             Everything the network surfaced is waiting in the inbox.
           </p>
         </div>
-        <HealthBadge level={health.level} score={health.score} />
+        <div className="flex items-center gap-3">
+          <RefreshIndicator />
+          <HealthBadge level={health.level} score={health.score} />
+        </div>
       </div>
 
       {/* Primary CTA — Review Assets */}
@@ -228,17 +232,20 @@ function DashboardPage() {
         </section>
 
         <aside className="soft-shadow rounded-xl border border-border bg-card p-5 h-fit xl:sticky xl:top-20">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 gap-2">
             <h2 className="text-sm font-semibold">Scanner Activity</h2>
-            <span
-              className={
-                sim.isScanning
-                  ? "text-[10px] uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-2 py-0.5"
-                  : "text-[10px] uppercase tracking-wider text-success bg-success/10 border border-success/30 rounded-full px-2 py-0.5"
-              }
-            >
-              {sim.isScanning ? "Live" : "Standby"}
-            </span>
+            <div className="flex items-center gap-2">
+              <RefreshIndicator />
+              <span
+                className={
+                  sim.isScanning
+                    ? "text-[10px] uppercase tracking-wider text-primary bg-primary/10 border border-primary/30 rounded-full px-2 py-0.5"
+                    : "text-[10px] uppercase tracking-wider text-success bg-success/10 border border-success/30 rounded-full px-2 py-0.5"
+                }
+              >
+                {sim.isScanning ? "Live" : "Standby"}
+              </span>
+            </div>
           </div>
           <ActivityTimeline events={activityEvents.length ? activityEvents : [{ time: "—", label: "No scanner activity yet", kind: "muted" }]} />
         </aside>
