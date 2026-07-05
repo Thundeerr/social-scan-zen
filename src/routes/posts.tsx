@@ -1,26 +1,70 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Check, X, Download, ExternalLink, RotateCcw } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+import { useMemo } from "react";
+import { Check, X, Download, ExternalLink, RotateCcw, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { usePosts, postActions } from "@/lib/posts-store";
+import type { Post } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+
+const DAYS = ["all", "today", "yesterday"] as const;
+const STATUSES = ["all", "new", "approved", "ignored", "downloaded"] as const;
+type Day = (typeof DAYS)[number];
+type Status = (typeof STATUSES)[number];
+
+const searchSchema = z.object({
+  day: fallback(z.enum(DAYS), "today").default("today"),
+  status: fallback(z.enum(STATUSES), "all").default("all"),
+  q: fallback(z.string(), "").default(""),
+});
 
 export const Route = createFileRoute("/posts")({
   head: () => ({ meta: [{ title: "New Posts — InstaScanner" }] }),
+  validateSearch: zodValidator(searchSchema),
   component: PostsPage,
 });
 
-type Filter = "today" | "yesterday" | "approved" | "ignored" | "downloaded";
+function matches(p: Post, day: Day, status: Status, q: string) {
+  if (day !== "all" && p.day !== day) return false;
+  if (status !== "all" && p.status !== status) return false;
+  if (q) {
+    const needle = q.toLowerCase();
+    if (
+      !p.username.toLowerCase().includes(needle) &&
+      !p.caption.toLowerCase().includes(needle)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 function PostsPage() {
-  const [filter, setFilter] = useState<Filter>("today");
+  const { day, status, q } = Route.useSearch();
+  const navigate = useNavigate({ from: "/posts" });
   const posts = usePosts();
 
-  const filtered = posts.filter((p) => {
-    if (filter === "today") return p.day === "today";
-    if (filter === "yesterday") return p.day === "yesterday";
-    return p.status === filter;
-  });
+  const setSearch = (patch: Partial<{ day: Day; status: Status; q: string }>) =>
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+
+  const dayCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        DAYS.map((d) => [d, posts.filter((p) => matches(p, d, status, q)).length]),
+      ) as Record<Day, number>,
+    [posts, status, q],
+  );
+  const statusCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        STATUSES.map((s) => [s, posts.filter((p) => matches(p, day, s, q)).length]),
+      ) as Record<Status, number>,
+    [posts, day, q],
+  );
+
+  const filtered = posts.filter((p) => matches(p, day, status, q));
 
   return (
     <div className="p-6 md:p-8">
@@ -29,22 +73,72 @@ function PostsPage() {
         description="Review, approve, or ignore freshly detected posts."
       />
 
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 mb-6 w-fit">
-        {(["today", "yesterday", "approved", "ignored", "downloaded"] as Filter[]).map((k) => (
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+          {DAYS.map((k) => (
+            <button
+              key={k}
+              onClick={() => setSearch({ day: k })}
+              className={cn(
+                "px-3 h-8 text-xs rounded-md capitalize transition-colors flex items-center gap-1.5",
+                day === k
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {k}
+              <span
+                className={cn(
+                  "text-[10px] tabular-nums rounded px-1",
+                  day === k ? "bg-primary/20" : "bg-muted",
+                )}
+              >
+                {dayCounts[k]}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 flex-wrap">
+          {STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSearch({ status: s })}
+              className={cn(
+                "h-8 px-2.5 text-xs rounded-full border capitalize transition-colors flex items-center gap-1.5",
+                status === s
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s}
+              <span className="text-[10px] tabular-nums text-muted-foreground/80">
+                {statusCounts[s]}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setSearch({ q: e.target.value })}
+            placeholder="Search username or caption…"
+            className="pl-9 h-8 w-64"
+          />
+        </div>
+
+        {(day !== "today" || status !== "all" || q) && (
           <button
-            key={k}
-            onClick={() => setFilter(k)}
-            className={cn(
-              "px-3 h-8 text-xs rounded-md capitalize transition-colors",
-              filter === k
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
+            onClick={() => setSearch({ day: "today", status: "all", q: "" })}
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
           >
-            {k}
+            Reset
           </button>
-        ))}
+        )}
       </div>
+
 
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card/30 p-16 text-center">
