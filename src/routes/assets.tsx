@@ -2,10 +2,16 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useMemo } from "react";
-import { Check, X, Download, ExternalLink, RotateCcw } from "lucide-react";
+import { Check, X, Download, ExternalLink, RotateCcw, Star } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { useAssets, assetActions } from "@/lib/assets-store";
 import { useGlobalQuery, setGlobalQuery, matchesQuery } from "@/lib/search-store";
+import { useFavorites, toggleFavorite } from "@/lib/favorites-store";
+import {
+  useRegisterVisibleAssets,
+  selectAsset,
+  useSelection,
+} from "@/lib/selection-store";
 import type { Asset } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +72,15 @@ function AssetsPage() {
     [assets, day, q],
   );
 
-  const filtered = assets.filter((a) => matches(a, day, status, q));
+  const filtered = useMemo(
+    () => assets.filter((a) => matches(a, day, status, q)),
+    [assets, day, status, q],
+  );
+  useRegisterVisibleAssets(
+    useMemo(() => filtered.map((a) => a.id), [filtered]),
+  );
+  const { selectedId } = useSelection();
+  const favorites = useFavorites();
 
   return (
     <div className="p-6 md:p-8">
@@ -146,77 +160,123 @@ function AssetsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((p) => (
-            <div
-              key={p.id}
-              className="soft-shadow group relative overflow-hidden rounded-xl border border-border bg-card"
-            >
-              <div className="relative aspect-square overflow-hidden bg-muted">
-                <img
-                  src={p.thumbnail}
-                  alt=""
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute inset-x-0 bottom-0 p-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="text-xs font-medium text-white">@{p.username}</div>
-                    <div className="text-[10px] text-white/70">· {p.detectedAt}</div>
-                  </div>
-                  <p className="text-[11px] text-white/90 line-clamp-2 mb-2">{p.caption}</p>
-                  <div className="flex items-center gap-1">
-                    <IconBtn
-                      as="a"
-                      href={`https://instagram.com/${p.username}`}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      title="View"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </IconBtn>
-                    {p.status === "new" ? (
-                      <>
-                        <IconBtn
-                          onClick={() => assetActions.download(p.id)}
-                          title="Synchronize"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </IconBtn>
-                        <IconBtn
-                          className="text-success"
-                          onClick={() => assetActions.approve(p.id)}
-                          title="Approve"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </IconBtn>
-                        <IconBtn
-                          className="text-destructive"
-                          onClick={() => assetActions.ignore(p.id)}
-                          title="Archive"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </IconBtn>
-                      </>
-                    ) : (
+          {filtered.map((p) => {
+            const selected = p.id === selectedId;
+            const sourceUrl = `https://instagram.com/${p.username}`;
+            const isFav = favorites.has(p.id);
+            return (
+              <div
+                key={p.id}
+                data-asset-id={p.id}
+                data-asset-url={sourceUrl}
+                onClick={() => selectAsset(p.id)}
+                className={cn(
+                  "soft-shadow group relative overflow-hidden rounded-xl border bg-card cursor-pointer transition-colors",
+                  selected
+                    ? "border-primary/60 ring-1 ring-primary/40"
+                    : "border-border hover:border-primary/30",
+                )}
+              >
+                <div className="relative aspect-square overflow-hidden bg-muted">
+                  <img
+                    src={p.thumbnail}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  {selected && (
+                    <div className="absolute top-2 left-2 rounded-md bg-primary/90 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-primary-foreground">
+                      Selected
+                    </div>
+                  )}
+                  {isFav && (
+                    <div className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur p-1">
+                      <Star className="h-3 w-3 fill-warning text-warning" />
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 p-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="text-xs font-medium text-white">@{p.username}</div>
+                      <div className="text-[10px] text-white/70">· {p.detectedAt}</div>
+                    </div>
+                    <p className="text-[11px] text-white/90 line-clamp-2 mb-2">{p.caption}</p>
+                    <div className="flex items-center gap-1">
                       <IconBtn
-                        onClick={() => assetActions.reset(p.id)}
-                        title="Reset to new"
+                        as="a"
+                        href={sourceUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title="Open original source (R)"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <RotateCcw className="h-3.5 w-3.5" />
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </IconBtn>
-                    )}
+                      <IconBtn
+                        className={cn(isFav && "text-warning")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(p.id);
+                        }}
+                        title="Toggle favorite (F)"
+                      >
+                        <Star className={cn("h-3.5 w-3.5", isFav && "fill-warning")} />
+                      </IconBtn>
+                      {p.status === "new" ? (
+                        <>
+                          <IconBtn
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              assetActions.download(p.id);
+                            }}
+                            title="Synchronize (D)"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </IconBtn>
+                          <IconBtn
+                            className="text-success"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              assetActions.approve(p.id);
+                            }}
+                            title="Approve (A)"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </IconBtn>
+                          <IconBtn
+                            className="text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              assetActions.ignore(p.id);
+                            }}
+                            title="Archive (I)"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </IconBtn>
+                        </>
+                      ) : (
+                        <IconBtn
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            assetActions.reset(p.id);
+                          }}
+                          title="Reset to new"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </IconBtn>
+                      )}
+                    </div>
                   </div>
                 </div>
+                <div className="px-3 py-2 flex items-center justify-between">
+                  <span className="text-xs font-medium truncate">@{p.username}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground capitalize">
+                    {p.status === "new" ? p.detectedAt : STATUS_LABEL[p.status as Status]}
+                  </span>
+                </div>
               </div>
-              <div className="px-3 py-2 flex items-center justify-between">
-                <span className="text-xs font-medium truncate">@{p.username}</span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground capitalize">
-                  {p.status === "new" ? p.detectedAt : STATUS_LABEL[p.status as Status]}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

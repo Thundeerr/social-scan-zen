@@ -11,12 +11,12 @@ import {
 import { cn } from "@/lib/utils";
 
 const items = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/accounts", label: "Tracked Accounts", icon: Users },
-  { to: "/assets", label: "New Assets", icon: Images },
-  { to: "/downloads", label: "Archive", icon: Download },
-  { to: "/scanner", label: "Scanner", icon: Radar },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, hint: "G D" },
+  { to: "/accounts", label: "Tracked Accounts", icon: Users, hint: "G T" },
+  { to: "/assets", label: "New Assets", icon: Images, hint: "G A" },
+  { to: "/downloads", label: "Archive", icon: Download, hint: null as string | null },
+  { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
+  { to: "/settings", label: "Settings", icon: Settings, hint: null as string | null },
 ] as const;
 
 export function AppSidebar() {
@@ -40,7 +40,7 @@ export function AppSidebar() {
         <div className="px-2 pb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Workspace
         </div>
-        {items.map(({ to, label, icon: Icon }) => {
+        {items.map(({ to, label, icon: Icon, hint }) => {
           const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
           return (
             <Link
@@ -54,7 +54,12 @@ export function AppSidebar() {
               )}
             >
               <Icon className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
-              <span>{label}</span>
+              <span className="flex-1">{label}</span>
+              {hint && (
+                <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/40 px-1 font-mono text-[9px] font-medium text-muted-foreground/80 tracking-wider">
+                  {hint}
+                </kbd>
+              )}
             </Link>
           );
         })}
