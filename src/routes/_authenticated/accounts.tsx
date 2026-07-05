@@ -45,7 +45,7 @@ import { tierFor } from "@/lib/priority";
 import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/accounts")({
+export const Route = createFileRoute("/_authenticated/accounts")({
   head: () => ({ meta: [{ title: "Tracked Accounts — InstaScanner" }] }),
   component: AccountsPage,
 });

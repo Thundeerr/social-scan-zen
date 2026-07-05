@@ -11,7 +11,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 
-export const Route = createFileRoute("/settings")({
+export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
   component: SettingsPage,
 });
