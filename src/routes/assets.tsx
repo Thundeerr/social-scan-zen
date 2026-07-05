@@ -1292,10 +1292,37 @@ function SwipeCard({
           </div>
         </div>
         <p className="mt-2 line-clamp-2 text-[13px] text-white/90">{asset.caption}</p>
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-white/80">
-          <Sparkles className="h-3 w-3" />
-          <span className="line-clamp-1">{aiSummary(asset)}</span>
-        </div>
+        {(() => {
+          const rec = computeRecommendation(asset);
+          const tone = verdictToneClasses(rec.verdict);
+          return (
+            <div
+              className={cn(
+                "mt-3 flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 backdrop-blur",
+                tone.border,
+                tone.bg,
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <Sparkles className={cn("h-3 w-3", tone.text)} />
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold uppercase tracking-[0.18em]",
+                    tone.text,
+                  )}
+                >
+                  {rec.verdict}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.15em] text-white/60">
+                  · {rec.reasons[0]}
+                </span>
+              </div>
+              <span className={cn("text-[11px] font-semibold tabular-nums", tone.text)}>
+                {rec.confidence}%
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Bottom quick-actions */}
