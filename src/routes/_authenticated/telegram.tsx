@@ -68,7 +68,7 @@ function TelegramPage() {
   });
 
   const testMutation = useMutation({
-    mutationFn: (chatId: string) => sendTest({ data: { chatId } }),
+    mutationFn: () => sendTest(),
     onSuccess: () => toast.success("Test signal delivered to Telegram"),
     onError: (err: unknown) =>
       toast.error(err instanceof Error ? err.message : "Failed to send test"),
@@ -126,7 +126,11 @@ function TelegramPage() {
         <section className="soft-shadow rounded-xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold mb-1">Telegram bot</h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Message the bot with /start, tap Detect to pull your chat ID, then flip the switch to enable delivery.
+            Message the bot with{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+              /start {prefsQuery.data?.setupToken ?? "…"}
+            </code>
+            , tap Detect to pull your chat ID, save it, then send a test.
           </p>
           <div className="divide-y divide-border">
             <SettingRow
@@ -173,7 +177,7 @@ function TelegramPage() {
                     size="sm"
                     variant="outline"
                     className="h-8 flex-1 gap-1.5 text-[11px]"
-                    onClick={() => testMutation.mutate(telegramChatId)}
+                    onClick={() => testMutation.mutate()}
                     disabled={testMutation.isPending || !telegramChatId.trim()}
                   >
                     {testMutation.isPending ? (

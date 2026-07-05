@@ -30,6 +30,9 @@ export const getTelegramPrefsFn = createServerFn({ method: "GET" })
     return {
       chatId: data?.telegram_chat_id ?? "",
       enabled: data?.telegram_enabled ?? false,
+      // Per-user token the operator must include when they send `/start` to
+      // the shared bot so `detectTelegramChatIdFn` can safely match their chat.
+      setupToken: context.userId,
     };
   });
 
@@ -66,28 +69,22 @@ export const saveTelegramPrefsFn = createServerFn({ method: "POST" })
 
 export const sendTelegramTestFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((raw) =>
-    z
-      .object({
-        chatId: z.string().trim().max(64).optional(),
-      })
-      .parse(raw),
-  )
-  .handler(async ({ data, context }) => {
-    // Prefer the ID the operator just typed (unsaved test). Fall back to the
-    // stored profile value.
-    let chatId = data.chatId?.trim() ?? "";
-    if (!chatId) {
-      const { data: row } = await context.supabase
-        .from("profiles")
-        .select("telegram_chat_id")
-        .eq("id", context.userId)
-        .maybeSingle();
-      chatId = row?.telegram_chat_id ?? "";
-    }
+  .handler(async ({ context }) => {
+    // Only ever send to the chat ID stored on the caller's own profile row.
+    // We intentionally ignore any client-supplied chat ID so the shared bot
+    // cannot be used as a relay to arbitrary Telegram chats.
+    const { data: row, error: profileErr } = await context.supabase
+      .from("profiles")
+      .select("telegram_chat_id")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (profileErr) throw new Error(profileErr.message);
+    const chatId = (row?.telegram_chat_id ?? "").trim();
     const parsed = chatIdSchema.safeParse(chatId);
     if (!parsed.success) {
-      throw new Error("Enter a numeric Telegram chat ID first");
+      throw new Error(
+        "Save a numeric Telegram chat ID on your profile before sending a test.",
+      );
     }
     const { sendPrioritySignalDigest } = await import("@/lib/telegram.server");
     const result = await sendPrioritySignalDigest(chatId, {
@@ -105,9 +102,25 @@ export const sendTelegramTestFn = createServerFn({ method: "POST" })
 
 export const detectTelegramChatIdFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const { detectLatestTelegramChatId } = await import("@/lib/telegram.server");
-    const result = await detectLatestTelegramChatId();
+  .handler(async ({ context }) => {
+    // Only operators may run chat-ID detection at all — this endpoint reads
+    // the shared bot's global getUpdates queue, so it must never be exposed
+    // to arbitrary signed-in users.
+    const { data: isOp, error: roleErr } = await context.supabase.rpc(
+      "is_operator",
+      { _user_id: context.userId },
+    );
+    if (roleErr) throw new Error(roleErr.message);
+    if (!isOp) throw new Error("Only operators can detect Telegram chat IDs.");
+
+    // Require the operator to have just messaged the bot with their own
+    // per-user token (`/start <userId>`), and only return chat IDs from
+    // updates whose text carried that token. This prevents one operator from
+    // capturing a chat ID belonging to a different operator mid-setup.
+    const { detectLatestTelegramChatIdForToken } = await import(
+      "@/lib/telegram.server"
+    );
+    const result = await detectLatestTelegramChatIdForToken(context.userId);
     if (!result.ok) throw new Error(result.error);
     return { chatId: result.chatId };
   });
