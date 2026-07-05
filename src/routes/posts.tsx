@@ -17,7 +17,6 @@ type Status = (typeof STATUSES)[number];
 const searchSchema = z.object({
   day: fallback(z.enum(DAYS), "today").default("today"),
   status: fallback(z.enum(STATUSES), "all").default("all"),
-  q: fallback(z.string(), "").default(""),
 });
 
 export const Route = createFileRoute("/posts")({
