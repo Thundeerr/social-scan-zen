@@ -47,7 +47,10 @@ function PostsPage() {
   const posts = usePosts();
 
   const setSearch = (patch: Partial<{ day: Day; status: Status; q: string }>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({
+      search: (prev: { day: Day; status: Status; q: string }) => ({ ...prev, ...patch }),
+      replace: true,
+    });
 
   const dayCounts = useMemo(
     () =>
