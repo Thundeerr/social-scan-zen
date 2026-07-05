@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Users, Sparkles, Clock, Activity, Plug } from "lucide-react";
+import { useMemo } from "react";
 import { KpiCard } from "@/components/kpi-card";
 import { AssetCard } from "@/components/asset-card";
 import { ActivityTimeline } from "@/components/activity-timeline";
@@ -7,6 +8,7 @@ import { kpis } from "@/lib/mock-data";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useGlobalQuery, matchesQuery } from "@/lib/search-store";
+import { useRegisterVisibleAssets } from "@/lib/selection-store";
 import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
@@ -23,7 +25,12 @@ function DashboardPage() {
   void sim.nowTick;
   const lastScan = sim.isScanning ? "scanning…" : formatLastScan(sim);
   const searching = q.trim().length > 0;
-  const results = searching ? allAssets.filter((a) => matchesQuery(a, q)) : allAssets;
+  const results = useMemo(
+    () => (searching ? allAssets.filter((a) => matchesQuery(a, q)) : allAssets),
+    [allAssets, q, searching],
+  );
+  const visible = useMemo(() => results.slice(0, 6), [results]);
+  useRegisterVisibleAssets(useMemo(() => visible.map((a) => a.id), [visible]));
   const newAssets = results.filter((a) => a.status === "new");
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -74,7 +81,7 @@ function DashboardPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
-                {results.slice(0, 6).map((a) => (
+                {visible.map((a) => (
                   <AssetCard key={a.id} asset={a} />
                 ))}
               </div>
