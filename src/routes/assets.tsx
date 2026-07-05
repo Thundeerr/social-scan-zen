@@ -451,6 +451,15 @@ function InboxRail({
         )}
       </div>
 
+      {/* Ranking indicator */}
+      <div className="flex items-center justify-between border-b border-border/60 bg-background/40 px-5 py-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-1 w-1 rounded-full bg-primary" />
+          Ranked by Operator Score
+        </span>
+        <span>{assets.length}</span>
+      </div>
+
       {/* Queue list */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {assets.length === 0 ? (
@@ -459,8 +468,13 @@ function InboxRail({
           </div>
         ) : (
           <ol className="py-1">
-            {assets.map((a, i) => {
+            {assets.map((a) => {
               const active = a.id === currentId;
+              const tier = tierFor(a.username);
+              const { score } = computeOperatorScore(a, {
+                isFavorite: false, // rank already accounts for favorites
+              });
+              const tone = scoreToneClasses(score);
               return (
                 <li key={a.id}>
                   <button
@@ -469,9 +483,7 @@ function InboxRail({
                     data-asset-url={`https://instagram.com/${a.username}`}
                     className={cn(
                       "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors",
-                      active
-                        ? "bg-primary/10"
-                        : "hover:bg-muted/40",
+                      active ? "bg-primary/10" : "hover:bg-muted/40",
                     )}
                   >
                     <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -489,6 +501,7 @@ function InboxRail({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
+                        <TierChip tier={tier} size="xs" />
                         <span
                           className={cn(
                             "truncate text-xs font-medium",
@@ -503,8 +516,16 @@ function InboxRail({
                         {watchlistFor(a.username)} · {a.detectedAt}
                       </div>
                     </div>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
-                      {String(i + 1).padStart(2, "0")}
+                    <span
+                      className={cn(
+                        "inline-flex h-6 shrink-0 items-center rounded-md border px-1.5 text-[10px] font-semibold tabular-nums",
+                        tone.border,
+                        tone.bg,
+                        tone.text,
+                      )}
+                      title={`Operator Score · ${scoreConfidenceLabel(score)}`}
+                    >
+                      {score}
                     </span>
                   </button>
                 </li>
