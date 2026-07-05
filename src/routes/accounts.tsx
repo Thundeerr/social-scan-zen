@@ -41,6 +41,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
 import { trackedAccounts, getAvatar, type Account } from "@/lib/mock-data";
+import { tierFor, TIER_META, TIER_ORDER } from "@/lib/priority";
+import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/accounts")({
