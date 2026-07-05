@@ -147,9 +147,15 @@ export function AnimatedCircuitBackground() {
 
 
 
-  // Idle particles: one slow light per trace. When scanning, add ~20% more
-  // trailing lights on a subset of traces. All motion is slow (30-60s per loop).
-  const scanningExtras = isScanning ? Math.max(1, Math.round(paths.length * 0.2)) : 0;
+  // Real-time reactions to scanner state. Everything stays subtle.
+  //   - scanningExtras: ~30% more travelling lights while running
+  //   - particleSpeedMul: particles flow ~15% faster during a scan
+  //   - traceBoost: brighter stroke on a wider subset of paths
+  //   - nodeBoost: nodes glow a touch stronger
+  const scanningExtras = isScanning ? Math.max(2, Math.round(paths.length * 0.3)) : 0;
+  const particleSpeedMul = isScanning ? 0.85 : 1;
+  const nodeBoost = isScanning ? 0.08 : 0;
+
 
   return (
     <div
