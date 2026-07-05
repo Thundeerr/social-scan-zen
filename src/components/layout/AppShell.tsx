@@ -23,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <KeyboardShortcuts />
         <CommandPalette />
+        <DownloadProgressPanel />
       </div>
     </TooltipProvider>
   );
