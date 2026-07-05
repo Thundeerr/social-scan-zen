@@ -1,11 +1,9 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useScanSim } from "@/lib/scan-simulator";
 
 /**
  * Performance tier detection.
- * - "low" on: prefers-reduced-motion, save-data, small viewport,
- *   low deviceMemory, low hardwareConcurrency, or coarse pointer (mobile).
- * - "high" otherwise.
- * Runs after mount so SSR always renders the full version, then downgrades.
+ * SSR renders the full version; downgrades after mount on constrained devices.
  */
 function usePerfTier(): "high" | "low" {
   const [tier, setTier] = useState<"high" | "low">("high");
@@ -47,163 +45,215 @@ function usePerfTier(): "high" | "low" {
 }
 
 /**
- * Subtle animated cyberpunk circuit-board background.
- * - fixed, non-interactive, sits behind all app content
- * - respects prefers-reduced-motion
- * - downshifts particle/node/path counts on low-power devices
- * - tunable via CSS vars: --circuit-opacity, --circuit-speed,
- *   --circuit-blue, --circuit-purple, --circuit-amber
+ * Autonomous surveillance network background.
+ *
+ * Six visual layers stacked behind the app:
+ *   1. deep navy/black base (via app bg + our darkening overlay)
+ *   2. faint circuit grid
+ *   3. dim circuit traces
+ *   4. small glowing network nodes
+ *   5. slow-moving light particles (data flowing through the fabric)
+ *   6. atmospheric haze / vignette
+ *
+ * When the scanner is running, more particles activate and a subset of traces
+ * dim up slightly. Everything else stays calm. No pulsing, no flashing.
  */
 export function AnimatedCircuitBackground() {
   const tier = usePerfTier();
   const uid = useId().replace(/:/g, "");
-  const gridId = `circuit-grid-${uid}`;
-  const glowId = `circuit-glow-${uid}`;
-  const fadeId = `circuit-fade-${uid}`;
+  const gridId = `net-grid-${uid}`;
+  const glowId = `net-glow-${uid}`;
+  const hazeId = `net-haze-${uid}`;
 
-
+  const sim = useScanSim();
+  const isScanning = sim.isScanning;
   const isLow = tier === "low";
 
-  // Full path set. On low-power devices we render fewer traces and skip the
-  // secondary trailing particle per trace — cuts SMIL animateMotion work
-  // roughly in half and drops the glow filter (biggest paint cost).
-  const allPaths = [
-    "M -20 120 L 260 120 L 260 260 L 520 260 L 520 180 L 900 180 L 900 340 L 1220 340 L 1260 340",
-    "M 1260 60 L 980 60 L 980 220 L 720 220 L 720 380 L 420 380 L 420 520 L 120 520 L -20 520",
-    "M -20 720 L 200 720 L 200 620 L 460 620 L 460 780 L 780 780 L 780 660 L 1080 660 L 1260 660",
-    "M 80 -20 L 80 200 L 340 200 L 340 440 L 600 440 L 600 640 L 860 640 L 860 820 L 860 900",
-    "M 1180 900 L 1180 700 L 940 700 L 940 500 L 700 500 L 700 300 L 460 300 L 460 80 L 460 -20",
-    "M -20 340 L 160 340 L 160 460 L 380 460 L 380 340 L 620 340 L 620 460 L 820 460",
-    "M 1260 460 L 1060 460 L 1060 560 L 820 560 L 820 720 L 560 720 L 560 860 L 320 860 L 320 900",
-  ];
-  const paths = isLow ? allPaths.slice(0, 4) : allPaths;
+  // Trace network. Organic-but-orthogonal routes across a huge board.
+  const allPaths = useMemo(
+    () => [
+      "M -20 120 L 260 120 L 260 260 L 520 260 L 520 180 L 900 180 L 900 340 L 1220 340 L 1260 340",
+      "M 1260 60 L 980 60 L 980 220 L 720 220 L 720 380 L 420 380 L 420 520 L 120 520 L -20 520",
+      "M -20 720 L 200 720 L 200 620 L 460 620 L 460 780 L 780 780 L 780 660 L 1080 660 L 1260 660",
+      "M 80 -20 L 80 200 L 340 200 L 340 440 L 600 440 L 600 640 L 860 640 L 860 820 L 860 900",
+      "M 1180 900 L 1180 700 L 940 700 L 940 500 L 700 500 L 700 300 L 460 300 L 460 80 L 460 -20",
+      "M -20 340 L 160 340 L 160 460 L 380 460 L 380 340 L 620 340 L 620 460 L 820 460",
+      "M 1260 460 L 1060 460 L 1060 560 L 820 560 L 820 720 L 560 720 L 560 860 L 320 860 L 320 900",
+      "M -20 60 L 60 60 L 60 300 L 240 300 L 240 560 L 40 560 L 40 780 L -20 780",
+      "M 1260 800 L 1140 800 L 1140 580 L 1000 580 L 1000 420 L 1200 420 L 1200 200 L 1260 200",
+    ],
+    [],
+  );
+  const paths = isLow ? allPaths.slice(0, 5) : allPaths;
 
-  const allNodes: Array<[number, number]> = [
-    [260, 120], [520, 260], [900, 180], [1220, 340],
-    [980, 60], [720, 220], [420, 380], [120, 520],
-    [200, 720], [460, 620], [780, 780], [1080, 660],
-    [340, 200], [600, 440], [860, 640],
-    [1180, 700], [940, 500], [700, 300], [460, 80],
-    [160, 340], [380, 460], [620, 340],
-    [1060, 460], [820, 560], [560, 720], [320, 860],
-  ];
+  const allNodes: Array<[number, number]> = useMemo(
+    () => [
+      [260, 120], [520, 260], [900, 180], [1220, 340],
+      [980, 60], [720, 220], [420, 380], [120, 520],
+      [200, 720], [460, 620], [780, 780], [1080, 660],
+      [340, 200], [600, 440], [860, 640],
+      [1180, 700], [940, 500], [700, 300], [460, 80],
+      [160, 340], [380, 460], [620, 340],
+      [1060, 460], [820, 560], [560, 720], [320, 860],
+      [60, 300], [240, 560], [1140, 580], [1000, 420], [1200, 200],
+    ],
+    [],
+  );
   const nodes = isLow ? allNodes.filter((_, i) => i % 2 === 0) : allNodes;
 
-  // Glow (SVG feGaussianBlur + feMerge) is the most expensive part; skip on low tier.
   const traceFilter = isLow ? undefined : `url(#${glowId})`;
 
+  // Idle particles: one slow light per trace. When scanning, add ~20% more
+  // trailing lights on a subset of traces. All motion is slow (30-60s per loop).
+  const scanningExtras = isScanning ? Math.max(1, Math.round(paths.length * 0.2)) : 0;
+
   return (
-    <div className={`circuit-bg${isLow ? " circuit-bg--low" : ""}`} aria-hidden="true">
+    <div
+      className={`net-bg${isLow ? " net-bg--low" : ""}${isScanning ? " net-bg--active" : ""}`}
+      aria-hidden="true"
+    >
+      {/* Layer 1: darkening base — sinks the app background toward black */}
+      <div className="net-bg__base" />
+
       <svg
-        className="circuit-bg__svg"
+        className="net-bg__svg"
         viewBox="0 0 1280 900"
         preserveAspectRatio="xMidYMid slice"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <pattern id={gridId} width="40" height="40" patternUnits="userSpaceOnUse">
+          <pattern id={gridId} width="48" height="48" patternUnits="userSpaceOnUse">
             <path
-              d="M 40 0 L 0 0 0 40"
+              d="M 48 0 L 0 0 0 48"
               fill="none"
-              stroke="var(--circuit-blue)"
-              strokeOpacity="0.08"
+              stroke="var(--net-blue)"
+              strokeOpacity="0.06"
               strokeWidth="0.5"
             />
           </pattern>
           {!isLow && (
             <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="1.4" result="blur" />
+              <feGaussianBlur stdDeviation="1.2" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
           )}
-          <radialGradient id={fadeId} cx="75%" cy="15%" r="90%">
-            <stop offset="0%" stopColor="var(--circuit-blue)" stopOpacity="0.35" />
-            <stop offset="55%" stopColor="var(--circuit-purple)" stopOpacity="0.12" />
+          <radialGradient id={hazeId} cx="72%" cy="18%" r="95%">
+            <stop offset="0%" stopColor="var(--net-blue)" stopOpacity="0.22" />
+            <stop offset="45%" stopColor="var(--net-purple)" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#000" stopOpacity="0" />
           </radialGradient>
         </defs>
 
+        {/* Layer 2: faint grid */}
         <rect width="1280" height="900" fill={`url(#${gridId})`} />
-        <rect width="1280" height="900" fill={`url(#${fadeId})`} />
 
+        {/* Layer 3: dim circuit traces */}
         <g
           fill="none"
-          stroke="var(--circuit-blue)"
-          strokeOpacity="0.35"
+          stroke="var(--net-blue)"
           strokeWidth="1"
           filter={traceFilter}
         >
-          {paths.map((d, i) => (
-            <path
-              key={i}
-              d={d}
-              stroke={i % 3 === 0 ? "var(--circuit-purple)" : "var(--circuit-blue)"}
-              strokeOpacity={i % 3 === 0 ? 0.28 : 0.32}
-            />
-          ))}
-        </g>
-
-        <g filter={traceFilter}>
-          {nodes.map(([x, y], i) => (
-            <circle
-              key={i}
-              cx={x}
-              cy={y}
-              r={i % 7 === 0 ? 2.2 : 1.2}
-              fill={
-                i % 11 === 0
-                  ? "var(--circuit-amber)"
-                  : i % 3 === 0
-                    ? "var(--circuit-purple)"
-                    : "var(--circuit-blue)"
-              }
-              opacity={i % 11 === 0 ? 0.75 : 0.55}
-            />
-          ))}
-        </g>
-
-        <g className="circuit-bg__particles" filter={traceFilter}>
           {paths.map((d, i) => {
-            const color =
-              i % 5 === 0
-                ? "var(--circuit-amber)"
-                : i % 3 === 0
-                  ? "var(--circuit-purple)"
-                  : "var(--circuit-blue)";
-            const dur = 18 + (i % 4) * 6;
-            const delay = -(i * 3);
+            const purple = i % 4 === 0;
+            const baseOpacity = purple ? 0.18 : 0.22;
+            const activeBoost = isScanning && i % 3 === 0 ? 0.08 : 0;
             return (
-              <g key={i}>
-                <circle r={1.6} fill={color} opacity={0.9}>
+              <path
+                key={i}
+                d={d}
+                stroke={purple ? "var(--net-purple)" : "var(--net-blue)"}
+                strokeOpacity={baseOpacity + activeBoost}
+                style={{ transition: "stroke-opacity 1200ms ease-out" }}
+              />
+            );
+          })}
+        </g>
+
+        {/* Layer 4: network nodes */}
+        <g filter={traceFilter}>
+          {nodes.map(([x, y], i) => {
+            const amber = i % 13 === 0;
+            const purple = !amber && i % 5 === 0;
+            return (
+              <circle
+                key={i}
+                cx={x}
+                cy={y}
+                r={amber ? 1.9 : 1.1}
+                fill={
+                  amber
+                    ? "var(--net-amber)"
+                    : purple
+                      ? "var(--net-purple)"
+                      : "var(--net-blue)"
+                }
+                opacity={amber ? 0.55 : 0.4}
+              />
+            );
+          })}
+        </g>
+
+        {/* Layer 5: slow data particles */}
+        <g className="net-bg__particles" filter={traceFilter}>
+          {paths.map((d, i) => {
+            const amber = i % 7 === 0;
+            const purple = !amber && i % 4 === 0;
+            const color = amber
+              ? "var(--net-amber)"
+              : purple
+                ? "var(--net-purple)"
+                : "var(--net-blue)";
+            // 30s to 60s per traversal. Different offsets per trace.
+            const dur = 32 + (i % 5) * 6;
+            const delay = -(i * 5);
+            return (
+              <circle
+                key={i}
+                r={amber ? 1.5 : 1.2}
+                fill={color}
+                opacity={amber ? 0.85 : 0.7}
+              >
+                <animateMotion
+                  dur={`${dur}s`}
+                  begin={`${delay}s`}
+                  repeatCount="indefinite"
+                  path={d}
+                  rotate="auto"
+                />
+              </circle>
+            );
+          })}
+
+          {/* Scanner-driven extras: only rendered while running */}
+          {!isLow &&
+            Array.from({ length: scanningExtras }).map((_, k) => {
+              const i = (k * 2) % paths.length;
+              const d = paths[i];
+              const dur = 28 + (k % 4) * 5;
+              const delay = -(k * 7);
+              return (
+                <circle key={`x-${k}`} r={1.1} fill="var(--net-blue)" opacity={0.55}>
                   <animateMotion
                     dur={`${dur}s`}
                     begin={`${delay}s`}
                     repeatCount="indefinite"
                     path={d}
-                    rotate="auto"
                   />
                 </circle>
-                {!isLow && i % 2 === 0 && (
-                  <circle r={1.1} fill={color} opacity={0.6}>
-                    <animateMotion
-                      dur={`${dur + 4}s`}
-                      begin={`${delay - 8}s`}
-                      repeatCount="indefinite"
-                      path={d}
-                    />
-                  </circle>
-                )}
-              </g>
-            );
-          })}
+              );
+            })}
         </g>
+
+        {/* Layer 6a: atmospheric haze — soft directional glow from upper right */}
+        <rect width="1280" height="900" fill={`url(#${hazeId})`} />
       </svg>
 
-      <div className="circuit-bg__overlay" />
+      {/* Layer 6b: bottom vignette to keep dashboard the focus */}
+      <div className="net-bg__vignette" />
     </div>
   );
 }
-
