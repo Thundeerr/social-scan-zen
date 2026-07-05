@@ -2,23 +2,40 @@
  * Autonomous scanner tick — called by pg_cron every minute.
  *
  * The route is public so pg_cron can reach it without a user session, but it
- * authenticates the caller with the Supabase anon key (standard Lovable
- * pattern for scheduled work) and does all writes through the service role
- * so RLS's operator-only INSERT/UPDATE policies still hold.
+ * authenticates the caller with a dedicated server-only CRON_SECRET (never
+ * shipped to the client) via a constant-time comparison. All writes still go
+ * through the service role so RLS's operator-only policies remain enforced
+ * for regular users.
  */
 
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 import type { Database } from "@/integrations/supabase/types";
+
+function safeEqual(a: string, b: string) {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 export const Route = createFileRoute("/api/public/hooks/scanner-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apiKey =
-          request.headers.get("apikey") ?? request.headers.get("x-api-key");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        if (!expected || apiKey !== expected) {
+        const expected = process.env.CRON_SECRET;
+        if (!expected) {
+          return new Response(
+            JSON.stringify({ error: "cron secret not configured" }),
+            { status: 500, headers: { "content-type": "application/json" } },
+          );
+        }
+        const provided =
+          request.headers.get("x-cron-secret") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          "";
+        if (!provided || !safeEqual(provided, expected)) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
             headers: { "content-type": "application/json" },
