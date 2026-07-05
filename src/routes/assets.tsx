@@ -1210,6 +1210,13 @@ function SwipeCard({
         </div>
       </div>
 
+      {/* Score badge — top-right */}
+      <div className="absolute right-3 top-3">
+        <div className="rounded-lg border border-white/25 bg-black/40 p-1 backdrop-blur">
+          <ScoreRing score={computeOperatorScore(asset).score} size={40} />
+        </div>
+      </div>
+
       {/* Info footer */}
       <div className="absolute inset-x-0 bottom-0 p-4 text-white">
         <div className="flex items-center gap-2">
@@ -1218,8 +1225,11 @@ function SwipeCard({
             alt=""
             className="h-8 w-8 shrink-0 rounded-full border border-white/40"
           />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">@{asset.username}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <TierChip tier={tierFor(asset.username)} size="xs" />
+              <span className="truncate text-sm font-semibold">@{asset.username}</span>
+            </div>
             <div className="truncate text-[11px] text-white/70">
               {watchlistFor(asset.username)} · {asset.detectedAt}
             </div>
