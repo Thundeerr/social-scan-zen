@@ -47,6 +47,50 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_downloads: {
+        Row: {
+          asset_id: string
+          created_at: string
+          downloaded_at: string
+          downloaded_by: string | null
+          file_size: number | null
+          filename: string | null
+          id: string
+          media_type: string | null
+          media_url: string | null
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          downloaded_at?: string
+          downloaded_by?: string | null
+          file_size?: number | null
+          filename?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          downloaded_at?: string
+          downloaded_by?: string | null
+          file_size?: number | null
+          filename?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_downloads_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_status: {
         Row: {
           asset_id: string
