@@ -7,12 +7,12 @@ import {
   Download,
   Radar,
   Settings,
-  ScanLine,
   Activity,
   Menu,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/layout/BrandMark";
 
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -40,15 +40,15 @@ export function MobileNav() {
         </button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-        <SheetHeader className="px-5 h-14 border-b border-sidebar-border flex-row items-center gap-2.5 space-y-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/30">
-            <ScanLine className="h-4 w-4 text-primary" />
-          </div>
-          <div className="flex flex-col leading-tight text-left">
+        <SheetHeader className="px-4 h-14 border-b border-sidebar-border flex-row items-center gap-3 space-y-0">
+          <BrandMark />
+          <div className="flex min-w-0 flex-col leading-tight text-left">
             <SheetTitle className="text-sm font-semibold tracking-tight text-sidebar-foreground">
               InstaScanner
             </SheetTitle>
-            <span className="text-[10px] text-muted-foreground">Autonomous Monitoring</span>
+            <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Autonomous Monitoring
+            </span>
           </div>
         </SheetHeader>
 
