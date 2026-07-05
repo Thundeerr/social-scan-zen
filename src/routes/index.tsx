@@ -319,3 +319,11 @@ function SummaryStat({
     </div>
   );
 }
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border bg-muted/40 px-1 text-[10px] font-medium text-foreground/80 tabular-nums">
+      {children}
+    </span>
+  );
+}
