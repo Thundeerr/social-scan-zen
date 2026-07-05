@@ -404,6 +404,7 @@ function AssetInbox() {
             setGlobalQuery("");
           }}
           query={q}
+          downloadedIds={downloadedIds}
         />
 
         <section className="relative flex min-w-0 flex-col border-x border-border/60 bg-background/40">
