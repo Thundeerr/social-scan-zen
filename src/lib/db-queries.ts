@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { logActivity } from "./activity-log";
 
 // ---------- Tracked accounts ----------
 export type TrackedAccount = Tables<"tracked_accounts">;
