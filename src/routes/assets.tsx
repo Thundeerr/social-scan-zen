@@ -18,6 +18,11 @@ import {
   Tag,
   Volume2,
   VolumeX,
+  Brain,
+  TrendingUp,
+  Repeat,
+  Film,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useAssets, assetActions } from "@/lib/assets-store";
 import { useGlobalQuery, matchesQuery, setGlobalQuery } from "@/lib/search-store";
