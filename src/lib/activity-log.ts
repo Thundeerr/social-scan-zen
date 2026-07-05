@@ -69,7 +69,7 @@ export async function logActivity(
     const { error } = await supabase.from("activity_log").insert({
       event_type,
       description,
-      metadata: metadata ?? null,
+      metadata: (metadata ?? null) as never,
       actor_id,
     });
     if (error) console.warn("[activity] insert failed", error);
