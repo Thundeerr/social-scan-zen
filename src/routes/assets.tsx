@@ -886,6 +886,64 @@ function IntelligencePanel({
   );
 }
 
+function RecommendationCard({
+  asset,
+  isFavorite,
+}: {
+  asset: Asset;
+  isFavorite: boolean;
+}) {
+  const rec = computeRecommendation(asset, { isFavorite });
+  const tone = verdictToneClasses(rec.verdict);
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-4",
+        tone.border,
+        tone.bg,
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <Sparkles className="h-3 w-3" />
+        Recommendation
+      </div>
+      <div className="mt-2 flex items-baseline justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className={cn("h-2 w-2 rounded-full", tone.dot)} />
+          <span className={cn("text-2xl font-semibold tracking-tight", tone.text)}>
+            {rec.verdict}
+          </span>
+        </div>
+        <div className="text-right">
+          <div className={cn("text-lg font-semibold tabular-nums", tone.text)}>
+            {rec.confidence}%
+          </div>
+          <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+            Confidence
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        Reasoning
+      </div>
+      <ul className="mt-1.5 space-y-1">
+        {rec.reasons.map((r, i) => (
+          <li
+            key={i}
+            className="flex gap-2 text-[12px] leading-snug text-foreground/85"
+          >
+            <span className={cn("mt-1.5 h-1 w-1 shrink-0 rounded-full", tone.dot)} />
+            <span>{r}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 border-t border-border/40 pt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        AI recommends · <span className="text-foreground/80">Operator decides</span>
+      </div>
+    </div>
+  );
+}
+
 function IntelField({
   label,
   icon: Icon,
