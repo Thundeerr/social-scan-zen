@@ -473,7 +473,7 @@ function ScannerPage() {
       <PageHeader
         eyebrow="Live operations"
         title="Scanner"
-        description="Autonomous network scans every tracked account every 8 hours, plus on-demand."
+        description={`Autonomous network scans every tracked account every ${intervalLabel}, plus on-demand.`}
         status={
           running.length > 0
             ? { label: `${running.length} in flight`, tone: "primary", live: true }
