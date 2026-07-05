@@ -557,9 +557,18 @@ function AccountsPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <img
-                        src={a.avatar_url || getAvatar(a.username)}
+                        src={`https://unavatar.io/instagram/${a.username}?fallback=${encodeURIComponent(
+                          a.avatar_url || getAvatar(a.username),
+                        )}`}
                         alt=""
-                        className="h-9 w-9 shrink-0 rounded-full ring-1 ring-border bg-muted"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          const fb = a.avatar_url || getAvatar(a.username);
+                          if (img.src !== fb) img.src = fb;
+                        }}
+                        className="h-9 w-9 shrink-0 rounded-full ring-1 ring-border bg-muted object-cover"
                       />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">
