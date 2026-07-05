@@ -148,6 +148,7 @@ export type Database = {
           detected_at: string
           external_id: string | null
           id: string
+          last_seen_at: string
           likes: number
           media_type: Database["public"]["Enums"]["asset_media_type"]
           media_url: string | null
@@ -168,6 +169,7 @@ export type Database = {
           detected_at?: string
           external_id?: string | null
           id?: string
+          last_seen_at?: string
           likes?: number
           media_type?: Database["public"]["Enums"]["asset_media_type"]
           media_url?: string | null
@@ -188,6 +190,7 @@ export type Database = {
           detected_at?: string
           external_id?: string | null
           id?: string
+          last_seen_at?: string
           likes?: number
           media_type?: Database["public"]["Enums"]["asset_media_type"]
           media_url?: string | null
