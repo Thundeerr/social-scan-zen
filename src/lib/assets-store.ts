@@ -164,7 +164,7 @@ function subscribe(l: () => void) {
   listeners.add(l);
   if (!loaded) {
     loaded = true;
-    loading = loadAll();
+    void loadAll();
     ensureChannel();
   }
   return () => {
