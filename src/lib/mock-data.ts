@@ -105,10 +105,6 @@ const captions = [
   "Weekend inspiration from the Dolomites.",
 ];
 
-import sneakerVideo from "@/assets/videos/asset-sneaker.mp4.asset.json";
-import mountainVideo from "@/assets/videos/asset-mountain.mp4.asset.json";
-import watchVideo from "@/assets/videos/asset-watch.mp4.asset.json";
-
 const sampleVideos = [sneakerVideo.url, mountainVideo.url, watchVideo.url];
 
 export const recentAssets: Asset[] = Array.from({ length: 24 }).map((_, i) => {
