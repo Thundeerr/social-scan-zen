@@ -379,6 +379,13 @@ function AssetInbox() {
           onToggleFavorite={() => current && toggleFavorite(current.id)}
         />
       </div>
+
+      <MissionComplete
+        visible={complete}
+        approved={session.approved}
+        dismissed={session.dismissed}
+        onDone={handleCompletionDone}
+      />
     </div>
   );
 }
