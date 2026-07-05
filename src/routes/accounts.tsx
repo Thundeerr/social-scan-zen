@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
