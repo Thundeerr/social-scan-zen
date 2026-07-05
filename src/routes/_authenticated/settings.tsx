@@ -112,21 +112,16 @@ function SettingsPage() {
               title="Scan Interval"
               description="How frequently the scanner cycles through all tracked accounts."
             >
-              <Select value={interval} onValueChange={setInterval}>
+              <Select value={interval} onValueChange={handleIntervalChange}>
                 <SelectTrigger className="w-full sm:w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="5">Every 5 minutes</SelectItem>
-                  <SelectItem value="15">Every 15 minutes</SelectItem>
-                  <SelectItem value="30">Every 30 minutes</SelectItem>
-                  <SelectItem value="60">Every hour</SelectItem>
-                  <SelectItem value="240">Every 4 hours</SelectItem>
-                  <SelectItem value="480">Every 8 hours</SelectItem>
-                  <SelectItem value="720">Every 12 hours</SelectItem>
-                  <SelectItem value="1440">Every 24 hours</SelectItem>
-                  <SelectItem value="2160">Every 36 hours</SelectItem>
-                  <SelectItem value="4320">Every 72 hours</SelectItem>
+                  {SCAN_INTERVAL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </SettingRow>
