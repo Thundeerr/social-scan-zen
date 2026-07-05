@@ -62,25 +62,75 @@ function SettingsPage() {
   const [desktopNotif, setDesktopNotif] = useState(false);
   const [newOnly, setNewOnly] = useState(true);
 
-  // Persist Telegram notification prefs locally so they survive refresh.
+  const qc = useQueryClient();
+  const getPrefs = useServerFn(getTelegramPrefsFn);
+  const savePrefs = useServerFn(saveTelegramPrefsFn);
+  const sendTest = useServerFn(sendTelegramTestFn);
+  const detectId = useServerFn(detectTelegramChatIdFn);
+
+  // Hydrate Telegram preferences from the operator's profile row.
+  const prefsQuery = useQuery({
+    queryKey: ["telegram-prefs"],
+    queryFn: () => getPrefs(),
+    staleTime: 30_000,
+  });
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const enabled = window.localStorage.getItem("instascanner.telegramNotif");
-    const chat = window.localStorage.getItem("instascanner.telegramChatId");
-    if (enabled !== null) setTelegramNotif(enabled === "1");
-    if (chat !== null) setTelegramChatId(chat);
-  }, []);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(
-      "instascanner.telegramNotif",
-      telegramNotif ? "1" : "0",
+    if (!prefsQuery.data) return;
+    setTelegramChatId(prefsQuery.data.chatId);
+    setTelegramNotif(prefsQuery.data.enabled);
+  }, [prefsQuery.data]);
+
+  const saveMutation = useMutation({
+    mutationFn: (input: { chatId: string; enabled: boolean }) =>
+      savePrefs({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["telegram-prefs"] }),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: (chatId: string) => sendTest({ data: { chatId } }),
+    onSuccess: () => toast.success("Test signal delivered to Telegram"),
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : "Failed to send test"),
+  });
+
+  const detectMutation = useMutation({
+    mutationFn: () => detectId(),
+    onSuccess: (res: { chatId: string | null }) => {
+      if (res.chatId) {
+        setTelegramChatId(res.chatId);
+        toast.success(`Detected chat ID ${res.chatId}`);
+      } else {
+        toast.error("No recent messages — send /start to the bot first");
+      }
+    },
+    onError: (err: unknown) =>
+      toast.error(err instanceof Error ? err.message : "Failed to detect"),
+  });
+
+  const commitPrefs = (chatId: string, enabled: boolean) => {
+    saveMutation.mutate(
+      { chatId, enabled },
+      {
+        onError: (err: unknown) =>
+          toast.error(err instanceof Error ? err.message : "Save failed"),
+      },
     );
-  }, [telegramNotif]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("instascanner.telegramChatId", telegramChatId);
-  }, [telegramChatId]);
+  };
+
+  const handleTelegramToggle = (next: boolean) => {
+    if (next && !telegramChatId.trim()) {
+      toast.error("Enter a Telegram chat ID first");
+      return;
+    }
+    setTelegramNotif(next);
+    commitPrefs(telegramChatId, next);
+  };
+
+  const handleTelegramBlur = () => {
+    // Auto-save the chat ID whenever the operator moves focus away.
+    if (prefsQuery.data?.chatId === telegramChatId) return;
+    commitPrefs(telegramChatId, telegramNotif && !!telegramChatId.trim());
+  };
 
   const handleIntervalChange = (next: string) => {
     const parsed = scanIntervalSchema.safeParse(next);
