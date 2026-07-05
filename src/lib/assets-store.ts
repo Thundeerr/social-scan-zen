@@ -214,25 +214,18 @@ export function setAssetStatus(id: string, status: Status) {
   void setState(id, STATUS_TO_STATE[status]);
 }
 
+import { downloadAsset as runDownload } from "./downloads-store";
+
 async function triggerDownload(a: Asset) {
-  const url = a.video ?? a.thumbnail;
-  if (!url) return;
-  try {
-    const res = await fetch(url, { mode: "cors" });
-    const blob = await res.blob();
-    const ext = (blob.type.split("/")[1] ?? (a.video ? "mp4" : "jpg")).split(";")[0];
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = `${a.username}-${a.id}.${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    // Fallback: open in new tab
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  const r = assets.find((x) => x.id === a.id);
+  await runDownload({
+    id: a.id,
+    username: a.username,
+    media_url: a.video ?? a.thumbnail ?? null,
+    thumbnail_url: a.thumbnail ?? null,
+    is_video: !!a.video,
+  });
+  void r; // reserved for future rowToAsset extension
 }
 
 export const assetActions = {
