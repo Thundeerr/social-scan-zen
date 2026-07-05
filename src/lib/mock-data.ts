@@ -1,3 +1,7 @@
+import sneakerVideo from "@/assets/videos/asset-sneaker.mp4.asset.json";
+import mountainVideo from "@/assets/videos/asset-mountain.mp4.asset.json";
+import watchVideo from "@/assets/videos/asset-watch.mp4.asset.json";
+
 export type Account = {
   id: string;
   username: string;
