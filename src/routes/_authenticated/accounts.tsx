@@ -40,10 +40,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
-import { trackedAccounts, getAvatar, type Account } from "@/lib/mock-data";
+import { getAvatar } from "@/lib/mock-data";
 import { tierFor } from "@/lib/priority";
 import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
+import {
+  useTrackedAccounts,
+  useCreateTrackedAccount,
+  useUpdateTrackedAccount,
+  useDeleteTrackedAccount,
+  type TrackedAccount,
+} from "@/lib/db-queries";
+
+function timeAgo(iso: string | null) {
+  if (!iso) return "—";
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
+  return `${Math.floor(s / 86400)} d ago`;
+}
 
 export const Route = createFileRoute("/_authenticated/accounts")({
   head: () => ({ meta: [{ title: "Tracked Accounts — InstaScanner" }] }),
@@ -52,17 +68,42 @@ export const Route = createFileRoute("/_authenticated/accounts")({
 
 type Category = "brand" | "creator" | "competitor" | "reference";
 
-type Row = Account & {
+type Row = {
+  id: string;
+  username: string;
+  displayName: string;
+  status: "active" | "paused";
+  lastScan: string;
+  assetsToday: number;
+  followers: string;
+  tier?: TrackedAccount["tier"];
   category?: Category;
   notes?: string;
   notify?: boolean;
   optimistic?: boolean;
 };
 
-const initialRows: Row[] = trackedAccounts.map((a) => ({ ...a }));
+function toRow(a: TrackedAccount): Row {
+  return {
+    id: a.id,
+    username: a.username,
+    displayName: a.display_name,
+    status: a.status,
+    lastScan: timeAgo(a.last_scan_at),
+    assetsToday: 0,
+    followers: a.followers ?? "—",
+    tier: a.tier,
+    notes: a.notes ?? undefined,
+  };
+}
 
 function AccountsPage() {
-  const [rows, setRows] = useState<Row[]>(initialRows);
+  const { data: dbRows = [], isLoading } = useTrackedAccounts();
+  const createAccount = useCreateTrackedAccount();
+  const updateAccount = useUpdateTrackedAccount();
+  const deleteAccount = useDeleteTrackedAccount();
+
+  const rows: Row[] = dbRows.map(toRow);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const [open, setOpen] = useState(false);
@@ -74,38 +115,47 @@ function AccountsPage() {
   });
 
   function handleAdd(row: Row) {
-    setRows((r) => [row, ...r]);
-    // Simulate backend confirmation
-    setTimeout(() => {
-      setRows((r) =>
-        r.map((x) => (x.id === row.id ? { ...x, optimistic: false } : x)),
-      );
-      toast.success(`@${row.username} is now being monitored`);
-    }, 1400);
+    createAccount.mutate(
+      {
+        username: row.username,
+        display_name: row.displayName,
+        followers: row.followers,
+        status: "active",
+        notes: row.notes ?? null,
+      },
+      {
+        onSuccess: () => toast.success(`@${row.username} is now being monitored`),
+        onError: (e: unknown) =>
+          toast.error(e instanceof Error ? e.message : "Failed to add account"),
+      },
+    );
   }
 
   function togglePause(id: string) {
-    setRows((r) =>
-      r.map((x) =>
-        x.id === id
-          ? { ...x, status: x.status === "active" ? "paused" : "active" }
-          : x,
-      ),
-    );
+    const current = rows.find((x) => x.id === id);
+    if (!current) return;
+    updateAccount.mutate({
+      id,
+      patch: { status: current.status === "active" ? "paused" : "active" },
+    });
   }
 
   function rescan(id: string) {
-    setRows((r) =>
-      r.map((x) => (x.id === id ? { ...x, lastScan: "just now" } : x)),
-    );
+    updateAccount.mutate({ id, patch: { last_scan_at: new Date().toISOString() } });
     toast("Rescan queued");
   }
 
   function remove(id: string) {
     const gone = rows.find((x) => x.id === id);
-    setRows((r) => r.filter((x) => x.id !== id));
-    if (gone) toast(`Removed @${gone.username}`);
+    deleteAccount.mutate(id, {
+      onSuccess: () => gone && toast(`Removed @${gone.username}`),
+      onError: (e: unknown) =>
+        toast.error(e instanceof Error ? e.message : "Failed to remove"),
+    });
   }
+
+  void isLoading;
+
 
   return (
     <div className="p-6 md:p-8">

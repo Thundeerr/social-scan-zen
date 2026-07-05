@@ -14,6 +14,154 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          updated_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      asset_status: {
+        Row: {
+          asset_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          state: Database["public"]["Enums"]["review_state"]
+          updated_at: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          state?: Database["public"]["Enums"]["review_state"]
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          state?: Database["public"]["Enums"]["review_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_status_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          account_id: string
+          ai_confidence: number | null
+          ai_reasons: Json | null
+          ai_verdict: string | null
+          caption: string | null
+          comments: number
+          created_at: string
+          created_by: string | null
+          detected_at: string
+          external_id: string | null
+          id: string
+          likes: number
+          media_type: Database["public"]["Enums"]["asset_media_type"]
+          media_url: string | null
+          posted_at: string | null
+          source_url: string | null
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          ai_confidence?: number | null
+          ai_reasons?: Json | null
+          ai_verdict?: string | null
+          caption?: string | null
+          comments?: number
+          created_at?: string
+          created_by?: string | null
+          detected_at?: string
+          external_id?: string | null
+          id?: string
+          likes?: number
+          media_type?: Database["public"]["Enums"]["asset_media_type"]
+          media_url?: string | null
+          posted_at?: string | null
+          source_url?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          ai_confidence?: number | null
+          ai_reasons?: Json | null
+          ai_verdict?: string | null
+          caption?: string | null
+          comments?: number
+          created_at?: string
+          created_by?: string | null
+          detected_at?: string
+          external_id?: string | null
+          id?: string
+          likes?: number
+          media_type?: Database["public"]["Enums"]["asset_media_type"]
+          media_url?: string | null
+          posted_at?: string | null
+          source_url?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -41,6 +189,93 @@ export type Database = {
         }
         Relationships: []
       }
+      scanner_runs: {
+        Row: {
+          accounts_scanned: number
+          assets_detected: number
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["scanner_run_status"]
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          accounts_scanned?: number
+          assets_detected?: number
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["scanner_run_status"]
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accounts_scanned?: number
+          assets_detected?: number
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["scanner_run_status"]
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tracked_accounts: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string | null
+          display_name: string
+          followers: string | null
+          id: string
+          last_scan_at: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["account_status"]
+          tier: Database["public"]["Enums"]["priority_tier"]
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          followers?: string | null
+          id?: string
+          last_scan_at?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["account_status"]
+          tier?: Database["public"]["Enums"]["priority_tier"]
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          followers?: string | null
+          id?: string
+          last_scan_at?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["account_status"]
+          tier?: Database["public"]["Enums"]["priority_tier"]
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -62,6 +297,81 @@ export type Database = {
         }
         Relationships: []
       }
+      watchlist_accounts: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          watchlist_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          watchlist_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          watchlist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watchlist_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "watchlist_accounts_watchlist_id_fkey"
+            columns: ["watchlist_id"]
+            isOneToOne: false
+            referencedRelation: "watchlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watchlists: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          tier: Database["public"]["Enums"]["priority_tier"]
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          tier?: Database["public"]["Enums"]["priority_tier"]
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          tier?: Database["public"]["Enums"]["priority_tier"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -74,9 +384,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_operator: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      account_status: "active" | "paused"
       app_role: "owner" | "cofounder"
+      asset_media_type: "image" | "video" | "carousel" | "reel" | "story"
+      priority_tier: "S" | "A" | "B" | "C"
+      review_state:
+        | "priority"
+        | "worth_reviewing"
+        | "later"
+        | "reviewed"
+        | "approved"
+        | "dismissed"
+        | "archived"
+      scanner_run_status: "queued" | "running" | "completed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -204,7 +527,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_status: ["active", "paused"],
       app_role: ["owner", "cofounder"],
+      asset_media_type: ["image", "video", "carousel", "reel", "story"],
+      priority_tier: ["S", "A", "B", "C"],
+      review_state: [
+        "priority",
+        "worth_reviewing",
+        "later",
+        "reviewed",
+        "approved",
+        "dismissed",
+        "archived",
+      ],
+      scanner_run_status: ["queued", "running", "completed", "failed"],
     },
   },
 } as const
