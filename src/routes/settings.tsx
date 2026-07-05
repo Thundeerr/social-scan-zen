@@ -94,7 +94,7 @@ function SettingsPage() {
         <section className="soft-shadow rounded-xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold mb-1">Notifications</h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Choose how you're alerted when new posts are detected.
+            Choose how you're alerted when new assets are detected.
           </p>
           <div className="divide-y divide-border">
             <SettingRow title="Email alerts" description="Send a daily digest at 09:00 UTC.">
@@ -103,7 +103,7 @@ function SettingsPage() {
             <SettingRow title="Desktop notifications" description="Show a native notification when scans complete.">
               <Switch checked={desktopNotif} onCheckedChange={setDesktopNotif} />
             </SettingRow>
-            <SettingRow title="New posts only" description="Suppress notifications for empty scans.">
+            <SettingRow title="New assets only" description="Suppress notifications for empty scans.">
               <Switch checked={newOnly} onCheckedChange={setNewOnly} />
             </SettingRow>
           </div>

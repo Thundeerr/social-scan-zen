@@ -19,13 +19,13 @@ export function setGlobalQuery(next: string) {
 }
 
 export function matchesQuery(
-  post: { username: string; caption: string },
+  asset: { username: string; caption: string },
   needle: string,
 ) {
   if (!needle) return true;
   const n = needle.toLowerCase();
   return (
-    post.username.toLowerCase().includes(n) ||
-    post.caption.toLowerCase().includes(n)
+    asset.username.toLowerCase().includes(n) ||
+    asset.caption.toLowerCase().includes(n)
   );
 }

@@ -4,11 +4,11 @@ export type Account = {
   displayName: string;
   status: "active" | "paused";
   lastScan: string;
-  postsToday: number;
+  assetsToday: number;
   followers: string;
 };
 
-export type Post = {
+export type Asset = {
   id: string;
   username: string;
   detectedAt: string;
@@ -31,7 +31,7 @@ const avatar = (s: string) => `https://i.pravatar.cc/120?u=${s}`;
 
 export const kpis = {
   trackedAccounts: 247,
-  newPostsToday: 34,
+  newAssetsToday: 34,
   lastScan: "12 min ago",
   scannerStatus: "Running",
   apiProvider: "Instagram Looter",
@@ -81,7 +81,7 @@ export const trackedAccounts: Account[] = brands.map(([u, d, f], i) => ({
     "just now", "2 min ago", "5 min ago", "12 min ago", "18 min ago",
     "23 min ago", "31 min ago", "44 min ago", "1 hr ago", "2 hr ago",
   ][i % 10],
-  postsToday: [0, 1, 2, 0, 3, 0, 1, 4, 0, 2, 1, 0][i % 12],
+  assetsToday: [0, 1, 2, 0, 3, 0, 1, 4, 0, 2, 1, 0][i % 12],
   followers: f,
 }));
 
@@ -100,10 +100,10 @@ const captions = [
   "Weekend inspiration from the Dolomites.",
 ];
 
-export const recentPosts: Post[] = Array.from({ length: 24 }).map((_, i) => {
+export const recentAssets: Asset[] = Array.from({ length: 24 }).map((_, i) => {
   const [u] = brands[i % brands.length];
   return {
-    id: `p${i + 1}`,
+    id: `a${i + 1}`,
     username: u,
     detectedAt: [
       "2 min ago", "8 min ago", "14 min ago", "22 min ago", "38 min ago",
@@ -119,14 +119,14 @@ export const recentPosts: Post[] = Array.from({ length: 24 }).map((_, i) => {
 });
 
 export const scannerActivity: ActivityEvent[] = [
-  { time: "14:06", label: "Scan complete · 34 new posts", kind: "success" },
-  { time: "14:05", label: "Checked @adidas · No new posts", kind: "muted" },
-  { time: "14:04", label: "Checked @nike · 2 new posts", kind: "info" },
-  { time: "14:03", label: "Checked @patagonia · 1 new post", kind: "info" },
-  { time: "14:03", label: "Checked @gucci · No new posts", kind: "muted" },
-  { time: "14:02", label: "Checked @apple · No new posts", kind: "muted" },
+  { time: "14:06", label: "Scan complete · 34 new assets", kind: "success" },
+  { time: "14:05", label: "Checked @adidas · No new assets", kind: "muted" },
+  { time: "14:04", label: "Checked @nike · 2 new assets", kind: "info" },
+  { time: "14:03", label: "Checked @patagonia · 1 new asset", kind: "info" },
+  { time: "14:03", label: "Checked @gucci · No new assets", kind: "muted" },
+  { time: "14:02", label: "Checked @apple · No new assets", kind: "muted" },
   { time: "14:02", label: "Started scan · 247 accounts", kind: "info" },
-  { time: "13:47", label: "Previous scan complete · 12 new posts", kind: "success" },
+  { time: "13:47", label: "Previous scan complete · 12 new assets", kind: "success" },
 ];
 
 export const getAvatar = avatar;

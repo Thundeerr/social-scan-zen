@@ -11,7 +11,7 @@ export type SimEvent = {
 type State = {
   events: SimEvent[];
   isScanning: boolean;
-  newPostsToday: number;
+  newAssetsToday: number;
   queueSize: number;
   requests: number;
   successRate: number;
@@ -36,10 +36,10 @@ const seedEvents: SimEvent[] = scannerActivity.map((e, i) => ({
   kind: (e.kind ?? "muted") as SimEvent["kind"],
 }));
 
-let state: State = {
+const INITIAL_STATE: State = {
   events: seedEvents,
   isScanning: false,
-  newPostsToday: kpis.newPostsToday,
+  newAssetsToday: kpis.newAssetsToday,
   queueSize: scannerHealth.queueSize,
   requests: scannerHealth.requests,
   successRate: scannerHealth.successRate,
@@ -48,14 +48,12 @@ let state: State = {
   nowTick: 0,
 };
 
+let state: State = { ...INITIAL_STATE };
+
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
-};
-const emit = () => {
-  state = { ...state };
-  listeners.forEach((l) => l());
 };
 const set = (patch: Partial<State>) => {
   state = { ...state, ...patch };
@@ -108,13 +106,13 @@ async function runScanCycle() {
     set({
       queueSize: Math.max(0, total - processed),
       requests: state.requests + rand(18, 42),
-      newPostsToday: state.newPostsToday + found,
+      newAssetsToday: state.newAssetsToday + found,
       avgResponse: Math.max(360, Math.min(480, state.avgResponse + rand(-12, 12))),
     });
     pushEvent(
       found > 0
-        ? `Checked @${brand} · ${found} new post${found > 1 ? "s" : ""}`
-        : `Checked @${brand} · No new posts`,
+        ? `Checked @${brand} · ${found} new asset${found > 1 ? "s" : ""}`
+        : `Checked @${brand} · No new assets`,
       found > 0 ? "info" : "muted",
     );
     await wait(rand(700, 1200));
@@ -126,7 +124,7 @@ async function runScanCycle() {
     queueSize: 0,
     lastScanAt: Date.now(),
   });
-  pushEvent(`Scan complete · ${foundThisScan} new post${foundThisScan === 1 ? "" : "s"}`, "success");
+  pushEvent(`Scan complete · ${foundThisScan} new asset${foundThisScan === 1 ? "" : "s"} delivered`, "success");
 }
 
 async function loop() {
@@ -162,7 +160,9 @@ function stop() {
 }
 
 const getSnapshot = () => state;
-const getServerSnapshot = () => state;
+// Always return the deterministic initial state during SSR so hydration
+// never mismatches when the module singleton is reused across requests.
+const getServerSnapshot = () => INITIAL_STATE;
 
 export function useScanSim() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -177,7 +177,7 @@ export function useScanSimulator() {
 }
 
 export function formatLastScan(state: State): string {
-  if (state.lastScanAt == null) return "just now";
+  if (state.lastScanAt == null) return "monitoring";
   const diff = Math.max(0, Date.now() - state.lastScanAt);
   const s = Math.floor(diff / 1000);
   if (s < 10) return "just now";

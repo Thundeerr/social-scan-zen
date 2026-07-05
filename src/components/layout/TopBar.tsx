@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function TopBar() {
   const s = useScanSim();
   void s.nowTick;
-  const label = s.isScanning ? "Scanning" : "Idle";
+  const label = s.isScanning ? "Scanning" : "Monitoring";
   const rel = s.isScanning ? "in progress" : formatLastScan(s);
 
   const q = useGlobalQuery();
@@ -16,15 +16,15 @@ export function TopBar() {
 
   const onChange = (value: string) => {
     setGlobalQuery(value);
-    if (value && pathname !== "/posts" && pathname !== "/") {
-      navigate({ to: "/posts", search: { day: "all", status: "all" }, replace: true });
+    if (value && pathname !== "/assets" && pathname !== "/") {
+      navigate({ to: "/assets", search: { day: "all", status: "all" }, replace: true });
     }
   };
 
   const onFocus = () => {
     // send the user to a view that shows results
-    if (pathname !== "/posts" && pathname !== "/") {
-      navigate({ to: "/posts", search: { day: "all", status: "all" }, replace: true });
+    if (pathname !== "/assets" && pathname !== "/") {
+      navigate({ to: "/assets", search: { day: "all", status: "all" }, replace: true });
     }
   };
 
@@ -37,7 +37,7 @@ export function TopBar() {
             value={q}
             onChange={(e) => onChange(e.target.value)}
             onFocus={onFocus}
-            placeholder="Search accounts, posts, captions…"
+            placeholder="Search accounts, assets, captions…"
             className="w-full h-9 rounded-lg bg-muted/60 border border-transparent focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 pl-9 pr-16 text-sm placeholder:text-muted-foreground"
           />
           {q ? (
@@ -64,7 +64,7 @@ export function TopBar() {
               <span
                 className={cn(
                   "relative inline-flex h-2 w-2 rounded-full",
-                  s.isScanning ? "bg-primary" : "bg-muted-foreground/60",
+                  s.isScanning ? "bg-primary" : "bg-success/80",
                 )}
               ></span>
             </span>
