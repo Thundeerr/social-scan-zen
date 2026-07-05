@@ -165,7 +165,8 @@ function AccountsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[40%]">Account</TableHead>
+              <TableHead className="w-[36%]">Account</TableHead>
+              <TableHead>Tier</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Scan</TableHead>
               <TableHead className="text-right">Assets Today</TableHead>
