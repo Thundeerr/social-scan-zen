@@ -379,9 +379,15 @@ function LocationsPage() {
               <TableRow>
                 <TableHead className="w-10">
                   <Checkbox
-                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                    onCheckedChange={(v) => toggleAll(v === true)}
-                    aria-label="Select all locations"
+                    checked={headerState}
+                    onCheckedChange={(v) => toggleAll(v)}
+                    aria-label={
+                      allSelected
+                        ? "Deselect all locations"
+                        : someSelected
+                          ? `Clear ${selectedCount} selected`
+                          : "Select all locations"
+                    }
                   />
                 </TableHead>
                 <TableHead>Location</TableHead>
