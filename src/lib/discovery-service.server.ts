@@ -385,11 +385,23 @@ export async function enrichCandidate(db: DB, candidateId: string) {
   if (profile?.avatar_url) patch.avatar_url = profile.avatar_url;
 
   if (verdict) {
-    patch.luxury_score = verdict.luxury_score;
-    patch.quality_score = verdict.quality_score;
-    patch.aesthetic_score = verdict.aesthetic_score;
-    patch.travel_score = verdict.travel_score;
-    patch.authenticity_score = verdict.authenticity_score;
+    const luxury = clampScore(verdict.luxury.score);
+    const quality = clampScore(verdict.quality.score);
+    const aesthetic = clampScore(verdict.aesthetic.score);
+    const travel = clampScore(verdict.travel.score);
+    const authenticity = clampScore(verdict.authenticity.score);
+    patch.luxury_score = luxury;
+    patch.quality_score = quality;
+    patch.aesthetic_score = aesthetic;
+    patch.travel_score = travel;
+    patch.authenticity_score = authenticity;
+    patch.score_reasons = {
+      luxury: clampReasons(verdict.luxury.reasons),
+      quality: clampReasons(verdict.quality.reasons),
+      aesthetic: clampReasons(verdict.aesthetic.reasons),
+      travel: clampReasons(verdict.travel.reasons),
+      authenticity: clampReasons(verdict.authenticity.reasons),
+    };
     patch.p_private_individual = verdict.p_private_individual;
     patch.p_commercial_brand = verdict.p_commercial_brand;
     patch.estimated_niche = verdict.estimated_niche;
@@ -402,7 +414,15 @@ export async function enrichCandidate(db: DB, candidateId: string) {
         verdict.confidence * Math.min(1, 0.2 + 0.15 * (cand.signal_count ?? 0)),
       ),
     );
-    patch.rank_score = await computeRankScore(db, cand.user_id, verdict);
+    patch.rank_score = await computeRankScore(db, cand.user_id, {
+      luxury,
+      quality,
+      aesthetic,
+      travel,
+      authenticity,
+      niche: verdict.estimated_niche,
+      confidence: verdict.confidence,
+    });
   }
 
   await db.from("discovery_candidates").update(patch).eq("id", cand.id);
