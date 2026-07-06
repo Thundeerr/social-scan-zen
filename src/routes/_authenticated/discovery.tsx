@@ -151,38 +151,69 @@ function DiscoveryPage() {
         />
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
-        {STATES.map((s) => (
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
+          {STATES.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setState(s.key)}
+              className={cn(
+                "px-3 h-8 text-xs rounded-md capitalize transition-colors",
+                state === s.key
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {state === "new" && (
           <button
-            key={s.key}
-            onClick={() => setState(s.key)}
+            onClick={() => setFoldClusters((v) => !v)}
             className={cn(
-              "px-3 h-8 text-xs rounded-md capitalize transition-colors",
-              state === s.key
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-foreground",
+              "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs transition-colors",
+              foldClusters
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground",
             )}
+            title="Fold friend groups behind their top-ranked representative"
           >
-            {s.label}
+            <Users className="h-3.5 w-3.5" />
+            {foldClusters ? "Clusters folded" : "Show all"}
           </button>
-        ))}
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Reading discovery graph…
-        </div>
-      ) : candidates.length === 0 ? (
-        <EmptyState state={state} />
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {candidates.map((c) => (
-            <CandidateCard
-              key={c.id}
-              candidate={c}
-              busy={decide.isPending && decide.variables?.id === c.id}
-              onDecide={(decision) => decide.mutate({ id: c.id, decision })}
-            />
+      {(() => {
+        const visible =
+          state === "new" && foldClusters
+            ? candidates.filter((c) => c.is_cluster_representative)
+            : candidates;
+        const hidden = candidates.length - visible.length;
+        return (
+          <>
+            {hidden > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                {hidden} similar account{hidden === 1 ? "" : "s"} folded behind representatives.
+              </div>
+            )}
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Reading discovery graph…
+              </div>
+            ) : visible.length === 0 ? (
+              <EmptyState state={state} />
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {visible.map((c) => (
+                  <CandidateCard
+                    key={c.id}
+                    candidate={c}
+                    busy={decide.isPending && decide.variables?.id === c.id}
+                    onDecide={(decision) => decide.mutate({ id: c.id, decision })}
+                  />
+
           ))}
         </div>
       )}
