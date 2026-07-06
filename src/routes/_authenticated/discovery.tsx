@@ -10,17 +10,14 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
-  Users,
-  MapPin,
-  Hash,
   Activity,
   ShieldCheck,
   Gauge,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { ScoreRing } from "@/components/operator-score";
 import { KpiCard } from "@/components/kpi-card";
 import { cn } from "@/lib/utils";
 import {
@@ -29,6 +26,7 @@ import {
   decideDiscoveryCandidateFn,
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
+  type ScoreReasons,
 } from "@/lib/discovery.functions";
 
 export const Route = createFileRoute("/_authenticated/discovery")({
