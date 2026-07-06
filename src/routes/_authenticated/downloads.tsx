@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Images,
   Loader2,
+  MapPin,
   RefreshCcw,
   User2,
 } from "lucide-react";
