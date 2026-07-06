@@ -397,7 +397,8 @@ function LocationProviderSection() {
                   key={s.id}
                   type="button"
                   onClick={() => setLocationId(s.id)}
-                  className={`text-xs px-2 py-1 rounded border transition-colors ${
+                  disabled={testing}
+                  className={`text-xs px-2 py-1 rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     active
                       ? "border-primary/50 bg-primary/10 text-foreground"
                       : "border-border hover:bg-accent text-muted-foreground hover:text-foreground"
