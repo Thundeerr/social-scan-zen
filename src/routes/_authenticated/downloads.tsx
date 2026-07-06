@@ -55,24 +55,52 @@ function formatWhen(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+type SourceFilter = "all" | "accounts" | "locations";
+
+function rowOrigin(r: DownloadRow): "account" | "location" | "unknown" {
+  if (r.asset?.location_id || r.asset?.tracked_locations) return "location";
+  if (r.asset?.account_id || r.asset?.tracked_accounts) return "account";
+  return "unknown";
+}
+
 function DownloadsPage() {
   const { rows } = useDownloads();
   const assets = useAssets();
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(
     null,
   );
+  const [source, setSource] = useState<SourceFilter>("all");
+
+  const filteredRows = useMemo(() => {
+    if (source === "all") return rows;
+    const kind = source === "accounts" ? "account" : "location";
+    return rows.filter((r) => rowOrigin(r) === kind);
+  }, [rows, source]);
+
+  const sourceCounts = useMemo(() => {
+    let accounts = 0;
+    let locations = 0;
+    for (const r of rows) {
+      const o = rowOrigin(r);
+      if (o === "account") accounts++;
+      else if (o === "location") locations++;
+    }
+    return { accounts, locations, all: rows.length };
+  }, [rows]);
 
   const stats = useMemo(() => {
-    const uniqueAssets = new Set(rows.map((r) => r.asset_id));
-    const totalBytes = rows.reduce((s, r) => s + (r.file_size ?? 0), 0);
-    const operators = new Set(rows.map((r) => r.downloaded_by).filter(Boolean));
+    const uniqueAssets = new Set(filteredRows.map((r) => r.asset_id));
+    const totalBytes = filteredRows.reduce((s, r) => s + (r.file_size ?? 0), 0);
+    const operators = new Set(
+      filteredRows.map((r) => r.downloaded_by).filter(Boolean),
+    );
     return {
-      total: rows.length,
+      total: filteredRows.length,
       uniqueAssets: uniqueAssets.size,
       totalBytes,
       operators: operators.size,
     };
-  }, [rows]);
+  }, [filteredRows]);
 
   const downloadedIds = useMemo(
     () => new Set(rows.map((r) => r.asset_id)),
