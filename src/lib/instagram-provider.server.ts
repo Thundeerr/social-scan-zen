@@ -163,6 +163,12 @@ export type InstagramProviderConfig = {
   profilePath?: string;
   /** Extra query params appended to the media request (e.g. `count=30`). */
   extraParams?: Record<string, string>;
+  /** Endpoint returning recent media for a given Instagram location id. */
+  locationPath?: string;
+  /** Query param name expected by the location endpoint (e.g. `id`, `location_id`). */
+  locationIdParam?: string;
+  /** Extra query params appended to the location request. */
+  locationExtraParams?: Record<string, string>;
 };
 
 /** Walk a nested object and return the first non-empty numeric IG id found. */
