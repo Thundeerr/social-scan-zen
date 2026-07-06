@@ -17,6 +17,15 @@ export type DiscoveredViaHop = {
   kind: "candidate" | "origin";
 };
 
+export type ClusterPeer = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  count: number;
+  is_representative: boolean;
+};
+
+
 export type DiscoveryCandidateRow = {
   id: string;
   username: string;
