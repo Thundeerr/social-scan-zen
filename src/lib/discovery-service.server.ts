@@ -246,14 +246,15 @@ export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
   }
 
   const assets = await fetchAssetsForAccount(db, accountId);
-  const signals = extractSignalsFromAssets(assets, acct.username);
-  const affected = await upsertCandidatesAndSignals(
+  const { signals, pairs } = extractSignalsFromAssets(assets, acct.username);
+  const { affected, idByUsername } = await upsertCandidatesAndSignals(
     db,
     acct.created_by,
     signals,
     { accountId },
     parent,
   );
+  await upsertCooccurrences(db, acct.created_by, idByUsername, pairs);
 
   await db
     .from("tracked_accounts")
@@ -261,6 +262,7 @@ export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
     .eq("id", accountId);
   return { candidates: affected };
 }
+
 
 
 export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string) {
