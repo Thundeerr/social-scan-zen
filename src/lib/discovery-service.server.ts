@@ -61,7 +61,7 @@ async function upsertCandidatesAndSignals(
   seed: { accountId?: string | null; locationId?: string | null },
   parent?: { candidateId: string | null; depth: number },
 ) {
-  if (!signals.length) return 0;
+  if (!signals.length) return { affected: 0, idByUsername: new Map() };
 
   // Filter blacklist
   const usernames = signals.map((s) => s.username);
