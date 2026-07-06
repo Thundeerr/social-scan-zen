@@ -666,3 +666,93 @@ export const enrichDiscoveryCandidateFn = createServerFn({ method: "POST" })
     const { enrichCandidate } = await import("@/lib/discovery-service.server");
     return enrichCandidate(context.supabase, data.id);
   });
+
+/**
+ * Discovery quality debug — per-seed candidate counts + enrichment tallies.
+ * Client computes top-10 / entropy-hidden from the already-ranked list; this
+ * fills in the bits the list can't answer (per-seed provenance, enrichment).
+ */
+export type DiscoveryDebugSeed = {
+  seed_id: string;
+  kind: "account" | "location";
+  label: string;
+  candidate_count: number;
+};
+
+export type DiscoveryDebugData = {
+  seeds: DiscoveryDebugSeed[];
+  total_candidates: number;
+  enriched: number;
+  unenriched: number;
+  new_state: number;
+};
+
+export const getDiscoveryDebugFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<DiscoveryDebugData> => {
+    const { supabase, userId } = context;
+
+    const [{ data: cands }, { data: sigs }, { data: accts }, { data: locs }] =
+      await Promise.all([
+        supabase
+          .from("discovery_candidates")
+          .select("id, state, last_ai_at")
+          .eq("user_id", userId),
+        supabase
+          .from("discovery_signals")
+          .select("candidate_id, seed_account_id, seed_location_id")
+          .eq("user_id", userId),
+        supabase
+          .from("tracked_accounts")
+          .select("id, username")
+          .eq("created_by", userId)
+          .eq("status", "active"),
+        supabase
+          .from("tracked_locations")
+          .select("id, name")
+          .eq("created_by", userId)
+          .eq("status", "active"),
+      ]);
+
+    const total = cands?.length ?? 0;
+    const enriched = (cands ?? []).filter((c) => c.last_ai_at).length;
+    const newState = (cands ?? []).filter((c) => c.state === "new").length;
+
+    const perAcct = new Map<string, Set<string>>();
+    const perLoc = new Map<string, Set<string>>();
+    for (const s of sigs ?? []) {
+      if (s.seed_account_id) {
+        const set = perAcct.get(s.seed_account_id) ?? new Set<string>();
+        set.add(s.candidate_id);
+        perAcct.set(s.seed_account_id, set);
+      }
+      if (s.seed_location_id) {
+        const set = perLoc.get(s.seed_location_id) ?? new Set<string>();
+        set.add(s.candidate_id);
+        perLoc.set(s.seed_location_id, set);
+      }
+    }
+
+    const seeds: DiscoveryDebugSeed[] = [
+      ...(accts ?? []).map((a) => ({
+        seed_id: a.id,
+        kind: "account" as const,
+        label: `@${a.username}`,
+        candidate_count: perAcct.get(a.id)?.size ?? 0,
+      })),
+      ...(locs ?? []).map((l) => ({
+        seed_id: l.id,
+        kind: "location" as const,
+        label: `📍 ${l.name}`,
+        candidate_count: perLoc.get(l.id)?.size ?? 0,
+      })),
+    ].sort((a, b) => b.candidate_count - a.candidate_count);
+
+    return {
+      seeds,
+      total_candidates: total,
+      enriched,
+      unenriched: total - enriched,
+      new_state: newState,
+    };
+  });

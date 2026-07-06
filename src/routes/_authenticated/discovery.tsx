@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import {
   listDiscoveryCandidatesFn,
   getDiscoveryStatsFn,
+  getDiscoveryDebugFn,
   decideDiscoveryCandidateFn,
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
@@ -34,6 +35,7 @@ import {
   type ClusterPeer,
   type ScoreReasons,
   type RankBreakdown,
+  type DiscoveryDebugData,
 } from "@/lib/discovery.functions";
 
 
@@ -68,10 +70,12 @@ function DiscoveryPage() {
   const [state, setState] = useState<StateKey>("new");
   const [foldClusters, setFoldClusters] = useState(true);
   const [hideBelowFloor, setHideBelowFloor] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
 
   const listFn = useServerFn(listDiscoveryCandidatesFn);
   const statsFn = useServerFn(getDiscoveryStatsFn);
+  const debugFn = useServerFn(getDiscoveryDebugFn);
   const decideFn = useServerFn(decideDiscoveryCandidateFn);
   const runNowFn = useServerFn(runDiscoveryNowFn);
   const qc = useQueryClient();
@@ -202,7 +206,24 @@ function DiscoveryPage() {
             {hideBelowFloor ? "Hiding below floor" : "Show all scores"}
           </button>
         )}
+        <button
+          onClick={() => setShowDebug((v) => !v)}
+          className={cn(
+            "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs transition-colors ml-auto",
+            showDebug
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:text-foreground",
+          )}
+          title="Quality debug — per-seed counts, enrichment, entropy hidden, top-10 before/after decisions"
+        >
+          <Activity className="h-3.5 w-3.5" />
+          {showDebug ? "Hide debug" : "Debug"}
+        </button>
       </div>
+
+      {showDebug && state === "new" && (
+        <DebugPanel candidates={candidates} debugFn={debugFn} />
+      )}
 
       {(() => {
         const clusterFiltered =
@@ -727,5 +748,278 @@ function RankRow({
     </div>
   );
 }
+
+
+
+
+
+type Top10Entry = {
+  username: string;
+  base: number;
+  learning: number;
+  novelty: number;
+  diversity: number;
+  final: number;
+  passes: boolean;
+};
+
+const SNAPSHOT_KEY = "discovery_debug_top10_snapshot";
+
+function DebugPanel({
+  candidates,
+  debugFn,
+}: {
+  candidates: DiscoveryCandidateRow[];
+  debugFn: () => Promise<DiscoveryDebugData>;
+}) {
+  const { data: debug } = useQuery({
+    queryKey: ["discovery_debug"],
+    queryFn: () => debugFn(),
+    refetchInterval: 30_000,
+  });
+
+  const top10: Top10Entry[] = candidates.slice(0, 10).map((c) => ({
+    username: c.username,
+    base: c.rank_breakdown?.base ?? 0,
+    learning: c.rank_breakdown?.learning ?? 0,
+    novelty: c.rank_breakdown?.novelty ?? 0,
+    diversity: c.rank_breakdown?.diversity ?? 0,
+    final: c.rank_breakdown?.final ?? 0,
+    passes: c.rank_breakdown?.passes_entropy ?? true,
+  }));
+
+  const [snapshot, setSnapshot] = useState<{
+    at: string;
+    top10: Top10Entry[];
+  } | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(SNAPSHOT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  function takeSnapshot() {
+    const snap = { at: new Date().toISOString(), top10 };
+    window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
+    setSnapshot(snap);
+    // Also mirror to console for the "console output" requirement.
+    console.groupCollapsed(
+      `[discovery] snapshot ${snap.at} — top ${top10.length}`,
+    );
+    console.table(
+      top10.map((e, i) => ({
+        rank: i + 1,
+        username: e.username,
+        base: e.base.toFixed(2),
+        learning: e.learning.toFixed(2),
+        novelty: e.novelty.toFixed(2),
+        diversity: e.diversity.toFixed(2),
+        final: e.final.toFixed(2),
+        passes: e.passes,
+      })),
+    );
+    console.groupEnd();
+  }
+
+  function clearSnapshot() {
+    window.localStorage.removeItem(SNAPSHOT_KEY);
+    setSnapshot(null);
+  }
+
+  const belowFloor = candidates.filter(
+    (c) => !c.rank_breakdown?.passes_entropy,
+  ).length;
+
+  const prevRankByUsername = new Map<string, number>();
+  snapshot?.top10.forEach((e, i) => prevRankByUsername.set(e.username, i + 1));
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/[0.03] p-4 space-y-4 font-mono text-[11px]">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-primary uppercase tracking-wider text-[10px]">
+          <Activity className="h-3.5 w-3.5" /> Discovery quality debug
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={takeSnapshot}>
+            Snapshot top 10
+          </Button>
+          {snapshot && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px]"
+              onClick={clearSnapshot}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tallies */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <DebugStat label="Total" value={debug?.total_candidates ?? "—"} />
+        <DebugStat label="New" value={debug?.new_state ?? "—"} />
+        <DebugStat label="Enriched" value={debug?.enriched ?? "—"} />
+        <DebugStat label="Unenriched" value={debug?.unenriched ?? "—"} />
+        <DebugStat label="Below floor" value={belowFloor} tone={belowFloor > 0 ? "warn" : undefined} />
+      </div>
+
+      {/* Per-seed */}
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+          Candidates per seed
+        </div>
+        {(debug?.seeds ?? []).length === 0 ? (
+          <div className="text-muted-foreground italic">No seed activity yet.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
+            {(debug?.seeds ?? []).map((s) => (
+              <div
+                key={s.seed_id}
+                className="flex items-baseline justify-between border-b border-border/30 py-0.5"
+              >
+                <span className="truncate text-foreground/80">{s.label}</span>
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    s.candidate_count === 0 ? "text-muted-foreground" : "text-foreground",
+                  )}
+                >
+                  {s.candidate_count}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Top 10 */}
+      <div>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Top 10 ranked {snapshot ? "· now vs snapshot" : "· current"}
+          </div>
+          {snapshot && (
+            <div className="text-[10px] text-muted-foreground">
+              snapshot {new Date(snapshot.at).toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+        {top10.length === 0 ? (
+          <div className="text-muted-foreground italic">No ranked candidates.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] tabular-nums">
+              <thead className="text-muted-foreground text-[10px] uppercase tracking-wider">
+                <tr>
+                  <th className="text-left font-normal py-1">#</th>
+                  <th className="text-left font-normal">Username</th>
+                  <th className="text-right font-normal">Base</th>
+                  <th className="text-right font-normal">Learn</th>
+                  <th className="text-right font-normal">Nov</th>
+                  <th className="text-right font-normal">Div</th>
+                  <th className="text-right font-normal">Final</th>
+                  <th className="text-right font-normal">Δ rank</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top10.map((e, i) => {
+                  const prev = prevRankByUsername.get(e.username);
+                  const delta = prev ? prev - (i + 1) : null;
+                  return (
+                    <tr
+                      key={e.username}
+                      className="border-t border-border/30 hover:bg-primary/[0.03]"
+                    >
+                      <td className="py-1 text-muted-foreground">{i + 1}</td>
+                      <td className="truncate">
+                        @{e.username}
+                        {!e.passes && (
+                          <span className="ml-1.5 text-amber-300 text-[9px]">↓floor</span>
+                        )}
+                      </td>
+                      <td className="text-right">{e.base.toFixed(2)}</td>
+                      <td
+                        className={cn(
+                          "text-right",
+                          e.learning > 0.01
+                            ? "text-emerald-300"
+                            : e.learning < -0.01
+                              ? "text-destructive/80"
+                              : "text-muted-foreground",
+                        )}
+                      >
+                        {e.learning >= 0 ? "+" : ""}
+                        {e.learning.toFixed(2)}
+                      </td>
+                      <td className="text-right text-emerald-300/80">
+                        +{e.novelty.toFixed(2)}
+                      </td>
+                      <td className="text-right text-amber-300/80">
+                        {e.diversity.toFixed(2)}
+                      </td>
+                      <td className="text-right text-foreground">
+                        {e.final.toFixed(2)}
+                      </td>
+                      <td className="text-right">
+                        {delta === null ? (
+                          <span className="text-muted-foreground">·</span>
+                        ) : delta === 0 ? (
+                          <span className="text-muted-foreground">=</span>
+                        ) : delta > 0 ? (
+                          <span className="text-emerald-300">↑{delta}</span>
+                        ) : (
+                          <span className="text-destructive/80">↓{-delta}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="text-[10px] text-muted-foreground leading-relaxed">
+        Test loop: take snapshot → Track / Ignore / Blacklist a few candidates →
+        Run discovery now → compare Δ rank. Learning should shift favored niches
+        up, Novelty should surface under-connected accounts, Diversity should
+        push clones down.
+      </div>
+    </div>
+  );
+}
+
+function DebugStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "warn";
+}) {
+  return (
+    <div className="rounded-md border border-border/50 bg-background/40 px-2.5 py-1.5">
+      <div className="text-[9px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "text-sm tabular-nums",
+          tone === "warn" ? "text-amber-300" : "text-foreground",
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 
 
