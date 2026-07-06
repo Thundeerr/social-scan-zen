@@ -33,7 +33,9 @@ import {
   type DiscoveredViaHop,
   type ClusterPeer,
   type ScoreReasons,
+  type RankBreakdown,
 } from "@/lib/discovery.functions";
+
 
 
 
@@ -65,6 +67,8 @@ const candidatesKey = (state: StateKey) => ["discovery_candidates", state] as co
 function DiscoveryPage() {
   const [state, setState] = useState<StateKey>("new");
   const [foldClusters, setFoldClusters] = useState(true);
+  const [hideBelowFloor, setHideBelowFloor] = useState(false);
+
 
   const listFn = useServerFn(listDiscoveryCandidatesFn);
   const statsFn = useServerFn(getDiscoveryStatsFn);
