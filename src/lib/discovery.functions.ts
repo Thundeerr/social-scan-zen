@@ -7,6 +7,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export type ScoreReasons = Partial<
+  Record<"luxury" | "quality" | "aesthetic" | "travel" | "authenticity", string[]>
+>;
+
 export type DiscoveryCandidateRow = {
   id: string;
   username: string;
@@ -24,6 +28,7 @@ export type DiscoveryCandidateRow = {
   aesthetic_score: number | null;
   travel_score: number | null;
   authenticity_score: number | null;
+  score_reasons: ScoreReasons;
   p_private_individual: number | null;
   p_commercial_brand: number | null;
   estimated_post_frequency: string | null;
@@ -34,6 +39,7 @@ export type DiscoveryCandidateRow = {
   first_seen_at: string;
   last_seen_at: string;
   last_ai_at: string | null;
+  headline_signals: string[];
   signals: Array<{
     source_type: string;
     seed_account_id: string | null;
