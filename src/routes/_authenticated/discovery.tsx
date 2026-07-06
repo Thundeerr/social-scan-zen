@@ -391,6 +391,10 @@ function CandidateCard({
         </span>
       </div>
 
+      {/* Ranking breakdown — transparent modifiers per candidate */}
+      {candidate.rank_breakdown && <RankingPanel breakdown={candidate.rank_breakdown} />}
+
+
       {/* Show reasoning toggle */}
       {hasReasoning && (
         <button
