@@ -369,6 +369,36 @@ function LocationProviderSection() {
           </Button>
         </div>
 
+        <div className="mt-3">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+            Sample locations
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SAMPLE_LOCATIONS.map((s) => {
+              const active = locationId.trim() === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setLocationId(s.id)}
+                  className={`text-xs px-2 py-1 rounded border transition-colors ${
+                    active
+                      ? "border-primary/50 bg-primary/10 text-foreground"
+                      : "border-border hover:bg-accent text-muted-foreground hover:text-foreground"
+                  }`}
+                  title={`${s.name} — ${s.id}`}
+                >
+                  <span className="font-medium">{s.name}</span>
+                  <span className="ml-1.5 font-mono text-[10px] opacity-60">
+                    {s.id}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+
         {testResult && testResult.ok && (
           <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs space-y-2">
             <div className="flex items-center justify-between">
