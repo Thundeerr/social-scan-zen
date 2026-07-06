@@ -449,7 +449,7 @@ function LocationProviderSection() {
                   {testResult.previewPosts.map((p) => (
                     <a
                       key={p.external_id}
-                      href={p.source_url}
+                      href={p.source_url ?? undefined}
                       target="_blank"
                       rel="noreferrer"
                       className="group flex gap-2 rounded-md border border-border bg-background/40 p-2 hover:border-primary/50 hover:bg-primary/5 transition-colors"
