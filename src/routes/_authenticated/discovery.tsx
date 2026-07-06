@@ -299,6 +299,16 @@ function CandidateCard({
             {candidate.is_verified && (
               <span className="text-[10px] text-primary" title="Verified">●</span>
             )}
+            {candidate.cluster_size > 1 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary tabular-nums"
+                title={`Part of a friend group with ${candidate.cluster_size - 1} similar account${candidate.cluster_size - 1 === 1 ? "" : "s"}`}
+              >
+                <Users className="h-3 w-3" />
+                {candidate.cluster_size}
+              </span>
+            )}
+
             <a
               href={`https://instagram.com/${candidate.username}/`}
               target="_blank"
