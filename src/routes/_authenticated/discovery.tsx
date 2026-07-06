@@ -388,8 +388,12 @@ function CandidateCard({
             </p>
           )}
           <ScoreReasonsBlock reasons={reasons} candidate={candidate} />
+          {candidate.cluster_peers.length > 0 && (
+            <ClusterPeersBlock peers={candidate.cluster_peers} />
+          )}
         </div>
       )}
+
 
       {/* Actions */}
       {candidate.state === "new" && (
