@@ -25,7 +25,10 @@ export type DownloadRow = {
     thumbnail_url: string | null;
     media_url: string | null;
     source_url: string | null;
+    account_id: string | null;
+    location_id: string | null;
     tracked_accounts: { username: string; avatar_url: string | null } | null;
+    tracked_locations: { name: string; location_id: string } | null;
   } | null;
   operator?: {
     id: string;
@@ -59,7 +62,7 @@ async function loadAll() {
   const { data, error } = await supabase
     .from("asset_downloads")
     .select(
-      "id, asset_id, downloaded_by, downloaded_at, media_url, media_type, filename, file_size, asset:assets(id, caption, media_type, thumbnail_url, media_url, source_url, tracked_accounts(username, avatar_url))",
+      "id, asset_id, downloaded_by, downloaded_at, media_url, media_type, filename, file_size, asset:assets(id, caption, media_type, thumbnail_url, media_url, source_url, account_id, location_id, tracked_accounts(username, avatar_url), tracked_locations(name, location_id))",
     )
     .order("downloaded_at", { ascending: false })
     .limit(500);
