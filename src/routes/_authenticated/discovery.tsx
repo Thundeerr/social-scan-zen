@@ -747,6 +747,10 @@ function RankRow({
       <span className={cn("text-[11px]", tone)}>{value}</span>
     </div>
   );
+}
+
+
+
 
 
 type Top10Entry = {
