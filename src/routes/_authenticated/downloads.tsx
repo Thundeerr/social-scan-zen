@@ -189,31 +189,105 @@ function DownloadsPage() {
         <Stat label="Operators" value={stats.operators.toLocaleString()} />
       </div>
 
+      {/* Origin filter */}
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit soft-shadow">
+        {(
+          [
+            { id: "all", label: "All", count: sourceCounts.all },
+            { id: "accounts", label: "Accounts", count: sourceCounts.accounts },
+            { id: "locations", label: "Locations", count: sourceCounts.locations },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setSource(tab.id)}
+            className={cn(
+              "px-3 h-8 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors",
+              source === tab.id
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {tab.id === "locations" ? <MapPin className="h-3.5 w-3.5" /> : null}
+            {tab.id === "accounts" ? <User2 className="h-3.5 w-3.5" /> : null}
+            <span>{tab.label}</span>
+            <span className="tabular-nums opacity-70">{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Table */}
       <div className="soft-shadow overflow-hidden rounded-2xl border border-border bg-card">
-        {rows.length === 0 ? (
+        {filteredRows.length === 0 ? (
           <div className="flex min-h-[42vh] items-center justify-center">
             <div className="max-w-sm px-6 py-16 text-center">
               <div className="relative mx-auto mb-6 h-24 w-24">
                 <div className="absolute inset-0 rounded-3xl bg-primary/10 blur-2xl" />
                 <div className="relative flex h-full w-full items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/20">
-                  <Download className="h-10 w-10 text-primary" />
+                  {source === "locations" ? (
+                    <MapPin className="h-10 w-10 text-primary" />
+                  ) : (
+                    <Download className="h-10 w-10 text-primary" />
+                  )}
                 </div>
               </div>
-              <h2 className="text-lg font-semibold tracking-tight">
-                Archive is empty
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                The moment an operator synchronizes an asset, it lands here with
-                full metadata.
-              </p>
-              <div className="mt-6 flex items-center justify-center gap-2">
-                <Button asChild variant="secondary" className="gap-1.5">
-                  <Link to="/assets" search={{ day: "all", status: "all" }}>
-                    <Images className="h-4 w-4" /> Review new assets
-                  </Link>
-                </Button>
-              </div>
+              {source === "locations" ? (
+                <>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    No location assets synchronized
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Approved posts from tracked locations will land here with
+                    the origin location preserved for audit.
+                  </p>
+                  <div className="mt-6 flex items-center justify-center gap-2">
+                    <Button asChild variant="secondary" className="gap-1.5">
+                      <Link to="/locations">
+                        <MapPin className="h-4 w-4" /> Manage locations
+                      </Link>
+                    </Button>
+                    <Button asChild variant="ghost" className="gap-1.5">
+                      <Link to="/assets" search={{ day: "all", status: "all" }}>
+                        <Images className="h-4 w-4" /> Review inbox
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              ) : source === "accounts" ? (
+                <>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    No account assets synchronized
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Approve posts from tracked accounts to sync them into the
+                    archive.
+                  </p>
+                  <div className="mt-6 flex items-center justify-center gap-2">
+                    <Button asChild variant="secondary" className="gap-1.5">
+                      <Link to="/assets" search={{ day: "all", status: "all" }}>
+                        <Images className="h-4 w-4" /> Review inbox
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    Archive is empty
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    The moment an operator synchronizes an asset — from an
+                    account or a location — it lands here with full metadata.
+                  </p>
+                  <div className="mt-6 flex items-center justify-center gap-2">
+                    <Button asChild variant="secondary" className="gap-1.5">
+                      <Link to="/assets" search={{ day: "all", status: "all" }}>
+                        <Images className="h-4 w-4" /> Review new assets
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (
@@ -222,7 +296,7 @@ function DownloadsPage() {
               <thead className="bg-muted/30 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Asset</th>
-                  <th className="px-4 py-3 text-left font-medium">Account</th>
+                  <th className="px-4 py-3 text-left font-medium">Origin</th>
                   <th className="px-4 py-3 text-left font-medium">Operator</th>
                   <th className="px-4 py-3 text-left font-medium">When</th>
                   <th className="px-4 py-3 text-left font-medium">Type</th>
@@ -231,7 +305,7 @@ function DownloadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {filteredRows.map((r) => (
                   <DownloadRowView key={r.id} row={r} />
                 ))}
               </tbody>
