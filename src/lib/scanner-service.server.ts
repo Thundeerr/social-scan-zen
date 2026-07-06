@@ -415,7 +415,7 @@ export async function executeScan(
  * prevention). Attempt count on the new run comes from
  * `consecutive_failures + 1` for the account so retries are visible.
  */
-export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> {
+export async function tickQueue(db: DB, maxPerTick = 3): Promise<Array<ScanOutcome | LocationScanOutcome>> {
   const now = new Date().toISOString();
 
   // ---- Provider budget guard ----
