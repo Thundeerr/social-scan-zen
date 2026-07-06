@@ -570,3 +570,36 @@ function DiscoveredViaChain({ hops, depth }: { hops: DiscoveredViaHop[]; depth: 
   );
 }
 
+function ClusterPeersBlock({ peers }: { peers: ClusterPeer[] }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Users className="h-3 w-3 text-muted-foreground" />
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Friend group · {peers.length} similar
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {peers.map((p) => (
+          <a
+            key={p.id}
+            href={`https://instagram.com/${p.username}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-colors",
+              p.is_representative
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border bg-background/40 text-foreground/70 hover:text-foreground",
+            )}
+            title={`Co-appeared ${p.count} time${p.count === 1 ? "" : "s"}${p.is_representative ? " · cluster representative" : ""}`}
+          >
+            @{p.username}
+            <span className="text-muted-foreground tabular-nums">·{p.count}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
