@@ -206,7 +206,24 @@ function DiscoveryPage() {
             {hideBelowFloor ? "Hiding below floor" : "Show all scores"}
           </button>
         )}
+        <button
+          onClick={() => setShowDebug((v) => !v)}
+          className={cn(
+            "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs transition-colors ml-auto",
+            showDebug
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:text-foreground",
+          )}
+          title="Quality debug — per-seed counts, enrichment, entropy hidden, top-10 before/after decisions"
+        >
+          <Activity className="h-3.5 w-3.5" />
+          {showDebug ? "Hide debug" : "Debug"}
+        </button>
       </div>
+
+      {showDebug && state === "new" && (
+        <DebugPanel candidates={candidates} debugFn={debugFn} />
+      )}
 
       {(() => {
         const clusterFiltered =
