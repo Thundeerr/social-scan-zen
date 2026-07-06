@@ -10,17 +10,14 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
-  Users,
-  MapPin,
-  Hash,
   Activity,
   ShieldCheck,
   Gauge,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { ScoreRing } from "@/components/operator-score";
 import { KpiCard } from "@/components/kpi-card";
 import { cn } from "@/lib/utils";
 import {
@@ -29,6 +26,7 @@ import {
   decideDiscoveryCandidateFn,
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
+  type ScoreReasons,
 } from "@/lib/discovery.functions";
 
 export const Route = createFileRoute("/_authenticated/discovery")({
@@ -220,26 +218,27 @@ function CandidateCard({
   busy: boolean;
   onDecide: (d: "track" | "ignore" | "blacklist") => void;
 }) {
-  const composite = compositeScore(candidate);
-  const scores: Array<{ label: string; value: number | null }> = [
-    { label: "Luxury", value: candidate.luxury_score },
-    { label: "Quality", value: candidate.quality_score },
-    { label: "Aesthetic", value: candidate.aesthetic_score },
-    { label: "Travel", value: candidate.travel_score },
-    { label: "Auth.", value: candidate.authenticity_score },
-  ];
+  const [expanded, setExpanded] = useState(false);
+  const headlineLines = candidate.headline_signals ?? [];
+  const scoreChips = buildScoreChips(candidate);
+  const confidencePct = Math.round((candidate.confidence ?? 0) * 100);
+  const reasons = candidate.score_reasons ?? {};
+  const hasReasoning =
+    Boolean(candidate.ai_summary) ||
+    Object.values(reasons).some((arr) => arr && arr.length > 0);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3">
-      <div className="flex items-start gap-3">
+    <div className="rounded-xl border border-border bg-card flex flex-col">
+      {/* Header — identity + confidence */}
+      <div className="flex items-start gap-3 p-4 pb-3">
         {candidate.avatar_url ? (
           <img
             src={candidate.avatar_url}
             alt=""
-            className="h-11 w-11 rounded-full object-cover ring-1 ring-border"
+            className="h-10 w-10 rounded-full object-cover ring-1 ring-border"
           />
         ) : (
-          <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
             {candidate.username.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -254,71 +253,87 @@ function CandidateCard({
               @{candidate.username}
             </a>
             {candidate.is_verified && (
-              <span className="text-[10px] text-primary" title="Verified">
-                ●
-              </span>
+              <span className="text-[10px] text-primary" title="Verified">●</span>
             )}
+            <a
+              href={`https://instagram.com/${candidate.username}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto text-muted-foreground hover:text-foreground"
+              title="Open on Instagram"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
-          <div className="text-xs text-muted-foreground truncate">
-            {candidate.full_name ?? candidate.estimated_niche ?? "Analyzing…"}
-          </div>
-          <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-            {candidate.estimated_niche && (
-              <span className="rounded-sm bg-primary/10 text-primary px-1.5 py-0.5">
-                {candidate.estimated_niche}
-              </span>
-            )}
-            {candidate.estimated_post_frequency && (
-              <span>{candidate.estimated_post_frequency}</span>
-            )}
-          </div>
+          {candidate.full_name && (
+            <div className="text-xs text-muted-foreground truncate">{candidate.full_name}</div>
+          )}
         </div>
-        <ScoreRing score={composite} size={44} />
       </div>
 
-      <div className="grid grid-cols-5 gap-1.5">
-        {scores.map((s) => (
-          <SubScore key={s.label} label={s.label} value={s.value} />
-        ))}
-      </div>
-
-      {candidate.ai_summary && (
-        <p className="text-xs text-muted-foreground line-clamp-3">{candidate.ai_summary}</p>
-      )}
-
-      {candidate.signals.length > 0 && (
-        <div className="rounded-md border border-border/60 bg-background/40 p-2 space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Why discovered
+      {/* Signal stack — the "why track this?" answer in <3s */}
+      <div className="px-4 space-y-1.5">
+        {headlineLines.length === 0 ? (
+          <div className="text-[11px] italic text-muted-foreground">
+            {candidate.last_ai_at ? "No strong signals yet" : "Analyzing…"}
           </div>
-          {candidate.signals.slice(0, 3).map((s, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-[11px] text-foreground/80">
-              <SignalIcon type={s.source_type} />
-              <span className="truncate">{s.seed_label ?? "signal"}</span>
-              <span className="text-muted-foreground">· {sourceLabel(s.source_type)}</span>
+        ) : (
+          headlineLines.map((line, i) => (
+            <div key={i} className="flex items-center gap-2 text-[12px] text-foreground/90">
+              <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">{line}</span>
             </div>
+          ))
+        )}
+      </div>
+
+      {/* Score chips row */}
+      {scoreChips.length > 0 && (
+        <div className="px-4 pt-3 flex flex-wrap gap-1.5">
+          {scoreChips.map((c) => (
+            <ScoreChip key={c.label} label={c.label} value={c.value} tone={c.tone} />
           ))}
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Confidence {Math.round((candidate.confidence ?? 0) * 100)}% · {candidate.signal_count}{" "}
-          signal{candidate.signal_count === 1 ? "" : "s"}
-        </div>
-        <a
-          href={`https://instagram.com/${candidate.username}/`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-foreground"
-          title="Open on Instagram"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
+      {/* Confidence + signal count strip */}
+      <div className="px-4 pt-3 flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span>
+          Confidence <span className="tabular-nums text-foreground/70">{confidencePct}%</span>
+        </span>
+        <span className="text-border">·</span>
+        <span>
+          {candidate.signal_count} signal{candidate.signal_count === 1 ? "" : "s"}
+        </span>
       </div>
 
+      {/* Show reasoning toggle */}
+      {hasReasoning && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mx-4 mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground hover:text-foreground border-t border-border/60 pt-3"
+        >
+          <span>Show reasoning</span>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-180")}
+          />
+        </button>
+      )}
+
+      {expanded && hasReasoning && (
+        <div className="px-4 pt-3 space-y-3">
+          {candidate.ai_summary && (
+            <p className="text-[12px] leading-relaxed text-foreground/80">
+              {candidate.ai_summary}
+            </p>
+          )}
+          <ScoreReasonsBlock reasons={reasons} candidate={candidate} />
+        </div>
+      )}
+
+      {/* Actions */}
       {candidate.state === "new" && (
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5 p-4 pt-4">
           <Button
             size="sm"
             variant="outline"
@@ -351,60 +366,108 @@ function CandidateCard({
   );
 }
 
-function SubScore({ label, value }: { label: string; value: number | null }) {
-  const v = value ?? 0;
+type ChipTone = "elite" | "strong" | "neutral";
+
+function ScoreChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: ChipTone;
+}) {
   return (
-    <div className="space-y-1">
-      <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="h-1 rounded-full bg-muted overflow-hidden">
-        <div
-          className="h-full bg-primary/70"
-          style={{ width: value == null ? "0%" : `${v}%` }}
-        />
-      </div>
-      <div className="text-[10px] tabular-nums text-foreground/80">
-        {value == null ? "—" : v}
-      </div>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums border",
+        tone === "elite" && "border-emerald-500/30 text-emerald-300 bg-emerald-500/10",
+        tone === "strong" && "border-primary/30 text-primary bg-primary/10",
+        tone === "neutral" && "border-border text-muted-foreground bg-background/40",
+      )}
+    >
+      <span>{label}</span>
+      <span>{value}</span>
+    </span>
   );
 }
 
-function SignalIcon({ type }: { type: string }) {
-  if (type === "location_cooccurrence")
-    return <MapPin className="h-3 w-3 text-primary" />;
-  if (type === "hashtag_cooccurrence") return <Hash className="h-3 w-3 text-primary" />;
-  return <Users className="h-3 w-3 text-primary" />;
-}
-
-function sourceLabel(t: string): string {
-  switch (t) {
-    case "account_mention":
-      return "mention";
-    case "tagged_user":
-      return "tagged";
-    case "tagged_collaborator":
-      return "collab";
-    case "co_appearance":
-      return "co-appearance";
-    case "location_cooccurrence":
-      return "same location";
-    case "hashtag_cooccurrence":
-      return "hashtag";
-    case "provider_recommendation":
-      return "recommended";
-    default:
-      return t;
+function buildScoreChips(c: DiscoveryCandidateRow) {
+  const chips: Array<{ label: string; value: number; tone: ChipTone }> = [];
+  const push = (label: string, v: number | null) => {
+    if (typeof v !== "number") return;
+    const tone: ChipTone = v >= 90 ? "elite" : v >= 75 ? "strong" : "neutral";
+    chips.push({ label, value: v, tone });
+  };
+  push("Luxury", c.luxury_score);
+  push("Aesthetic", c.aesthetic_score);
+  push("Quality", c.quality_score);
+  push("Travel", c.travel_score);
+  push("Auth.", c.authenticity_score);
+  if (typeof c.p_private_individual === "number") {
+    const pct = Math.round(c.p_private_individual * 100);
+    if (pct >= 60) {
+      chips.push({
+        label: "Private",
+        value: pct,
+        tone: pct >= 85 ? "elite" : "strong",
+      });
+    }
   }
+  // sort highest-scoring first, cap at 5
+  return chips.sort((a, b) => b.value - a.value).slice(0, 5);
 }
 
-function compositeScore(c: DiscoveryCandidateRow): number {
-  const parts = [
-    c.luxury_score,
-    c.quality_score,
-    c.aesthetic_score,
-    c.travel_score,
-    c.authenticity_score,
-  ].filter((v): v is number => typeof v === "number");
-  if (!parts.length) return Math.round((c.confidence ?? 0) * 100);
-  return Math.round(parts.reduce((s, v) => s + v, 0) / parts.length);
+const AXIS_LABELS: Record<keyof ScoreReasons, string> = {
+  luxury: "Luxury",
+  quality: "Quality",
+  aesthetic: "Aesthetic",
+  travel: "Travel",
+  authenticity: "Authenticity",
+};
+
+function ScoreReasonsBlock({
+  reasons,
+  candidate,
+}: {
+  reasons: ScoreReasons;
+  candidate: DiscoveryCandidateRow;
+}) {
+  const scoreFor: Record<keyof ScoreReasons, number | null> = {
+    luxury: candidate.luxury_score,
+    quality: candidate.quality_score,
+    aesthetic: candidate.aesthetic_score,
+    travel: candidate.travel_score,
+    authenticity: candidate.authenticity_score,
+  };
+  const axes = (Object.keys(AXIS_LABELS) as Array<keyof ScoreReasons>).filter(
+    (k) => (reasons[k]?.length ?? 0) > 0,
+  );
+  if (axes.length === 0) return null;
+  return (
+    <div className="space-y-2.5">
+      {axes.map((k) => (
+        <div key={k}>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {AXIS_LABELS[k]}
+            </span>
+            <span className="text-xs font-medium tabular-nums text-foreground/80">
+              {scoreFor[k] ?? "—"}
+            </span>
+          </div>
+          <ul className="space-y-0.5 pl-3">
+            {(reasons[k] ?? []).map((r, i) => (
+              <li
+                key={i}
+                className="relative text-[11px] text-foreground/75 leading-snug before:content-['•'] before:absolute before:-left-3 before:text-muted-foreground"
+              >
+                {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
 }
