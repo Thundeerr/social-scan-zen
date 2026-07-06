@@ -187,21 +187,41 @@ function DiscoveryPage() {
             {foldClusters ? "Clusters folded" : "Show all"}
           </button>
         )}
+        {state === "new" && (
+          <button
+            onClick={() => setHideBelowFloor((v) => !v)}
+            className={cn(
+              "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs transition-colors",
+              hideBelowFloor
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+            title="Hide candidates that don't clear the entropy floor. Off by default — visible so you can audit the cutoff."
+          >
+            <Gauge className="h-3.5 w-3.5" />
+            {hideBelowFloor ? "Hiding below floor" : "Show all scores"}
+          </button>
+        )}
       </div>
 
       {(() => {
-        const visible =
+        const clusterFiltered =
           state === "new" && foldClusters
             ? candidates.filter((c) => c.is_cluster_representative)
             : candidates;
+        const visible =
+          state === "new" && hideBelowFloor
+            ? clusterFiltered.filter((c) => c.rank_breakdown?.passes_entropy)
+            : clusterFiltered;
         const hidden = candidates.length - visible.length;
         return (
           <>
             {hidden > 0 && (
               <div className="text-[11px] text-muted-foreground">
-                {hidden} similar account{hidden === 1 ? "" : "s"} folded behind representatives.
+                {hidden} candidate{hidden === 1 ? "" : "s"} hidden by cluster / entropy filters.
               </div>
             )}
+
             {isLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Reading discovery graph…
