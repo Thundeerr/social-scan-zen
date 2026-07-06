@@ -330,10 +330,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function DownloadRowView({ row }: { row: DownloadRow }) {
   const thumb = row.asset?.thumbnail_url ?? row.asset?.media_url ?? null;
-  const username = row.asset?.tracked_accounts?.username ?? "unknown";
   const source = row.asset?.source_url ?? null;
   const operator =
     row.operator?.display_name || row.operator?.email || "operator";
+  const origin = rowOrigin(row);
+  const locationName = row.asset?.tracked_locations?.name ?? null;
+  const locationId = row.asset?.tracked_locations?.location_id ?? null;
+  const username = row.asset?.tracked_accounts?.username ?? null;
 
   return (
     <tr className="border-t border-border/50 hover:bg-muted/20">
@@ -366,7 +369,29 @@ function DownloadRowView({ row }: { row: DownloadRow }) {
         </div>
       </td>
       <td className="px-4 py-3">
-        <span className="text-sm font-medium">@{username}</span>
+        {origin === "location" ? (
+          <div className="flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">
+                {locationName ?? "Location"}
+              </div>
+              {locationId ? (
+                <div className="truncate text-[10px] text-muted-foreground font-mono">
+                  {locationId}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : origin === "account" ? (
+          <span className="text-sm font-medium">
+            @{username ?? "unknown"}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground italic">
+            unknown source
+          </span>
+        )}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
