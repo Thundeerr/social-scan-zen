@@ -367,10 +367,13 @@ function LocationProviderSection() {
             onChange={(e) => setLocationId(e.target.value)}
             placeholder="213385402"
             className="font-mono sm:max-w-xs"
+            disabled={testing}
+            aria-busy={testing}
           />
           <Button
             onClick={() => void onTest()}
             disabled={testing || !status?.host || !status?.keySet}
+            aria-busy={testing}
             className="gap-1.5"
           >
             {testing ? (
@@ -378,7 +381,7 @@ function LocationProviderSection() {
             ) : (
               <Radar className="h-3.5 w-3.5" />
             )}
-            Run test fetch
+            {testing ? "Running…" : "Run test fetch"}
           </Button>
         </div>
 
