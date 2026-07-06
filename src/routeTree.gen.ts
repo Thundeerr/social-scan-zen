@@ -17,12 +17,14 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
 import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
+import { Route as AuthenticatedDiscoveryRouteImport } from './routes/_authenticated/discovery'
 import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/burn'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
+import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -63,6 +65,11 @@ const AuthenticatedDownloadsRoute = AuthenticatedDownloadsRouteImport.update({
   path: '/downloads',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDiscoveryRoute = AuthenticatedDiscoveryRouteImport.update({
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedBurnRoute = AuthenticatedBurnRouteImport.update({
   id: '/burn',
   path: '/burn',
@@ -95,6 +102,12 @@ const ApiPublicHooksScannerTickRoute =
     path: '/api/public/hooks/scanner-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksDiscoveryTickRoute =
+  ApiPublicHooksDiscoveryTickRouteImport.update({
+    id: '/api/public/hooks/discovery-tick',
+    path: '/api/public/hooks/discovery-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -103,11 +116,13 @@ export interface FileRoutesByFullPath {
   '/activity': typeof AuthenticatedActivityRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/burn': typeof AuthenticatedBurnRoute
+  '/discovery': typeof AuthenticatedDiscoveryRoute
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
+  '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -117,12 +132,14 @@ export interface FileRoutesByTo {
   '/activity': typeof AuthenticatedActivityRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/burn': typeof AuthenticatedBurnRoute
+  '/discovery': typeof AuthenticatedDiscoveryRoute
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
   '/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -134,12 +151,14 @@ export interface FileRoutesById {
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/burn': typeof AuthenticatedBurnRoute
+  '/_authenticated/discovery': typeof AuthenticatedDiscoveryRoute
   '/_authenticated/downloads': typeof AuthenticatedDownloadsRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
@@ -152,11 +171,13 @@ export interface FileRouteTypes {
     | '/activity'
     | '/assets'
     | '/burn'
+    | '/discovery'
     | '/downloads'
     | '/locations'
     | '/scanner'
     | '/settings'
     | '/telegram'
+    | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -166,12 +187,14 @@ export interface FileRouteTypes {
     | '/activity'
     | '/assets'
     | '/burn'
+    | '/discovery'
     | '/downloads'
     | '/locations'
     | '/scanner'
     | '/settings'
     | '/telegram'
     | '/'
+    | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
   id:
@@ -182,12 +205,14 @@ export interface FileRouteTypes {
     | '/_authenticated/activity'
     | '/_authenticated/assets'
     | '/_authenticated/burn'
+    | '/_authenticated/discovery'
     | '/_authenticated/downloads'
     | '/_authenticated/locations'
     | '/_authenticated/scanner'
     | '/_authenticated/settings'
     | '/_authenticated/telegram'
     | '/_authenticated/'
+    | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
@@ -195,6 +220,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
@@ -257,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDownloadsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/discovery': {
+      id: '/_authenticated/discovery'
+      path: '/discovery'
+      fullPath: '/discovery'
+      preLoaderRoute: typeof AuthenticatedDiscoveryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/burn': {
       id: '/_authenticated/burn'
       path: '/burn'
@@ -299,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksScannerTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/discovery-tick': {
+      id: '/api/public/hooks/discovery-tick'
+      path: '/api/public/hooks/discovery-tick'
+      fullPath: '/api/public/hooks/discovery-tick'
+      preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -307,6 +347,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedBurnRoute: typeof AuthenticatedBurnRoute
+  AuthenticatedDiscoveryRoute: typeof AuthenticatedDiscoveryRoute
   AuthenticatedDownloadsRoute: typeof AuthenticatedDownloadsRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
@@ -320,6 +361,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedActivityRoute: AuthenticatedActivityRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedBurnRoute: AuthenticatedBurnRoute,
+  AuthenticatedDiscoveryRoute: AuthenticatedDiscoveryRoute,
   AuthenticatedDownloadsRoute: AuthenticatedDownloadsRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
@@ -334,6 +376,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
