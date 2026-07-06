@@ -73,7 +73,7 @@ async function upsertCandidatesAndSignals(
   const blacklisted = new Set((black ?? []).map((r) => r.username));
 
   const kept = signals.filter((s) => !blacklisted.has(s.username));
-  if (!kept.length) return 0;
+  if (!kept.length) return { affected: 0, idByUsername: new Map() };
 
   // Upsert candidates one shot
   const nowIso = new Date().toISOString();
