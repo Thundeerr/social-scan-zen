@@ -175,6 +175,86 @@ export function useAccountAssetCounts() {
 }
 
 
+// ---------- Tracked locations ----------
+export type TrackedLocation = Tables<"tracked_locations">;
+export type TrackedLocationInsert = TablesInsert<"tracked_locations">;
+export type TrackedLocationUpdate = TablesUpdate<"tracked_locations">;
+
+export const trackedLocationsKey = ["tracked_locations"] as const;
+
+export function useTrackedLocations() {
+  return useQuery({
+    queryKey: trackedLocationsKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tracked_locations")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+export function useCreateTrackedLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: TrackedLocationInsert) => {
+      const { data, error } = await supabase
+        .from("tracked_locations")
+        .insert(input)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: trackedLocationsKey });
+      void logActivity(
+        "location_added",
+        `Tracking location "${data.name}"`,
+        { location_id: data.id },
+      );
+    },
+  });
+}
+
+export function useUpdateTrackedLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: TrackedLocationUpdate }) => {
+      const { data, error } = await supabase
+        .from("tracked_locations")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: trackedLocationsKey });
+    },
+  });
+}
+
+export function useDeleteTrackedLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tracked_locations").delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: trackedLocationsKey });
+    },
+  });
+}
+
+
+
 // ---------- Assets ----------
 export type AssetRow = Tables<"assets">;
 

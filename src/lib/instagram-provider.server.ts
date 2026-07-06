@@ -26,6 +26,12 @@ export type ProviderResponse = {
   posts: ProviderPost[];
 };
 
+export type LocationProviderResponse = {
+  location_id: string;
+  name: string | null;
+  posts: ProviderPost[];
+};
+
 const DEFAULT_PATH = "/user-medias";
 
 function pick<T = unknown>(obj: Record<string, unknown> | null | undefined, keys: string[]): T | null {
@@ -157,6 +163,12 @@ export type InstagramProviderConfig = {
   profilePath?: string;
   /** Extra query params appended to the media request (e.g. `count=30`). */
   extraParams?: Record<string, string>;
+  /** Endpoint returning recent media for a given Instagram location id. */
+  locationPath?: string;
+  /** Query param name expected by the location endpoint (e.g. `id`, `location_id`). */
+  locationIdParam?: string;
+  /** Extra query params appended to the location request. */
+  locationExtraParams?: Record<string, string>;
 };
 
 /** Walk a nested object and return the first non-empty numeric IG id found. */
@@ -260,7 +272,36 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     };
   }
 
-  return { fetchAccount };
+  async function fetchLocation(locationId: string): Promise<LocationProviderResponse> {
+    if (!cfg.locationPath) {
+      throw new Error(
+        "Instagram location provider not configured (missing RAPIDAPI_LOCATION_PATH)",
+      );
+    }
+    const paramName = cfg.locationIdParam ?? "id";
+    const url = new URL(`https://${cfg.host}${cfg.locationPath}`);
+    url.searchParams.set(paramName, locationId);
+    for (const [k, v] of Object.entries(cfg.locationExtraParams ?? {})) {
+      url.searchParams.set(k, v);
+    }
+    const res = await fetch(url.toString(), { headers });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Instagram location provider ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as unknown;
+    const normalised = normaliseResponse(locationId, json);
+    // Location endpoints often include a `name` or `location.name` field.
+    let name: string | null = null;
+    if (json && typeof json === "object") {
+      const root = json as Record<string, unknown>;
+      const loc = (pick<Record<string, unknown>>(root, ["location", "data"]) ?? root) as Record<string, unknown>;
+      name = pick<string>(loc, ["name", "title", "short_name"]) ?? null;
+    }
+    return { location_id: locationId, name, posts: normalised.posts };
+  }
+
+  return { fetchAccount, fetchLocation };
 }
 
 export function getInstagramProviderFromEnv() {
@@ -276,6 +317,11 @@ export function getInstagramProviderFromEnv() {
   if (raw) {
     for (const [k, v] of new URLSearchParams(raw).entries()) extraParams[k] = v;
   }
+  const locationExtraParams: Record<string, string> = {};
+  const rawLoc = process.env.RAPIDAPI_LOCATION_EXTRA_PARAMS;
+  if (rawLoc) {
+    for (const [k, v] of new URLSearchParams(rawLoc).entries()) locationExtraParams[k] = v;
+  }
   return createInstagramProvider({
     apiKey,
     host,
@@ -283,6 +329,9 @@ export function getInstagramProviderFromEnv() {
     usernameParam: process.env.RAPIDAPI_USERNAME_PARAM,
     profilePath: process.env.RAPIDAPI_PROFILE_PATH,
     extraParams,
+    locationPath: process.env.RAPIDAPI_LOCATION_PATH,
+    locationIdParam: process.env.RAPIDAPI_LOCATION_ID_PARAM,
+    locationExtraParams,
   });
 }
 
@@ -296,4 +345,11 @@ export function describeProviderRequest(username: string): string {
     return `GET https://${host}${profilePath}?username=${username} → GET https://${host}${path}?${param}=<id>`;
   }
   return `GET https://${host}${path}?${param}=${username}`;
+}
+
+export function describeLocationProviderRequest(locationId: string): string {
+  const host = process.env.RAPIDAPI_HOST ?? "provider";
+  const path = process.env.RAPIDAPI_LOCATION_PATH ?? "/location-feeds";
+  const param = process.env.RAPIDAPI_LOCATION_ID_PARAM ?? "id";
+  return `GET https://${host}${path}?${param}=${locationId}`;
 }

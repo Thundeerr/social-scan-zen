@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/public/hooks/scanner-tick")({
             ok: true,
             picked: outcomes.length,
             outcomes: outcomes.map((o) => ({
-              username: o.username,
+              target: "username" in o ? `@${o.username}` : `📍 ${o.name}`,
               status: o.status,
               inserted: o.inserted,
               duplicates: o.duplicates,

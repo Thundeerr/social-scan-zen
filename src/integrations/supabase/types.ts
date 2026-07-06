@@ -137,7 +137,7 @@ export type Database = {
       }
       assets: {
         Row: {
-          account_id: string
+          account_id: string | null
           ai_confidence: number | null
           ai_reasons: Json | null
           ai_verdict: string | null
@@ -152,6 +152,7 @@ export type Database = {
           ig_post_id: string | null
           last_seen_at: string
           likes: number
+          location_id: string | null
           media_type: Database["public"]["Enums"]["asset_media_type"]
           media_url: string | null
           posted_at: string | null
@@ -161,7 +162,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           ai_confidence?: number | null
           ai_reasons?: Json | null
           ai_verdict?: string | null
@@ -176,6 +177,7 @@ export type Database = {
           ig_post_id?: string | null
           last_seen_at?: string
           likes?: number
+          location_id?: string | null
           media_type?: Database["public"]["Enums"]["asset_media_type"]
           media_url?: string | null
           posted_at?: string | null
@@ -185,7 +187,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           ai_confidence?: number | null
           ai_reasons?: Json | null
           ai_verdict?: string | null
@@ -200,6 +202,7 @@ export type Database = {
           ig_post_id?: string | null
           last_seen_at?: string
           likes?: number
+          location_id?: string | null
           media_type?: Database["public"]["Enums"]["asset_media_type"]
           media_url?: string | null
           posted_at?: string | null
@@ -214,6 +217,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "tracked_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_locations"
             referencedColumns: ["id"]
           },
         ]
@@ -401,6 +411,7 @@ export type Database = {
           created_by: string | null
           error: string | null
           id: string
+          location_id: string | null
           phase: string | null
           phase_detail: string | null
           scheduled_for: string
@@ -421,6 +432,7 @@ export type Database = {
           created_by?: string | null
           error?: string | null
           id?: string
+          location_id?: string | null
           phase?: string | null
           phase_detail?: string | null
           scheduled_for?: string
@@ -441,6 +453,7 @@ export type Database = {
           created_by?: string | null
           error?: string | null
           id?: string
+          location_id?: string | null
           phase?: string | null
           phase_detail?: string | null
           scheduled_for?: string
@@ -455,6 +468,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "tracked_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scanner_runs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_locations"
             referencedColumns: ["id"]
           },
         ]
@@ -510,6 +530,54 @@ export type Database = {
           tier?: Database["public"]["Enums"]["priority_tier"]
           updated_at?: string
           username?: string
+        }
+        Relationships: []
+      }
+      tracked_locations: {
+        Row: {
+          consecutive_failures: number
+          created_at: string
+          created_by: string
+          id: string
+          last_error: string | null
+          last_scan_at: string | null
+          location_id: string
+          name: string
+          next_scan_at: string
+          slug: string | null
+          status: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          created_at?: string
+          created_by: string
+          id?: string
+          last_error?: string | null
+          last_scan_at?: string | null
+          location_id: string
+          name: string
+          next_scan_at?: string
+          slug?: string | null
+          status?: string
+          tier?: string
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_error?: string | null
+          last_scan_at?: string | null
+          location_id?: string
+          name?: string
+          next_scan_at?: string
+          slug?: string | null
+          status?: string
+          tier?: string
+          updated_at?: string
         }
         Relationships: []
       }

@@ -15,6 +15,7 @@ import type { Database } from "@/integrations/supabase/types";
 import {
   getInstagramProviderFromEnv,
   describeProviderRequest,
+  describeLocationProviderRequest,
   type ProviderPost,
 } from "./instagram-provider.server";
 
@@ -414,7 +415,7 @@ export async function executeScan(
  * prevention). Attempt count on the new run comes from
  * `consecutive_failures + 1` for the account so retries are visible.
  */
-export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> {
+export async function tickQueue(db: DB, maxPerTick = 3): Promise<Array<ScanOutcome | LocationScanOutcome>> {
   const now = new Date().toISOString();
 
   // ---- Provider budget guard ----
@@ -425,10 +426,12 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
     await logBudgetBlocked(db, budget, "autonomous tick skipped");
     return [];
   }
-  const budgetCap = Math.max(0, Math.min(maxPerTick, budget.remaining));
+  let budgetCap = Math.max(0, Math.min(maxPerTick, budget.remaining));
   if (budgetCap === 0) return [];
 
-  // Accounts whose next_scan_at has passed and status = active.
+  const outcomes: Array<ScanOutcome | LocationScanOutcome> = [];
+
+  // ---- Accounts pass ----
   const { data: due, error: dueErr } = await db
     .from("tracked_accounts")
     .select("id, username, consecutive_failures")
@@ -437,43 +440,88 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
     .order("next_scan_at", { ascending: true })
     .limit(budgetCap * 3);
   if (dueErr) throw dueErr;
-  if (!due?.length) return [];
 
-  // Randomise the selection order so scans distribute over time.
-  const shuffled = [...due].sort(() => Math.random() - 0.5);
+  if (due?.length) {
+    const shuffled = [...due].sort(() => Math.random() - 0.5);
+    const ids = shuffled.map((a) => a.id);
+    const { data: busy } = await db
+      .from("scanner_runs")
+      .select("account_id")
+      .in("account_id", ids)
+      .in("status", ["queued", "running"]);
+    const busyIds = new Set((busy ?? []).map((r) => r.account_id));
+    const picks = shuffled.filter((a) => !busyIds.has(a.id)).slice(0, budgetCap);
 
-  // Skip accounts with an in-flight run (queued or running).
-  const ids = shuffled.map((a) => a.id);
-  const { data: busy } = await db
-    .from("scanner_runs")
-    .select("account_id")
-    .in("account_id", ids)
-    .in("status", ["queued", "running"]);
-  const busyIds = new Set((busy ?? []).map((r) => r.account_id));
+    if (picks.length) {
+      const runsInsert = picks.map((a) => ({
+        status: "queued" as const,
+        account_id: a.id,
+        attempt: (a.consecutive_failures ?? 0) + 1,
+        scheduled_for: now,
+      }));
+      const { data: runs, error: runsErr } = await db
+        .from("scanner_runs")
+        .insert(runsInsert)
+        .select("id, account_id, attempt");
+      if (runsErr) throw runsErr;
 
-  const picks = shuffled.filter((a) => !busyIds.has(a.id)).slice(0, budgetCap);
-  if (!picks.length) return [];
-
-  // Create queued runs
-  const runsInsert = picks.map((a) => ({
-    status: "queued" as const,
-    account_id: a.id,
-    attempt: (a.consecutive_failures ?? 0) + 1,
-    scheduled_for: now,
-  }));
-  const { data: runs, error: runsErr } = await db
-    .from("scanner_runs")
-    .insert(runsInsert)
-    .select("id, account_id, attempt");
-  if (runsErr) throw runsErr;
-
-  const byAccount = new Map((runs ?? []).map((r) => [r.account_id, r]));
-  const outcomes: ScanOutcome[] = [];
-  for (const acc of picks) {
-    const run = byAccount.get(acc.id);
-    if (!run) continue;
-    outcomes.push(await executeScan(db, run.id, acc.id, acc.username, run.attempt ?? 1));
+      const byAccount = new Map((runs ?? []).map((r) => [r.account_id, r]));
+      for (const acc of picks) {
+        const run = byAccount.get(acc.id);
+        if (!run) continue;
+        outcomes.push(await executeScan(db, run.id, acc.id, acc.username, run.attempt ?? 1));
+        budgetCap--;
+      }
+    }
   }
+
+  if (budgetCap <= 0) return outcomes;
+
+  // ---- Locations pass ----
+  const { data: dueLoc, error: dueLocErr } = await db
+    .from("tracked_locations")
+    .select("id, location_id, name, consecutive_failures")
+    .eq("status", "active")
+    .lte("next_scan_at", now)
+    .order("next_scan_at", { ascending: true })
+    .limit(budgetCap * 3);
+  if (dueLocErr) throw dueLocErr;
+
+  if (dueLoc?.length) {
+    const shuffled = [...dueLoc].sort(() => Math.random() - 0.5);
+    const locIds = shuffled.map((l) => l.id);
+    const { data: busy } = await db
+      .from("scanner_runs")
+      .select("location_id")
+      .in("location_id", locIds)
+      .in("status", ["queued", "running"]);
+    const busyIds = new Set((busy ?? []).map((r) => r.location_id));
+    const picks = shuffled.filter((l) => !busyIds.has(l.id)).slice(0, budgetCap);
+
+    if (picks.length) {
+      const runsInsert = picks.map((l) => ({
+        status: "queued" as const,
+        location_id: l.id,
+        attempt: (l.consecutive_failures ?? 0) + 1,
+        scheduled_for: now,
+      }));
+      const { data: runs, error: runsErr } = await db
+        .from("scanner_runs")
+        .insert(runsInsert)
+        .select("id, location_id, attempt");
+      if (runsErr) throw runsErr;
+
+      const byLoc = new Map((runs ?? []).map((r) => [r.location_id, r]));
+      for (const loc of picks) {
+        const run = byLoc.get(loc.id);
+        if (!run) continue;
+        outcomes.push(
+          await executeLocationScan(db, run.id, loc.id, loc.location_id, loc.name, run.attempt ?? 1),
+        );
+      }
+    }
+  }
+
   return outcomes;
 }
 
@@ -521,4 +569,248 @@ export async function scanAccountNow(db: DB, accountId: string): Promise<ScanOut
   if (runErr || !run) throw runErr ?? new Error("Failed to enqueue run");
 
   return executeScan(db, run.id, account.id, account.username, 1);
+}
+
+// ============================================================================
+// Locations — parallel scan pipeline
+// ============================================================================
+
+export type LocationScanOutcome = {
+  runId: string;
+  locationId: string; // tracked_locations.id (uuid)
+  externalLocationId: string; // Instagram numeric location id
+  name: string;
+  status: "completed" | "failed";
+  detected: number;
+  inserted: number;
+  duplicates: number;
+  error?: string;
+};
+
+export async function executeLocationScan(
+  db: DB,
+  runId: string,
+  locationRowId: string,
+  externalLocationId: string,
+  locationName: string,
+  attempt: number,
+): Promise<LocationScanOutcome> {
+  await db
+    .from("scanner_runs")
+    .update({
+      status: "running",
+      started_at: new Date().toISOString(),
+      phase: "connecting",
+      phase_detail: `Establishing session with provider`,
+      assets_found: 0,
+    })
+    .eq("id", runId);
+
+  await db.from("activity_log").insert({
+    event_type: "location_scan_started",
+    description: `Scanning location "${locationName}"${attempt > 1 ? ` (attempt ${attempt})` : ""}`,
+    metadata: { location_id: locationRowId, run_id: runId, attempt },
+  });
+
+  try {
+    const provider = getInstagramProviderFromEnv();
+
+    await setPhase(db, runId, "fetching", describeLocationProviderRequest(externalLocationId));
+    const result = await provider.fetchLocation(externalLocationId);
+
+    await setPhase(
+      db,
+      runId,
+      "parsing",
+      `Normalising ${result.posts.length} item${result.posts.length === 1 ? "" : "s"}`,
+      { assets_found: result.posts.length },
+    );
+
+    // Sync display name if provider surfaced one and we still have the raw id.
+    if (result.name && result.name !== locationName) {
+      await db.from("tracked_locations").update({ name: result.name }).eq("id", locationRowId);
+    }
+
+    const rows = result.posts.map((p: ProviderPost) => ({
+      location_id: locationRowId,
+      account_id: null,
+      external_id: p.external_id,
+      media_type: p.media_type,
+      caption: p.caption,
+      thumbnail_url: p.thumbnail_url,
+      media_url: p.media_url,
+      source_url: p.source_url,
+      likes: p.likes,
+      comments: p.comments,
+      posted_at: p.posted_at,
+    }));
+
+    await setPhase(
+      db,
+      runId,
+      "storing",
+      `Reconciling ${rows.length} record${rows.length === 1 ? "" : "s"} against archive`,
+    );
+
+    let inserted = 0;
+    let duplicates = 0;
+    if (rows.length) {
+      const { data, error } = await db
+        .from("assets")
+        .upsert(rows, { onConflict: "location_id,external_id", ignoreDuplicates: true })
+        .select("id");
+      if (error) throw error;
+      inserted = data?.length ?? 0;
+      duplicates = rows.length - inserted;
+
+      if (duplicates > 0) {
+        const nowIso = new Date().toISOString();
+        await db
+          .from("assets")
+          .update({ last_seen_at: nowIso })
+          .eq("location_id", locationRowId)
+          .in(
+            "external_id",
+            rows.map((r) => r.external_id).filter((x): x is string => Boolean(x)),
+          );
+      }
+    }
+
+    if (inserted > 0) {
+      await db.from("activity_log").insert({
+        event_type: "asset_detected",
+        description: `Detected ${inserted} new asset${inserted === 1 ? "" : "s"} at "${locationName}"`,
+        metadata: { location_id: locationRowId, run_id: runId, inserted },
+      });
+    }
+
+    await db
+      .from("scanner_runs")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        accounts_scanned: 0,
+        assets_detected: inserted,
+        assets_duplicates: duplicates,
+        assets_found: rows.length,
+        phase: "completed",
+        phase_detail:
+          inserted > 0
+            ? `${inserted} new · ${duplicates} already archived`
+            : `No new assets · ${duplicates} already archived`,
+      })
+      .eq("id", runId);
+
+    await db
+      .from("tracked_locations")
+      .update({
+        last_scan_at: new Date().toISOString(),
+        next_scan_at: nextScanIso(),
+        consecutive_failures: 0,
+        last_error: null,
+      })
+      .eq("id", locationRowId);
+
+    await db.from("activity_log").insert({
+      event_type: "location_scan_completed",
+      description: `Checked "${locationName}" · ${inserted} new asset${inserted === 1 ? "" : "s"}`,
+      metadata: { location_id: locationRowId, run_id: runId, inserted, duplicates },
+    });
+
+    return {
+      runId,
+      locationId: locationRowId,
+      externalLocationId,
+      name: locationName,
+      status: "completed",
+      detected: rows.length,
+      inserted,
+      duplicates,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const nextAttempt = attempt + 1;
+    const willRetry = nextAttempt <= MAX_ATTEMPTS;
+
+    await db
+      .from("scanner_runs")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error: message.slice(0, 500),
+        phase: "failed",
+        phase_detail: message.slice(0, 200),
+      })
+      .eq("id", runId);
+
+    await db
+      .from("tracked_locations")
+      .update({
+        consecutive_failures: attempt,
+        last_error: message.slice(0, 500),
+        next_scan_at: willRetry ? backoffIso(attempt) : nextScanIso(),
+      })
+      .eq("id", locationRowId);
+
+    await db.from("activity_log").insert({
+      event_type: willRetry ? "location_scan_retry_scheduled" : "location_scan_failed",
+      description: willRetry
+        ? `Retry scheduled for "${locationName}" (attempt ${nextAttempt})`
+        : `Location scan failed for "${locationName}"`,
+      metadata: { location_id: locationRowId, run_id: runId, error: message, attempt },
+    });
+
+    return {
+      runId,
+      locationId: locationRowId,
+      externalLocationId,
+      name: locationName,
+      status: "failed",
+      detected: 0,
+      inserted: 0,
+      duplicates: 0,
+      error: message,
+    };
+  }
+}
+
+export async function scanLocationNow(db: DB, locationRowId: string): Promise<LocationScanOutcome> {
+  const budget = await getBudgetStatus(db);
+  if (budget.exhausted) {
+    await logBudgetBlocked(db, budget, "manual location scan refused");
+    throw new Error(
+      `Monthly API budget reached (${budget.used}/${budget.monthlyCap}). Scans resume ${new Date(budget.periodEnd).toUTCString().slice(0, 16)}.`,
+    );
+  }
+
+  const { data: loc, error } = await db
+    .from("tracked_locations")
+    .select("id, location_id, name, consecutive_failures")
+    .eq("id", locationRowId)
+    .maybeSingle();
+  if (error || !loc) throw new Error("Location not found");
+
+  const { data: existing } = await db
+    .from("scanner_runs")
+    .select("id")
+    .eq("location_id", locationRowId)
+    .in("status", ["queued", "running"])
+    .limit(1);
+  if (existing && existing.length) {
+    throw new Error("Scan already in progress for this location");
+  }
+
+  const { data: run, error: runErr } = await db
+    .from("scanner_runs")
+    .insert({
+      status: "queued",
+      location_id: locationRowId,
+      attempt: (loc.consecutive_failures ?? 0) + 1,
+      scheduled_for: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (runErr || !run) throw runErr ?? new Error("Failed to enqueue run");
+
+  return executeLocationScan(db, run.id, loc.id, loc.location_id, loc.name, 1);
 }
