@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Gauge,
   ChevronDown,
+  ChevronRight,
+  Anchor,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -26,8 +28,10 @@ import {
   decideDiscoveryCandidateFn,
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
+  type DiscoveredViaHop,
   type ScoreReasons,
 } from "@/lib/discovery.functions";
+
 
 export const Route = createFileRoute("/_authenticated/discovery")({
   head: () => ({
