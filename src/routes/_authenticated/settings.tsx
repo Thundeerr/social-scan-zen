@@ -1,9 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
+import {
+  Send,
+  Check,
+  X,
+  Loader2,
+  Radar,
+  MapPin,
+  RefreshCcw,
+  AlertTriangle,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,11 +24,16 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
+import { cn } from "@/lib/utils";
 import {
   SCAN_INTERVAL_OPTIONS,
   scanIntervalSchema,
   useScanInterval,
 } from "@/lib/scan-interval";
+import {
+  locationProviderStatusFn,
+  testLocationFetchFn,
+} from "@/lib/location-diagnostics.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — InstaScanner" }] }),
