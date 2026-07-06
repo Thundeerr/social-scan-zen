@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   Anchor,
+  Users,
+
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -29,8 +31,10 @@ import {
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
   type DiscoveredViaHop,
+  type ClusterPeer,
   type ScoreReasons,
 } from "@/lib/discovery.functions";
+
 
 
 export const Route = createFileRoute("/_authenticated/discovery")({
@@ -60,6 +64,8 @@ const candidatesKey = (state: StateKey) => ["discovery_candidates", state] as co
 
 function DiscoveryPage() {
   const [state, setState] = useState<StateKey>("new");
+  const [foldClusters, setFoldClusters] = useState(true);
+
   const listFn = useServerFn(listDiscoveryCandidatesFn);
   const statsFn = useServerFn(getDiscoveryStatsFn);
   const decideFn = useServerFn(decideDiscoveryCandidateFn);
@@ -145,44 +151,78 @@ function DiscoveryPage() {
         />
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
-        {STATES.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setState(s.key)}
-            className={cn(
-              "px-3 h-8 text-xs rounded-md capitalize transition-colors",
-              state === s.key
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Reading discovery graph…
-        </div>
-      ) : candidates.length === 0 ? (
-        <EmptyState state={state} />
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {candidates.map((c) => (
-            <CandidateCard
-              key={c.id}
-              candidate={c}
-              busy={decide.isPending && decide.variables?.id === c.id}
-              onDecide={(decision) => decide.mutate({ id: c.id, decision })}
-            />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
+          {STATES.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setState(s.key)}
+              className={cn(
+                "px-3 h-8 text-xs rounded-md capitalize transition-colors",
+                state === s.key
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s.label}
+            </button>
           ))}
         </div>
-      )}
+        {state === "new" && (
+          <button
+            onClick={() => setFoldClusters((v) => !v)}
+            className={cn(
+              "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs transition-colors",
+              foldClusters
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+            title="Fold friend groups behind their top-ranked representative"
+          >
+            <Users className="h-3.5 w-3.5" />
+            {foldClusters ? "Clusters folded" : "Show all"}
+          </button>
+        )}
+      </div>
+
+      {(() => {
+        const visible =
+          state === "new" && foldClusters
+            ? candidates.filter((c) => c.is_cluster_representative)
+            : candidates;
+        const hidden = candidates.length - visible.length;
+        return (
+          <>
+            {hidden > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                {hidden} similar account{hidden === 1 ? "" : "s"} folded behind representatives.
+              </div>
+            )}
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Reading discovery graph…
+              </div>
+            ) : visible.length === 0 ? (
+              <EmptyState state={state} />
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {visible.map((c) => (
+                  <CandidateCard
+                    key={c.id}
+                    candidate={c}
+                    busy={decide.isPending && decide.variables?.id === c.id}
+                    onDecide={(decision) => decide.mutate({ id: c.id, decision })}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
+
 
 function EmptyState({ state }: { state: StateKey }) {
   const copy: Record<StateKey, { title: string; body: string }> = {
@@ -259,6 +299,16 @@ function CandidateCard({
             {candidate.is_verified && (
               <span className="text-[10px] text-primary" title="Verified">●</span>
             )}
+            {candidate.cluster_size > 1 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary tabular-nums"
+                title={`Part of a friend group with ${candidate.cluster_size - 1} similar account${candidate.cluster_size - 1 === 1 ? "" : "s"}`}
+              >
+                <Users className="h-3 w-3" />
+                {candidate.cluster_size}
+              </span>
+            )}
+
             <a
               href={`https://instagram.com/${candidate.username}/`}
               target="_blank"
@@ -338,8 +388,12 @@ function CandidateCard({
             </p>
           )}
           <ScoreReasonsBlock reasons={reasons} candidate={candidate} />
+          {candidate.cluster_peers.length > 0 && (
+            <ClusterPeersBlock peers={candidate.cluster_peers} />
+          )}
         </div>
       )}
+
 
       {/* Actions */}
       {candidate.state === "new" && (
@@ -511,6 +565,39 @@ function DiscoveredViaChain({ hops, depth }: { hops: DiscoveredViaHop[]; depth: 
             <span className="text-foreground/80 shrink-0">hop {depth}</span>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ClusterPeersBlock({ peers }: { peers: ClusterPeer[] }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1.5">
+        <Users className="h-3 w-3 text-muted-foreground" />
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Friend group · {peers.length} similar
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {peers.map((p) => (
+          <a
+            key={p.id}
+            href={`https://instagram.com/${p.username}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-colors",
+              p.is_representative
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border bg-background/40 text-foreground/70 hover:text-foreground",
+            )}
+            title={`Co-appeared ${p.count} time${p.count === 1 ? "" : "s"}${p.is_representative ? " · cluster representative" : ""}`}
+          >
+            @{p.username}
+            <span className="text-muted-foreground tabular-nums">·{p.count}</span>
+          </a>
+        ))}
       </div>
     </div>
   );

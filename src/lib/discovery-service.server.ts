@@ -61,7 +61,7 @@ async function upsertCandidatesAndSignals(
   seed: { accountId?: string | null; locationId?: string | null },
   parent?: { candidateId: string | null; depth: number },
 ) {
-  if (!signals.length) return 0;
+  if (!signals.length) return { affected: 0, idByUsername: new Map() };
 
   // Filter blacklist
   const usernames = signals.map((s) => s.username);
@@ -73,7 +73,7 @@ async function upsertCandidatesAndSignals(
   const blacklisted = new Set((black ?? []).map((r) => r.username));
 
   const kept = signals.filter((s) => !blacklisted.has(s.username));
-  if (!kept.length) return 0;
+  if (!kept.length) return { affected: 0, idByUsername: new Map() };
 
   // Upsert candidates one shot
   const nowIso = new Date().toISOString();
@@ -155,8 +155,72 @@ async function upsertCandidatesAndSignals(
     if (error) throw error;
   }
 
-  return kept.length;
+  return { affected: kept.length, idByUsername: byName };
 }
+
+/**
+ * Record how often pairs of candidates appear together in the same asset.
+ * Only pairs where BOTH sides exist as candidates for this operator are stored.
+ */
+async function upsertCooccurrences(
+  db: DB,
+  userId: string,
+  idByUsername: Map<string, { id: string }>,
+  pairs: Array<[string, string]>,
+) {
+  if (!pairs.length) return;
+  const rows: Array<{ user_id: string; a_id: string; b_id: string }> = [];
+  for (const [x, y] of pairs) {
+    const a = idByUsername.get(x);
+    const b = idByUsername.get(y);
+    if (!a || !b || a.id === b.id) continue;
+    const [aid, bid] = a.id < b.id ? [a.id, b.id] : [b.id, a.id];
+    rows.push({ user_id: userId, a_id: aid, b_id: bid });
+  }
+  if (!rows.length) return;
+
+  // Group duplicates emitted by this call
+  const grouped = new Map<string, { user_id: string; a_id: string; b_id: string; add: number }>();
+  for (const r of rows) {
+    const k = `${r.a_id}|${r.b_id}`;
+    const cur = grouped.get(k) ?? { ...r, add: 0 };
+    cur.add += 1;
+    grouped.set(k, cur);
+  }
+
+  // Load existing counts and update / insert accordingly
+  const pairKeys = [...grouped.values()];
+  const aIds = [...new Set(pairKeys.map((p) => p.a_id))];
+  const { data: existing } = await db
+    .from("discovery_cooccurrences")
+    .select("a_id, b_id, count")
+    .eq("user_id", userId)
+    .in("a_id", aIds);
+  const existingByKey = new Map(
+    (existing ?? []).map((r) => [`${r.a_id}|${r.b_id}`, r.count ?? 0]),
+  );
+
+  const toInsert: Array<{ user_id: string; a_id: string; b_id: string; count: number }> = [];
+  const toUpdate: Array<{ a_id: string; b_id: string; count: number }> = [];
+  for (const [k, p] of grouped) {
+    if (existingByKey.has(k)) {
+      toUpdate.push({ a_id: p.a_id, b_id: p.b_id, count: (existingByKey.get(k) ?? 0) + p.add });
+    } else {
+      toInsert.push({ user_id: p.user_id, a_id: p.a_id, b_id: p.b_id, count: p.add });
+    }
+  }
+  if (toInsert.length) {
+    await db.from("discovery_cooccurrences").insert(toInsert);
+  }
+  for (const u of toUpdate) {
+    await db
+      .from("discovery_cooccurrences")
+      .update({ count: u.count, updated_at: new Date().toISOString() })
+      .eq("a_id", u.a_id)
+      .eq("b_id", u.b_id);
+  }
+}
+
 
 
 export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
@@ -182,14 +246,15 @@ export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
   }
 
   const assets = await fetchAssetsForAccount(db, accountId);
-  const signals = extractSignalsFromAssets(assets, acct.username);
-  const affected = await upsertCandidatesAndSignals(
+  const { signals, pairs } = extractSignalsFromAssets(assets, acct.username);
+  const { affected, idByUsername } = await upsertCandidatesAndSignals(
     db,
     acct.created_by,
     signals,
     { accountId },
     parent,
   );
+  await upsertCooccurrences(db, acct.created_by, idByUsername, pairs);
 
   await db
     .from("tracked_accounts")
@@ -197,6 +262,7 @@ export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
     .eq("id", accountId);
   return { candidates: affected };
 }
+
 
 
 export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string) {
@@ -209,10 +275,14 @@ export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string)
   if (!loc?.created_by) return { candidates: 0 };
 
   const assets = await fetchAssetsForLocation(db, locationRowId);
-  const signals = extractSignalsFromAssets(assets, null);
-  const affected = await upsertCandidatesAndSignals(db, loc.created_by, signals, {
-    locationId: locationRowId,
-  });
+  const { signals, pairs } = extractSignalsFromAssets(assets, null);
+  const { affected, idByUsername } = await upsertCandidatesAndSignals(
+    db,
+    loc.created_by,
+    signals,
+    { locationId: locationRowId },
+  );
+  await upsertCooccurrences(db, loc.created_by, idByUsername, pairs);
 
   await db
     .from("tracked_locations")
@@ -220,6 +290,7 @@ export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string)
     .eq("id", locationRowId);
   return { candidates: affected };
 }
+
 
 // ---------- Enrichment ----------------------------------------------------
 

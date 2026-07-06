@@ -52,24 +52,50 @@ export type AssetLike = {
  * Extract all discovery signals from a batch of assets belonging to a single
  * seed (account or location). Returns unique `{ username, weight }` pairs —
  * one row per candidate — with `weight` summing the per-asset contributions.
+ *
+ * Also returns per-asset co-occurrence pairs: two candidates that appear
+ * together inside the same caption count as one shared appearance, used to
+ * detect friend groups / clusters downstream.
  */
 export function extractSignalsFromAssets(
   assets: AssetLike[],
   seedUsername?: string | null,
-): { username: string; source: ExtractedSignal["source"]; weight: number }[] {
+): {
+  signals: { username: string; source: ExtractedSignal["source"]; weight: number }[];
+  pairs: Array<[string, string]>;
+} {
   const totals = new Map<string, number>();
+  const pairs = new Map<string, number>();
   const seedLower = seedUsername?.toLowerCase() ?? null;
 
   for (const a of assets) {
-    for (const mention of extractMentions(a.caption)) {
-      if (seedLower && mention === seedLower) continue;
+    const mentions = extractMentions(a.caption).filter(
+      (m) => !seedLower || m !== seedLower,
+    );
+    for (const mention of mentions) {
       totals.set(mention, (totals.get(mention) ?? 0) + 1);
+    }
+    // Emit pairs (unordered, canonical a<b) for co-occurrence within the same asset.
+    for (let i = 0; i < mentions.length; i++) {
+      for (let j = i + 1; j < mentions.length; j++) {
+        const [x, y] =
+          mentions[i] < mentions[j] ? [mentions[i], mentions[j]] : [mentions[j], mentions[i]];
+        const key = `${x}\u0000${y}`;
+        pairs.set(key, (pairs.get(key) ?? 0) + 1);
+      }
     }
   }
 
-  return [...totals.entries()].map(([username, weight]) => ({
-    username,
-    source: "account_mention" as const,
-    weight,
-  }));
+  return {
+    signals: [...totals.entries()].map(([username, weight]) => ({
+      username,
+      source: "account_mention" as const,
+      weight,
+    })),
+    pairs: [...pairs.keys()].map((k) => {
+      const [a, b] = k.split("\u0000");
+      return [a, b] as [string, string];
+    }),
+  };
 }
+

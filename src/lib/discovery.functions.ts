@@ -17,6 +17,15 @@ export type DiscoveredViaHop = {
   kind: "candidate" | "origin";
 };
 
+export type ClusterPeer = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  count: number;
+  is_representative: boolean;
+};
+
+
 export type DiscoveryCandidateRow = {
   id: string;
   username: string;
@@ -49,6 +58,10 @@ export type DiscoveryCandidateRow = {
   last_ai_at: string | null;
   headline_signals: string[];
   discovered_via: DiscoveredViaHop[];
+  cluster_peers: ClusterPeer[];
+  is_cluster_representative: boolean;
+  cluster_size: number;
+
   signals: Array<{
     source_type: string;
     seed_account_id: string | null;
@@ -211,17 +224,106 @@ export const listDiscoveryCandidatesFn = createServerFn({ method: "POST" })
       return chain.reverse();
     }
 
+    // Cluster detection — group candidates that repeatedly co-appear.
+    const CLUSTER_MIN = 2;
+    const rowIds = rowsSafe.map((r) => r.id);
+    const peersByCandidate = new Map<
+      string,
+      Array<{ id: string; count: number }>
+    >();
+    for (const id of rowIds) peersByCandidate.set(id, []);
+    if (rowIds.length) {
+      const { data: cooc } = await supabase
+        .from("discovery_cooccurrences")
+        .select("a_id, b_id, count")
+        .eq("user_id", userId)
+        .gte("count", CLUSTER_MIN)
+        .or(
+          `a_id.in.(${rowIds.join(",")}),b_id.in.(${rowIds.join(",")})`,
+        );
+      for (const e of cooc ?? []) {
+        const cnt = e.count ?? 0;
+        if (cnt < CLUSTER_MIN) continue;
+        if (peersByCandidate.has(e.a_id))
+          peersByCandidate.get(e.a_id)!.push({ id: e.b_id, count: cnt });
+        if (peersByCandidate.has(e.b_id))
+          peersByCandidate.get(e.b_id)!.push({ id: e.a_id, count: cnt });
+      }
+    }
+
+    // Union-find over candidates that appear in each other's peer list
+    const parent = new Map<string, string>();
+    const find = (x: string): string => {
+      const p = parent.get(x) ?? x;
+      if (p === x) return x;
+      const r = find(p);
+      parent.set(x, r);
+      return r;
+    };
+    const union = (x: string, y: string) => {
+      const rx = find(x);
+      const ry = find(y);
+      if (rx !== ry) parent.set(rx, ry);
+    };
+    for (const id of rowIds) parent.set(id, id);
+    for (const [id, peers] of peersByCandidate) {
+      for (const p of peers) if (peersByCandidate.has(p.id)) union(id, p.id);
+    }
+
+    // For each cluster, pick a representative = highest rank_score.
+    const rowById = new Map(rowsSafe.map((r) => [r.id, r]));
+    const clusters = new Map<string, string[]>();
+    for (const id of rowIds) {
+      const root = find(id);
+      const arr = clusters.get(root) ?? [];
+      arr.push(id);
+      clusters.set(root, arr);
+    }
+    const representativeIds = new Set<string>();
+    const clusterSizeById = new Map<string, number>();
+    for (const [, members] of clusters) {
+      if (members.length <= 1) {
+        clusterSizeById.set(members[0], 1);
+        continue;
+      }
+      const rep = members
+        .map((id) => rowById.get(id))
+        .filter((r): r is NonNullable<typeof r> => Boolean(r))
+        .sort((a, b) => Number(b.rank_score ?? 0) - Number(a.rank_score ?? 0))[0];
+      if (rep) representativeIds.add(rep.id);
+      for (const m of members) clusterSizeById.set(m, members.length);
+    }
+
     return rowsSafe.map((r) => {
       const sigs = signalsByCandidate.get(r.id) ?? [];
+      const peers = (peersByCandidate.get(r.id) ?? [])
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8)
+        .map<ClusterPeer>((p) => {
+          const peer = rowById.get(p.id);
+          return {
+            id: p.id,
+            username: peer?.username ?? "",
+            avatar_url: peer?.avatar_url ?? null,
+            count: p.count,
+            is_representative: representativeIds.has(p.id),
+          };
+        })
+        .filter((p) => p.username.length > 0);
       return {
         ...r,
         score_reasons: (r.score_reasons ?? {}) as ScoreReasons,
         headline_signals: buildHeadlineSignals(r, sigs),
         discovered_via: chainFor(r.id),
+        cluster_peers: peers,
+        is_cluster_representative:
+          representativeIds.has(r.id) || (clusterSizeById.get(r.id) ?? 1) <= 1,
+        cluster_size: clusterSizeById.get(r.id) ?? 1,
         signals: sigs.slice(0, 6),
       };
     }) as DiscoveryCandidateRow[];
   });
+
 
 
 function buildHeadlineSignals(
