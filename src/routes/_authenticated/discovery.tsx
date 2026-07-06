@@ -64,6 +64,8 @@ const candidatesKey = (state: StateKey) => ["discovery_candidates", state] as co
 
 function DiscoveryPage() {
   const [state, setState] = useState<StateKey>("new");
+  const [foldClusters, setFoldClusters] = useState(true);
+
   const listFn = useServerFn(listDiscoveryCandidatesFn);
   const statsFn = useServerFn(getDiscoveryStatsFn);
   const decideFn = useServerFn(decideDiscoveryCandidateFn);
