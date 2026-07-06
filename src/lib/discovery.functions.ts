@@ -6,7 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { DISCOVERY_WEIGHTS } from "@/lib/discovery-service.server";
+import { DISCOVERY_WEIGHTS } from "@/lib/discovery-weights";
 
 export type ScoreReasons = Partial<
   Record<"luxury" | "quality" | "aesthetic" | "travel" | "authenticity", string[]>
