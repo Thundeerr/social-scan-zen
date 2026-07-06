@@ -26,6 +26,12 @@ export type ProviderResponse = {
   posts: ProviderPost[];
 };
 
+export type LocationProviderResponse = {
+  location_id: string;
+  name: string | null;
+  posts: ProviderPost[];
+};
+
 const DEFAULT_PATH = "/user-medias";
 
 function pick<T = unknown>(obj: Record<string, unknown> | null | undefined, keys: string[]): T | null {
