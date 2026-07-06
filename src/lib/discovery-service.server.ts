@@ -275,10 +275,14 @@ export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string)
   if (!loc?.created_by) return { candidates: 0 };
 
   const assets = await fetchAssetsForLocation(db, locationRowId);
-  const signals = extractSignalsFromAssets(assets, null);
-  const affected = await upsertCandidatesAndSignals(db, loc.created_by, signals, {
-    locationId: locationRowId,
-  });
+  const { signals, pairs } = extractSignalsFromAssets(assets, null);
+  const { affected, idByUsername } = await upsertCandidatesAndSignals(
+    db,
+    loc.created_by,
+    signals,
+    { locationId: locationRowId },
+  );
+  await upsertCooccurrences(db, loc.created_by, idByUsername, pairs);
 
   await db
     .from("tracked_locations")
@@ -286,6 +290,7 @@ export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string)
     .eq("id", locationRowId);
   return { candidates: affected };
 }
+
 
 // ---------- Enrichment ----------------------------------------------------
 
