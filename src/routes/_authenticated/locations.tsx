@@ -81,6 +81,72 @@ function LocationsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [scanning, setScanning] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [bulkPending, setBulkPending] = useState(false);
+
+  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  const selectedCount = selectedIds.length;
+  const allSelected = rows.length > 0 && selectedCount === rows.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  function toggleAll(v: boolean) {
+    if (!v) {
+      setSelected({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const r of rows) next[r.id] = true;
+    setSelected(next);
+  }
+
+  function toggleOne(id: string, v: boolean) {
+    setSelected((s) => {
+      const next = { ...s };
+      if (v) next[id] = true;
+      else delete next[id];
+      return next;
+    });
+  }
+
+  async function bulkSetStatus(status: "active" | "paused") {
+    if (selectedCount === 0 || bulkPending) return;
+    const ids = [...selectedIds];
+    const label = status === "paused" ? "Pausing" : "Activating";
+    const t = toast.loading(`${label} ${ids.length} location${ids.length === 1 ? "" : "s"}…`);
+    setBulkPending(true);
+    let ok = 0;
+    let failed = 0;
+    await Promise.all(
+      ids.map(
+        (id) =>
+          new Promise<void>((resolve) => {
+            updateLocation.mutate(
+              { id, patch: { status } },
+              {
+                onSuccess: () => {
+                  ok++;
+                  resolve();
+                },
+                onError: () => {
+                  failed++;
+                  resolve();
+                },
+              },
+            );
+          }),
+      ),
+    );
+    setBulkPending(false);
+    setSelected({});
+    if (failed === 0) {
+      toast.success(
+        `${status === "paused" ? "Paused" : "Activated"} ${ok} location${ok === 1 ? "" : "s"}`,
+        { id: t },
+      );
+    } else {
+      toast.error(`Updated ${ok}, failed ${failed}`, { id: t });
+    }
+  }
 
   const [locationId, setLocationId] = useState("");
   const [name, setName] = useState("");
