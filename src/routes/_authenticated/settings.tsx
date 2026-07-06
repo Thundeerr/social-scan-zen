@@ -215,6 +215,7 @@ function LocationProviderSection() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [locationId, setLocationId] = useState("213385402"); // Berghain — public reference
   const [testing, setTesting] = useState(false);
+  const testingRef = useRef(false);
   const [testResult, setTestResult] = useState<TestPayload | null>(null);
 
   async function refreshStatus() {
