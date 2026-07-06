@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { MapPin, Plus, Radar, Loader2, Trash2 } from "lucide-react";
+import { MapPin, Plus, Radar, Loader2, Trash2, Pause, Play, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +81,72 @@ function LocationsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [scanning, setScanning] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [bulkPending, setBulkPending] = useState(false);
+
+  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  const selectedCount = selectedIds.length;
+  const allSelected = rows.length > 0 && selectedCount === rows.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  function toggleAll(v: boolean) {
+    if (!v) {
+      setSelected({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const r of rows) next[r.id] = true;
+    setSelected(next);
+  }
+
+  function toggleOne(id: string, v: boolean) {
+    setSelected((s) => {
+      const next = { ...s };
+      if (v) next[id] = true;
+      else delete next[id];
+      return next;
+    });
+  }
+
+  async function bulkSetStatus(status: "active" | "paused") {
+    if (selectedCount === 0 || bulkPending) return;
+    const ids = [...selectedIds];
+    const label = status === "paused" ? "Pausing" : "Activating";
+    const t = toast.loading(`${label} ${ids.length} location${ids.length === 1 ? "" : "s"}…`);
+    setBulkPending(true);
+    let ok = 0;
+    let failed = 0;
+    await Promise.all(
+      ids.map(
+        (id) =>
+          new Promise<void>((resolve) => {
+            updateLocation.mutate(
+              { id, patch: { status } },
+              {
+                onSuccess: () => {
+                  ok++;
+                  resolve();
+                },
+                onError: () => {
+                  failed++;
+                  resolve();
+                },
+              },
+            );
+          }),
+      ),
+    );
+    setBulkPending(false);
+    setSelected({});
+    if (failed === 0) {
+      toast.success(
+        `${status === "paused" ? "Paused" : "Activated"} ${ok} location${ok === 1 ? "" : "s"}`,
+        { id: t },
+      );
+    } else {
+      toast.error(`Updated ${ok}, failed ${failed}`, { id: t });
+    }
+  }
 
   const [locationId, setLocationId] = useState("");
   const [name, setName] = useState("");
@@ -244,6 +311,46 @@ function LocationsPage() {
         }
       />
 
+      {selectedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 soft-shadow">
+          <div className="text-sm">
+            <span className="font-medium">{selectedCount}</span>{" "}
+            <span className="text-muted-foreground">
+              selected of {rows.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => bulkSetStatus("active")}
+              disabled={bulkPending}
+            >
+              <Play className="h-3.5 w-3.5" /> Activate
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => bulkSetStatus("paused")}
+              disabled={bulkPending}
+            >
+              <Pause className="h-3.5 w-3.5" /> Pause
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1.5"
+              onClick={() => setSelected({})}
+              disabled={bulkPending}
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border bg-card soft-shadow overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
@@ -261,6 +368,13 @@ function LocationsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => toggleAll(v === true)}
+                    aria-label="Select all locations"
+                  />
+                </TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Tier</TableHead>
                 <TableHead>Status</TableHead>
@@ -271,7 +385,14 @@ function LocationsPage() {
             </TableHeader>
             <TableBody>
               {rows.map((loc) => (
-                <TableRow key={loc.id}>
+                <TableRow key={loc.id} data-state={selected[loc.id] ? "selected" : undefined}>
+                  <TableCell className="w-10">
+                    <Checkbox
+                      checked={!!selected[loc.id]}
+                      onCheckedChange={(v) => toggleOne(loc.id, v === true)}
+                      aria-label={`Select ${loc.name}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
