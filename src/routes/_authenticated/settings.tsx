@@ -417,15 +417,21 @@ function LocationProviderSection() {
 
 
         {testResult && testResult.ok && (
-          <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 font-medium text-emerald-300">
-                <Check className="h-3.5 w-3.5" />
-                Provider responded in {testResult.elapsedMs} ms
+          <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-semibold tabular-nums text-emerald-300 leading-none">
+                    {testResult.postCount}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    asset{testResult.postCount === 1 ? "" : "s"} found
+                  </span>
+                </div>
               </div>
-              <div className="text-muted-foreground">
-                {testResult.postCount} post
-                {testResult.postCount === 1 ? "" : "s"}
+              <div className="flex items-center gap-1.5 text-emerald-300">
+                <Check className="h-3.5 w-3.5" />
+                <span className="font-medium">{testResult.elapsedMs} ms</span>
               </div>
             </div>
             <div className="text-muted-foreground">
@@ -433,34 +439,51 @@ function LocationProviderSection() {
               {testResult.name ?? <span className="italic">unnamed</span>}{" "}
               <span className="font-mono">({testResult.locationId})</span>
             </div>
-            {testResult.firstPost && (
-              <div className="flex gap-3 pt-1">
-                {testResult.firstPost.thumbnail_url && (
-                  <img
-                    src={testResult.firstPost.thumbnail_url}
-                    alt=""
-                    className="h-16 w-16 rounded-md border border-border object-cover shrink-0"
-                    loading="lazy"
-                  />
-                )}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    First post
-                  </div>
-                  {testResult.firstPost.caption && (
-                    <div className="text-foreground line-clamp-2">
-                      {testResult.firstPost.caption}
-                    </div>
-                  )}
-                  <div className="text-muted-foreground text-[11px]">
-                    {testResult.firstPost.media_type} ·{" "}
-                    {testResult.firstPost.likes} likes ·{" "}
-                    {testResult.firstPost.comments} comments
-                  </div>
+
+            {testResult.previewPosts && testResult.previewPosts.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Preview · first {testResult.previewPosts.length} of {testResult.postCount}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {testResult.previewPosts.map((p) => (
+                    <a
+                      key={p.external_id}
+                      href={p.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="group flex gap-2 rounded-md border border-border bg-background/40 p-2 hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                    >
+                      {p.thumbnail_url ? (
+                        <img
+                          src={p.thumbnail_url}
+                          alt=""
+                          className="h-14 w-14 rounded border border-border object-cover shrink-0"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded border border-border bg-muted/30 shrink-0" />
+                      )}
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {p.media_type}
+                        </div>
+                        {p.caption && (
+                          <div className="text-[11px] text-foreground line-clamp-2 leading-tight">
+                            {p.caption}
+                          </div>
+                        )}
+                        <div className="text-[10px] text-muted-foreground tabular-nums">
+                          {p.likes.toLocaleString()} ♥ · {p.comments.toLocaleString()} 💬
+                        </div>
+                      </div>
+                    </a>
+                  ))}
                 </div>
               </div>
             )}
-            {!testResult.firstPost && (
+
+            {(!testResult.previewPosts || testResult.previewPosts.length === 0) && (
               <div className="text-muted-foreground italic">
                 Provider returned no posts for this location.
               </div>
