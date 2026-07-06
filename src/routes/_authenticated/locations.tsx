@@ -404,7 +404,7 @@ function LocationsPage() {
                   <TableCell className="w-10">
                     <Checkbox
                       checked={!!selected[loc.id]}
-                      onCheckedChange={(v) => toggleOne(loc.id, v === true)}
+                      onCheckedChange={(v) => toggleOne(loc.id, v)}
                       aria-label={`Select ${loc.name}`}
                     />
                   </TableCell>
