@@ -69,3 +69,29 @@ Before shipping any Discovery change, ask:
 4. Does it raise quality, or just volume?
 
 If not — cut it.
+
+## 7. Operator decision speed > visual richness
+
+Every card must answer 4 questions in <3 seconds without reading a paragraph:
+1. Why was this account discovered?
+2. Why is it valuable?
+3. Why is it different from accounts I already track?
+4. Track / Ignore / Blacklist?
+
+First screen = strong visual signals, near-zero prose. Checkmark list style:
+- ✓ Appeared with @aman 8×
+- ✓ Seen at Soneva Jani 5×
+- ✓ Tagged by 3 tracked accounts
+- ✓ Luxury Score 94
+- ✓ Private Individual 96%
+- ✓ Confidence 91%
+
+AI summary + per-axis reasons live BEHIND a "Show reasoning" expand. Never on the first screen.
+
+## 8. Operator trust: every score is traceable
+
+An AI score without reasons attached is a bug, not a feature. When the operator expands reasons, they must feel they could audit the number back to real evidence in the underlying captions/tags/locations. If reasons are missing, hide the score rather than show it bare.
+
+## 9. Maximize excellent discoveries, not candidate volume
+
+One incredible hidden account beats fifty average ones. Ranking, thresholds, and enrichment budgets must all optimize for the top of the distribution — never for "more cards visible". Better to show 3 exceptional candidates today than flood the inbox with mediocre ones.
