@@ -273,13 +273,13 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
   }
 
   async function fetchLocation(locationId: string): Promise<LocationProviderResponse> {
-    if (!cfg.locationPath) {
-      throw new Error(
-        "Instagram location provider not configured (missing RAPIDAPI_LOCATION_PATH)",
-      );
-    }
+    // Default to the instagram-looter2 convention (same host as accounts):
+    //   GET https://<host>/location-feeds?id=<location_id>
+    // Override via RAPIDAPI_LOCATION_PATH / RAPIDAPI_LOCATION_ID_PARAM if
+    // the connected RapidAPI host uses a different path (e.g. `/v1/location_media`).
+    const locationPath = cfg.locationPath ?? "/location-feeds";
     const paramName = cfg.locationIdParam ?? "id";
-    const url = new URL(`https://${cfg.host}${cfg.locationPath}`);
+    const url = new URL(`https://${cfg.host}${locationPath}`);
     url.searchParams.set(paramName, locationId);
     for (const [k, v] of Object.entries(cfg.locationExtraParams ?? {})) {
       url.searchParams.set(k, v);
