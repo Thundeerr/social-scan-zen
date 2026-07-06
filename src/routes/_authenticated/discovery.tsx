@@ -631,3 +631,101 @@ function ClusterPeersBlock({ peers }: { peers: ClusterPeer[] }) {
   );
 }
 
+function RankingPanel({ breakdown }: { breakdown: RankBreakdown }) {
+  const [open, setOpen] = useState(false);
+  const fmt = (n: number, signed = false) => {
+    const v = n.toFixed(2);
+    if (!signed) return v;
+    return n > 0 ? `+${v}` : v;
+  };
+  const learningTone =
+    breakdown.learning > 0.01
+      ? "text-emerald-300"
+      : breakdown.learning < -0.01
+        ? "text-destructive/80"
+        : "text-muted-foreground";
+  const diversityTone =
+    breakdown.diversity < 0 ? "text-amber-300/90" : "text-muted-foreground";
+  const noveltyTone =
+    breakdown.novelty > 0.08 ? "text-emerald-300" : "text-foreground/70";
+
+  return (
+    <div className="mx-4 mt-3 rounded-md border border-border/60 bg-background/40">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+      >
+        <span className="flex items-center gap-1.5">
+          <Gauge className="h-3 w-3" /> Ranking
+          <span className="tabular-nums text-foreground/80 normal-case tracking-normal">
+            {fmt(breakdown.final)}
+          </span>
+          {!breakdown.passes_entropy && (
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[9px] font-medium tracking-normal normal-case text-amber-300">
+              below floor
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="px-2.5 pb-2 pt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono tabular-nums">
+          <RankRow label="Base" value={fmt(breakdown.base)} />
+          <RankRow
+            label="Learning"
+            value={fmt(breakdown.learning, true)}
+            tone={learningTone}
+          />
+          <RankRow
+            label="Novelty"
+            value={fmt(breakdown.novelty, true)}
+            tone={noveltyTone}
+            hint={`${breakdown.novelty_detail.tracked_peers}/${breakdown.novelty_detail.total_peers} peers already tracked`}
+          />
+          <RankRow
+            label="Diversity"
+            value={fmt(breakdown.diversity, true)}
+            tone={diversityTone}
+            hint={`${breakdown.diversity_detail.niche_repeats} same niche · ${breakdown.diversity_detail.cluster_repeats} same cluster above`}
+          />
+          <RankRow
+            label="Final"
+            value={fmt(breakdown.final)}
+            tone="text-foreground"
+          />
+          <RankRow
+            label="Floor"
+            value={fmt(breakdown.entropy_floor)}
+            tone={breakdown.passes_entropy ? "text-emerald-300" : "text-amber-300"}
+            hint={breakdown.passes_entropy ? "PASS" : "BELOW"}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RankRow({
+  label,
+  value,
+  tone = "text-foreground/80",
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2" title={hint}>
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
+        {label}
+      </span>
+      <span className={cn("text-[11px]", tone)}>{value}</span>
+    </div>
+  );
+}
+
+
