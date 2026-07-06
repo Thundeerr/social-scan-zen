@@ -84,25 +84,34 @@ function LocationsPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkPending, setBulkPending] = useState(false);
 
-  const selectedIds = Object.keys(selected).filter((k) => selected[k]);
+  // Derive selection strictly from current rows so stale IDs (from deleted
+  // rows) never leave the header checkbox in a wedged state.
+  const rowIds = rows.map((r) => r.id);
+  const selectedIds = rowIds.filter((id) => selected[id]);
   const selectedCount = selectedIds.length;
   const allSelected = rows.length > 0 && selectedCount === rows.length;
   const someSelected = selectedCount > 0 && !allSelected;
+  const headerState: boolean | "indeterminate" = allSelected
+    ? true
+    : someSelected
+      ? "indeterminate"
+      : false;
 
-  function toggleAll(v: boolean) {
-    if (!v) {
+  function toggleAll(next: boolean | "indeterminate") {
+    // Any click while some or all are selected clears; otherwise select all.
+    if (next === false || selectedCount > 0) {
       setSelected({});
       return;
     }
-    const next: Record<string, boolean> = {};
-    for (const r of rows) next[r.id] = true;
-    setSelected(next);
+    const map: Record<string, boolean> = {};
+    for (const id of rowIds) map[id] = true;
+    setSelected(map);
   }
 
-  function toggleOne(id: string, v: boolean) {
+  function toggleOne(id: string, v: boolean | "indeterminate") {
     setSelected((s) => {
       const next = { ...s };
-      if (v) next[id] = true;
+      if (v === true) next[id] = true;
       else delete next[id];
       return next;
     });
