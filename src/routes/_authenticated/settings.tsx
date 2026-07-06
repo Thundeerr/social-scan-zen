@@ -198,6 +198,15 @@ function StatusChip({ set, label }: { set: boolean; label: string }) {
   );
 }
 
+const SAMPLE_LOCATIONS: { id: string; name: string }[] = [
+  { id: "213385402", name: "Berghain, Berlin" },
+  { id: "110536485641386", name: "Sisyphos, Berlin" },
+  { id: "212988663", name: "Watergate, Berlin" },
+  { id: "6889842", name: "Times Square, NYC" },
+  { id: "6002986", name: "Eiffel Tower, Paris" },
+  { id: "212790535", name: "Shibuya Crossing, Tokyo" },
+];
+
 function LocationProviderSection() {
   const loadStatus = useServerFn(locationProviderStatusFn);
   const runTest = useServerFn(testLocationFetchFn);
