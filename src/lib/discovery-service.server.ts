@@ -162,17 +162,34 @@ async function upsertCandidatesAndSignals(
 export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
   const { data: acct, error } = await db
     .from("tracked_accounts")
-    .select("id, username, created_by")
+    .select("id, username, created_by, origin_candidate_id")
     .eq("id", accountId)
     .maybeSingle();
   if (error) throw error;
   if (!acct?.created_by) return { candidates: 0 };
 
+  // If this seed was promoted from a discovery candidate, use it as chain parent.
+  let parent: { candidateId: string | null; depth: number } | undefined;
+  if (acct.origin_candidate_id) {
+    const { data: parentRow } = await db
+      .from("discovery_candidates")
+      .select("id, depth")
+      .eq("id", acct.origin_candidate_id)
+      .maybeSingle();
+    if (parentRow) {
+      parent = { candidateId: parentRow.id, depth: parentRow.depth ?? 0 };
+    }
+  }
+
   const assets = await fetchAssetsForAccount(db, accountId);
   const signals = extractSignalsFromAssets(assets, acct.username);
-  const affected = await upsertCandidatesAndSignals(db, acct.created_by, signals, {
-    accountId,
-  });
+  const affected = await upsertCandidatesAndSignals(
+    db,
+    acct.created_by,
+    signals,
+    { accountId },
+    parent,
+  );
 
   await db
     .from("tracked_accounts")
@@ -180,6 +197,7 @@ export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
     .eq("id", accountId);
   return { candidates: affected };
 }
+
 
 export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string) {
   const { data: loc, error } = await db
