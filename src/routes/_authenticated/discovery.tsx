@@ -213,13 +213,16 @@ function DiscoveryPage() {
                     busy={decide.isPending && decide.variables?.id === c.id}
                     onDecide={(decision) => decide.mutate({ id: c.id, decision })}
                   />
-
-          ))}
-        </div>
-      )}
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
+
 
 function EmptyState({ state }: { state: StateKey }) {
   const copy: Record<StateKey, { title: string; body: string }> = {
