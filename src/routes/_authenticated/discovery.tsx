@@ -31,8 +31,10 @@ import {
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
   type DiscoveredViaHop,
+  type ClusterPeer,
   type ScoreReasons,
 } from "@/lib/discovery.functions";
+
 
 
 export const Route = createFileRoute("/_authenticated/discovery")({
