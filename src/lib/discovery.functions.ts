@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { DISCOVERY_WEIGHTS } from "@/lib/discovery-service.server";
 
 export type ScoreReasons = Partial<
   Record<"luxury" | "quality" | "aesthetic" | "travel" | "authenticity", string[]>
@@ -24,6 +25,20 @@ export type ClusterPeer = {
   count: number;
   is_representative: boolean;
 };
+
+export type RankBreakdown = {
+  base: number;
+  learning: number;
+  diversity: number;
+  novelty: number;
+  final: number;
+  entropy_floor: number;
+  passes_entropy: boolean;
+  novelty_detail: { tracked_peers: number; total_peers: number };
+  diversity_detail: { niche_repeats: number; cluster_repeats: number };
+};
+
+
 
 
 export type DiscoveryCandidateRow = {
