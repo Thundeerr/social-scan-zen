@@ -426,10 +426,12 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
     await logBudgetBlocked(db, budget, "autonomous tick skipped");
     return [];
   }
-  const budgetCap = Math.max(0, Math.min(maxPerTick, budget.remaining));
+  let budgetCap = Math.max(0, Math.min(maxPerTick, budget.remaining));
   if (budgetCap === 0) return [];
 
-  // Accounts whose next_scan_at has passed and status = active.
+  const outcomes: ScanOutcome[] = [];
+
+  // ---- Accounts pass ----
   const { data: due, error: dueErr } = await db
     .from("tracked_accounts")
     .select("id, username, consecutive_failures")
@@ -438,43 +440,88 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
     .order("next_scan_at", { ascending: true })
     .limit(budgetCap * 3);
   if (dueErr) throw dueErr;
-  if (!due?.length) return [];
 
-  // Randomise the selection order so scans distribute over time.
-  const shuffled = [...due].sort(() => Math.random() - 0.5);
+  if (due?.length) {
+    const shuffled = [...due].sort(() => Math.random() - 0.5);
+    const ids = shuffled.map((a) => a.id);
+    const { data: busy } = await db
+      .from("scanner_runs")
+      .select("account_id")
+      .in("account_id", ids)
+      .in("status", ["queued", "running"]);
+    const busyIds = new Set((busy ?? []).map((r) => r.account_id));
+    const picks = shuffled.filter((a) => !busyIds.has(a.id)).slice(0, budgetCap);
 
-  // Skip accounts with an in-flight run (queued or running).
-  const ids = shuffled.map((a) => a.id);
-  const { data: busy } = await db
-    .from("scanner_runs")
-    .select("account_id")
-    .in("account_id", ids)
-    .in("status", ["queued", "running"]);
-  const busyIds = new Set((busy ?? []).map((r) => r.account_id));
+    if (picks.length) {
+      const runsInsert = picks.map((a) => ({
+        status: "queued" as const,
+        account_id: a.id,
+        attempt: (a.consecutive_failures ?? 0) + 1,
+        scheduled_for: now,
+      }));
+      const { data: runs, error: runsErr } = await db
+        .from("scanner_runs")
+        .insert(runsInsert)
+        .select("id, account_id, attempt");
+      if (runsErr) throw runsErr;
 
-  const picks = shuffled.filter((a) => !busyIds.has(a.id)).slice(0, budgetCap);
-  if (!picks.length) return [];
-
-  // Create queued runs
-  const runsInsert = picks.map((a) => ({
-    status: "queued" as const,
-    account_id: a.id,
-    attempt: (a.consecutive_failures ?? 0) + 1,
-    scheduled_for: now,
-  }));
-  const { data: runs, error: runsErr } = await db
-    .from("scanner_runs")
-    .insert(runsInsert)
-    .select("id, account_id, attempt");
-  if (runsErr) throw runsErr;
-
-  const byAccount = new Map((runs ?? []).map((r) => [r.account_id, r]));
-  const outcomes: ScanOutcome[] = [];
-  for (const acc of picks) {
-    const run = byAccount.get(acc.id);
-    if (!run) continue;
-    outcomes.push(await executeScan(db, run.id, acc.id, acc.username, run.attempt ?? 1));
+      const byAccount = new Map((runs ?? []).map((r) => [r.account_id, r]));
+      for (const acc of picks) {
+        const run = byAccount.get(acc.id);
+        if (!run) continue;
+        outcomes.push(await executeScan(db, run.id, acc.id, acc.username, run.attempt ?? 1));
+        budgetCap--;
+      }
+    }
   }
+
+  if (budgetCap <= 0) return outcomes;
+
+  // ---- Locations pass ----
+  const { data: dueLoc, error: dueLocErr } = await db
+    .from("tracked_locations")
+    .select("id, location_id, name, consecutive_failures")
+    .eq("status", "active")
+    .lte("next_scan_at", now)
+    .order("next_scan_at", { ascending: true })
+    .limit(budgetCap * 3);
+  if (dueLocErr) throw dueLocErr;
+
+  if (dueLoc?.length) {
+    const shuffled = [...dueLoc].sort(() => Math.random() - 0.5);
+    const locIds = shuffled.map((l) => l.id);
+    const { data: busy } = await db
+      .from("scanner_runs")
+      .select("location_id")
+      .in("location_id", locIds)
+      .in("status", ["queued", "running"]);
+    const busyIds = new Set((busy ?? []).map((r) => r.location_id));
+    const picks = shuffled.filter((l) => !busyIds.has(l.id)).slice(0, budgetCap);
+
+    if (picks.length) {
+      const runsInsert = picks.map((l) => ({
+        status: "queued" as const,
+        location_id: l.id,
+        attempt: (l.consecutive_failures ?? 0) + 1,
+        scheduled_for: now,
+      }));
+      const { data: runs, error: runsErr } = await db
+        .from("scanner_runs")
+        .insert(runsInsert)
+        .select("id, location_id, attempt");
+      if (runsErr) throw runsErr;
+
+      const byLoc = new Map((runs ?? []).map((r) => [r.location_id, r]));
+      for (const loc of picks) {
+        const run = byLoc.get(loc.id);
+        if (!run) continue;
+        outcomes.push(
+          await executeLocationScan(db, run.id, loc.id, loc.location_id, loc.name, run.attempt ?? 1),
+        );
+      }
+    }
+  }
+
   return outcomes;
 }
 
