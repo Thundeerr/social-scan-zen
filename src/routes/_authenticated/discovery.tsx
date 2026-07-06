@@ -70,10 +70,12 @@ function DiscoveryPage() {
   const [state, setState] = useState<StateKey>("new");
   const [foldClusters, setFoldClusters] = useState(true);
   const [hideBelowFloor, setHideBelowFloor] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
 
   const listFn = useServerFn(listDiscoveryCandidatesFn);
   const statsFn = useServerFn(getDiscoveryStatsFn);
+  const debugFn = useServerFn(getDiscoveryDebugFn);
   const decideFn = useServerFn(decideDiscoveryCandidateFn);
   const runNowFn = useServerFn(runDiscoveryNowFn);
   const qc = useQueryClient();
