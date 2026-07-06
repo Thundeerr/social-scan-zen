@@ -429,7 +429,19 @@ export async function enrichCandidate(db: DB, candidateId: string) {
   return { ok: true as const };
 }
 
-async function computeRankScore(db: DB, userId: string, v: AiVerdict) {
+async function computeRankScore(
+  db: DB,
+  userId: string,
+  v: {
+    luxury: number;
+    quality: number;
+    aesthetic: number;
+    travel: number;
+    authenticity: number;
+    niche: string;
+    confidence: number;
+  },
+) {
   const { data: prefs } = await db
     .from("discovery_preferences")
     .select("*")
@@ -445,8 +457,8 @@ async function computeRankScore(db: DB, userId: string, v: AiVerdict) {
   };
   const nicheWeights = (p.niche_weights ?? {}) as Record<string, number>;
   const nicheMatch =
-    v.estimated_niche && nicheWeights[v.estimated_niche.toLowerCase()]
-      ? Math.min(1, (nicheWeights[v.estimated_niche.toLowerCase()] as number) / 3)
+    v.niche && nicheWeights[v.niche.toLowerCase()]
+      ? Math.min(1, (nicheWeights[v.niche.toLowerCase()] as number) / 3)
       : 0.3;
 
   const normalised = (score: number, pref: number) => {
@@ -455,11 +467,11 @@ async function computeRankScore(db: DB, userId: string, v: AiVerdict) {
   };
   return (
     0.35 * nicheMatch +
-    0.15 * normalised(v.luxury_score, p.avg_luxury as number) +
-    0.15 * normalised(v.quality_score, p.avg_quality as number) +
-    0.1 * normalised(v.aesthetic_score, p.avg_aesthetic as number) +
-    0.1 * normalised(v.travel_score, p.avg_travel as number) +
-    0.05 * normalised(v.authenticity_score, p.avg_authenticity as number) +
+    0.15 * normalised(v.luxury, p.avg_luxury as number) +
+    0.15 * normalised(v.quality, p.avg_quality as number) +
+    0.1 * normalised(v.aesthetic, p.avg_aesthetic as number) +
+    0.1 * normalised(v.travel, p.avg_travel as number) +
+    0.05 * normalised(v.authenticity, p.avg_authenticity as number) +
     0.1 * v.confidence
   );
 }
