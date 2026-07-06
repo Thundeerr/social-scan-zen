@@ -353,4 +353,3 @@ export function describeLocationProviderRequest(locationId: string): string {
   const param = process.env.RAPIDAPI_LOCATION_ID_PARAM ?? "id";
   return `GET https://${host}${path}?${param}=${locationId}`;
 }
-}
