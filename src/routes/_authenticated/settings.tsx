@@ -237,10 +237,12 @@ function LocationProviderSection() {
   }, []);
 
   async function onTest() {
+    if (testingRef.current) return;
     if (!/^\d{3,20}$/.test(locationId.trim())) {
       toast.error("Enter a numeric Instagram location id (3–20 digits)");
       return;
     }
+    testingRef.current = true;
     setTesting(true);
     setTestResult(null);
     const t = toast.loading("Contacting provider…");
@@ -260,6 +262,7 @@ function LocationProviderSection() {
       setTestResult({ ok: false, elapsedMs: 0, error: msg });
       toast.error("Provider test failed", { id: t, description: msg });
     } finally {
+      testingRef.current = false;
       setTesting(false);
     }
   }
