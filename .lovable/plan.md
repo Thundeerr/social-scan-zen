@@ -1,130 +1,110 @@
-# Discovery Engine
+## Phase 4 — Self-improving Discovery
 
-Zweite autonome Pipeline neben dem Scanner. Ziel: aus getrackten Accounts + Locations kontinuierlich neue Kandidaten ableiten, per AI bewerten und dem Operator in einer eigenen Inbox zur Ein-Klick-Entscheidung vorlegen. Kein Auto-Tracking.
+Ship four transparent ranking modifiers on top of Phase 3. All weights live in ONE constant block near the top of `discovery-service.server.ts` so they are trivial to tune. No black boxes: every candidate returns a `rank_breakdown` the UI renders.
 
-## 1. Datenmodell (Migration)
+### Priorities
 
-Neue Tabellen unter `public`, alle mit `GRANT authenticated + service_role` und RLS scoped auf `created_by`/`user_id`.
+1. **Learning loop completion** (already partly wired) — must be verifiable in the UI.
+2. **Diversity + novelty** — visible modifiers on the score.
+3. **Entropy floor** — conservative, pass/fail, non-destructive.
+4. **Debug panel** — every candidate card exposes the numbers.
 
-- `discovery_candidates` — ein Datensatz je Operator+Username
-  - `id`, `user_id`, `username` (unique per user), `full_name`, `avatar_url`
-  - `followers`, `following`, `posts_count`, `is_private`, `is_verified`
-  - `estimated_niche` (text), `ai_summary` (text)
-  - Scores 0–100: `luxury_score`, `quality_score`, `aesthetic_score`, `travel_score`, `authenticity_score`
-  - `p_private_individual`, `p_commercial_brand` (numeric 0–1)
-  - `estimated_post_frequency` (text: „~4/Woche" o.Ä.)
-  - `confidence` (0–1), `state` (`new` | `tracked` | `ignored` | `blacklisted`)
-  - `first_seen_at`, `last_seen_at`, `last_ai_at`, `signal_count` (int)
-- `discovery_signals` — jedes Auftauchen eines Kandidaten
-  - `id`, `user_id`, `candidate_id` (fk), `username`
-  - `source_type` enum: `tagged_collaborator | tagged_user | co_appearance | location_cooccurrence | hashtag_cooccurrence | account_mention | provider_recommendation`
-  - `seed_account_id` (nullable fk), `seed_location_id` (nullable fk), `seed_hashtag` (nullable text)
-  - `weight` (numeric), `created_at`
-- `discovery_blacklist` — schneller Lookup: `user_id + username unique`
-- `discovery_preferences` — Lernvektor je Operator
-  - `user_id` (pk), gewichtete Aggregate: `avg_luxury`, `avg_quality`, `avg_aesthetic`, `avg_travel`, `avg_authenticity`, `pref_private`, `pref_commercial`, `niche_weights jsonb`, `signal_weights jsonb`, `sample_size int`
-- Enum `discovery_state` (`new/tracked/ignored/blacklisted`) + `discovery_source_type`.
+---
 
-Trigger: bei `discovery_candidates.state → 'tracked'` wird der Kandidat als Seed in `tracked_accounts` eingefügt (idempotent via `handle` unique), Tier default `B`. Bei `ignored`/`blacklisted` → Preferences-Update anstoßen.
+### 1. Learning loop — finish what's wired
 
-## 2. Signal-Extraktion (server-only)
+Current state: `applyOperatorDecision → updatePreferences` already updates `avg_*`, `niche_weights`, `pref_private/commercial` via EMA. What's missing:
 
-`src/lib/discovery-extract.server.ts` — pure Funktion, keine Netzwerk-Aufrufe. Bekommt einen `ProviderPost`-Batch und liefert Signale:
-- Caption/Comment-Regex `@[a-zA-Z0-9._]{2,30}` → `account_mention`
-- `usertags`/`coauthor_producers`/`tagged_users` aus dem rohen Post-JSON → `tagged_user` / `tagged_collaborator`
-- Location-Referenzen im Post → `location_cooccurrence` (Seed = Location, falls in tracked_locations)
-- Hashtags → `hashtag_cooccurrence` (nur wenn Hashtag im späteren „Watchlist Hashtags"-Feature; vorerst nur Signal, nicht Seed)
+- **`signal_weights`** is written back unchanged. Fix: read the candidate's `discovery_signals`, group by `source_type`, apply the same directional EMA (`+1 / -0.3 / -1`) per source type, cap between −3 and +3.
+- **Blacklist strengthening**: on `blacklist`, additionally decay `niche_weights[k]` by an extra −0.5 (already −1 direction + the extra), and de-duplicate the blacklist insert (already `.then(()=>...,()=>...)`).
+- **Sample size**: keep the current `sample_size + 1` cap at 200 (already implicit via α = 1/min(50, …)).
 
-`normalisePost` behält dazu einen `raw` Payload-Ausschnitt (`usertags`, `coauthor_producers`, `location`, `caption.tags`). Dafür bekommt `ProviderPost` optional `signals?: { mentions: string[]; tagged: string[]; collaborators: string[]; location_id?: string; hashtags: string[] }`.
+No new tables. Just a real `signal_weights` update.
 
-## 3. Discovery-Service
+### 2. Ranking modifiers — computed live in `listDiscoveryCandidatesFn`
 
-`src/lib/discovery-service.server.ts`:
-- `runDiscoveryForSeedAccount(db, accountId)` — nimmt die letzten N Assets dieses Seeds (aus `assets`, kein Extra-Fetch), extrahiert Signale, upsertet Kandidaten (`signal_count += 1`, `last_seen_at = now`), schreibt `discovery_signals`.
-- `runDiscoveryForSeedLocation(db, locationId)` — analog.
-- `enrichPendingCandidates(db, limit)` — für Kandidaten ohne `last_ai_at` bzw. mit `signal_count >= threshold` und `state = 'new'`:
-  1. Provider-Profil-Lookup (nur `profilePath` — kein Feed) → Follower/Following/Posts/Avatar/Verified/Private
-  2. Wenige Posts (falls günstig) für AI-Kontext
-  3. AI-Call an Lovable AI (`google/gemini-3.5-flash`) via `structured_output` → JSON mit den 5 Scores + Probabilities + niche + summary + confidence
-  4. Update `discovery_candidates.*`, `last_ai_at = now`
-- `applyOperatorDecision(db, candidateId, decision)` — schreibt state, aktualisiert `discovery_preferences` (exponentieller gleitender Mittelwert, Sample-Size cap 200).
-- Provider-Budget respektiert: Enrichment nur wenn `provider_budget.remaining >= reserve`.
+Move from a single frozen `rank_score` (baked at enrichment) to a **live composite** computed at list time. The stored `rank_score` becomes `base_score`; diversity/novelty/entropy are applied on top per request, because they depend on the current batch and current graph state.
 
-Ranking-Formel für die Inbox:
+Composite:
+
+```text
+final = base + learning + novelty − diversity
+pass  = final ≥ entropy_floor
 ```
-score =
-  0.35 * niche_match(candidate.niche, prefs.niche_weights)
-+ 0.15 * normalised(luxury_score,  prefs.avg_luxury)
-+ 0.15 * normalised(quality_score, prefs.avg_quality)
-+ 0.10 * normalised(aesthetic_score, prefs.avg_aesthetic)
-+ 0.10 * normalised(travel_score, prefs.avg_travel)
-+ 0.05 * normalised(authenticity_score, prefs.avg_authenticity)
-+ 0.10 * signal_weight(signals, prefs.signal_weights)
+
+Component definitions — small, simple, editable:
+
+```text
+DISCOVERY_WEIGHTS = {
+  DIVERSITY_STEP:      0.10,   // penalty per repeat of same niche OR cluster
+  DIVERSITY_MAX:       0.30,   // cap on total diversity penalty
+  NOVELTY_MAX:         0.15,   // max novelty boost
+  NOVELTY_NEUTRAL:     0.05,   // when no peer data
+  ENTROPY_BASE:        0.30,
+  ENTROPY_PER_TRACKED: 0.005,
+  ENTROPY_CEIL:        0.55,
+}
 ```
-Confidence = min(1, 0.2 + 0.15 * signal_count) × AI-self-confidence.
 
-## 4. Orchestrierung
+- **base**: existing `rank_score` at enrichment time (niche match + axes vs prefs + confidence).
+- **learning**: `base − base_without_prefs`. Recomputed cheaply from stored scores + current prefs, so we always see the delta the operator's decisions produced. (No stored value; derived at list time.)
+- **diversity penalty**: walk the ranked list top→bottom; for each candidate, `−DIVERSITY_STEP` per prior candidate sharing the same `estimated_niche` OR the same cluster root, capped at `DIVERSITY_MAX`. This runs after cluster folding, so it mainly punishes repeated niches across clusters.
+- **novelty boost**: from `cluster_peers` — `tracked_density = tracked_peers / total_peers` where `tracked_peers` = peers whose `username` exists in `tracked_accounts` for this user. Boost = `NOVELTY_MAX × (1 − tracked_density)`. If no peers, use `NOVELTY_NEUTRAL`.
+- **entropy floor**: `min(ENTROPY_CEIL, ENTROPY_BASE + ENTROPY_PER_TRACKED × tracked_count)`. Conservative: with 20 tracked accounts, floor = 0.40; with 50, floor = 0.55 (ceiling).
 
-- Bestehender `tickQueue` bleibt unverändert. **Neuer** öffentlicher Endpoint `POST /api/public/hooks/discovery-tick` (mit `apikey`-Header, wie scanner-tick).
-- Tick-Logik: pro Aufruf max. K Seeds (Accounts+Locations) mit ältestem `last_discovery_at` → `runDiscoveryForSeed*`; anschließend `enrichPendingCandidates(limit=E)`.
-- `pg_cron` Job „discovery-tick" alle 30 Min (SQL-Migration mit `net.http_post`, Anon-Key-Header — Muster identisch zu bestehendem Scanner-Cron falls vorhanden, sonst neu).
-- `tracked_accounts` bekommt `last_discovery_at timestamptz null`; ebenso `tracked_locations`.
+Sort key stays `final` (desc), then `signal_count`, then `last_seen_at`.
 
-## 5. Server-Functions (`src/lib/discovery.functions.ts`)
+### 3. Transparent debug data per candidate
 
-Alle mit `requireSupabaseAuth`.
-- `listDiscoveryCandidatesFn({ state, limit, cursor })` — Ranked Feed (default `state='new'`).
-- `getDiscoveryCandidateFn({ id })` — inkl. jüngste Signale + Seed-Namen.
-- `decideDiscoveryCandidateFn({ id, decision: 'track'|'ignore'|'blacklist' })` — ruft `applyOperatorDecision`; bei `track` wird zusätzlich `tracked_accounts` befüllt (via Trigger).
-- `runDiscoveryNowFn({ seedType, seedId })` — manueller Trigger für einen Seed (Enqueue + Sofort-Tick begrenzt).
-- `getDiscoveryStatsFn()` — Zahlen für Dashboard: candidates_new, tracked_via_discovery, ignored, blacklisted, avg_confidence.
+Extend `DiscoveryCandidateRow`:
 
-## 6. UI
+```ts
+rank_breakdown: {
+  base:      number;
+  learning:  number;  // signed
+  diversity: number;  // negative or 0
+  novelty:   number;  // positive or 0
+  final:     number;
+  entropy_floor: number;
+  passes_entropy: boolean;
+  novelty_detail: { tracked_peers: number; total_peers: number };
+  diversity_detail: { niche_repeats: number; cluster_repeats: number };
+}
+```
 
-Sidebar-Eintrag **„Discovery"** (Icon `Sparkles`) direkt unter „Assets". Shortcut `G D`. Command-Palette: `Go to Discovery`, `Run discovery now`.
+Populated in `listDiscoveryCandidatesFn` after cluster folding.
 
-Neue Route `src/routes/_authenticated/discovery.tsx`:
-- Top: KPI-Reihe (New candidates, Tracked this week, Ignored, Avg confidence) + „Run discovery now"-Button.
-- Filterleiste: `state` (New / Tracked / Ignored / Blacklisted), Sort (Rank / Newest / Highest luxury), Niche-Chips.
-- Kandidatenkarte (analog `asset-card`):
-  - Avatar, `@username`, verified/private badge
-  - Follower · Following · Posts · geschätzte Post-Frequenz
-  - Score-Ring (Composite) + kleine Sub-Score-Bars für Luxury/Quality/Aesthetic/Travel/Authenticity
-  - „Why discovered" — Liste bis zu 3 Signale mit Seed-Chip (`@seed_account` oder `📍 location`)
-  - AI Summary (2 Zeilen, `line-clamp-2`, expandable)
-  - Confidence-Chip
-  - Aktionen als Icon-Buttons mit Tooltip + Shortcut:
-    - **Track** (`T`) — grün
-    - **Ignore** (`I`) — neutral
-    - **Blacklist** (`B`) — rot
-    - **View profile** — öffnet Detail-Sheet
-    - **Open on Instagram** — externer Link
-- Detail-Sheet: alle Sub-Scores, komplette AI-Analyse, komplette Signalhistorie, letzte 6 Posts als Vorschau (falls im Enrichment geladen).
-- Empty-State im InstaScanner-Ton: „Discovery running. New candidates surface as the network expands."
+### 4. UI
 
-Asset-Card + Accounts-Liste bekommen kleinen „via Discovery"-Chip, wenn `tracked_accounts.source = 'discovery'` (neue nullable Spalte).
+In `discovery.tsx` `CandidateCard`:
 
-## 7. Lernschleife
+- Small `<Ranking>` collapsible strip under the score chips: "Ranking · 0.62" with a chevron. Expanded rows show:
+  - `Base 0.48`
+  - `Learning +0.09` (green if positive, muted if negative)
+  - `Novelty +0.12` (with tooltip: "3 of 8 peers already tracked")
+  - `Diversity −0.07` (with tooltip: "2 similar niche · 1 same cluster higher up")
+  - `Final 0.62`
+  - `Entropy floor 0.35 · PASS` (or `BELOW` in warning tone)
+- Below the tab bar, add a small toggle `Hide below entropy floor` (default: off, so nothing disappears silently).
 
-- Nach jedem Track/Ignore/Blacklist: `discovery_preferences` aktualisieren (EMA α = 1/min(50, sample_size+1)).
-- Niche-Weights: bei `track` +1 auf niche, bei `ignore` −0.3, bei `blacklist` −1 und Username → `discovery_blacklist`.
-- Signal-Weights (welche `source_type` führt zu Tracks) analog.
-- Ranking und `enrichPendingCandidates`-Priorität lesen `discovery_preferences` bei jedem Aufruf.
+Keep it terse — this is operator debug, not a chart.
 
-## 8. Reihenfolge der Umsetzung
+### 5. What we're NOT doing (yet)
 
-1. Migration (Tabellen, Enums, Trigger, GRANTs, RLS, Cron)
-2. Signal-Extraktion + `ProviderPost.signals`
-3. Discovery-Service + AI-Enrichment (structured output)
-4. Public Tick-Endpoint + `pg_cron`
-5. Server-Functions
-6. UI-Route, Sidebar, Command-Palette
-7. „via Discovery"-Chip in Accounts/Assets
+- No new tables, no migration. All new state is derived.
+- No auto-hiding — entropy floor is visual/optional at first.
+- No cross-user normalization. Weights are per-operator via existing `discovery_preferences`.
+- No signal-weight display in the card yet — it feeds base but is visible in future settings.
 
-## Offen / bewusst weggelassen
+### Files touched
 
-- **Provider-Recommendations & Creator-Suggestions**: nur wenn dein RapidAPI-Host so einen Endpoint anbietet. Skelett dafür in `discovery-service.server.ts` als optionaler Signal-Provider, standardmäßig deaktiviert.
-- Kein Auto-Add zu Tracking (per Spec).
-- Kein Hashtag-Seed-Tracking (bleibt später „Watchlist Hashtags").
+- `src/lib/discovery-service.server.ts` — finish `signal_weights` EMA in `updatePreferences`; constants block.
+- `src/lib/discovery.functions.ts` — extend row type; compute modifiers in `listDiscoveryCandidatesFn`; count tracked usernames once per request.
+- `src/routes/_authenticated/discovery.tsx` — add `<Ranking>` panel + entropy-floor toggle.
 
-Sag Bescheid, ob du das so umgesetzt haben willst, oder ob ich Teile davon streichen/schlanker halten soll — insbesondere ob wir für den ersten Wurf **ohne** AI-Enrichment starten (Kandidaten + Signale + Inbox + Track/Ignore/Blacklist), und AI-Scoring in einem zweiten Schritt draufsetzen.
+### Verification
+
+- `bunx tsgo --noEmit` clean.
+- Manually: track one candidate → next list refresh shows Learning value moves; card with tracked peers gets lower Novelty; second candidate in the same niche after a same-niche one shows Diversity −0.10.
+
+Confirm and I'll implement.

@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { DISCOVERY_WEIGHTS } from "@/lib/discovery-weights";
 
 export type ScoreReasons = Partial<
   Record<"luxury" | "quality" | "aesthetic" | "travel" | "authenticity", string[]>
@@ -24,6 +25,20 @@ export type ClusterPeer = {
   count: number;
   is_representative: boolean;
 };
+
+export type RankBreakdown = {
+  base: number;
+  learning: number;
+  diversity: number;
+  novelty: number;
+  final: number;
+  entropy_floor: number;
+  passes_entropy: boolean;
+  novelty_detail: { tracked_peers: number; total_peers: number };
+  diversity_detail: { niche_repeats: number; cluster_repeats: number };
+};
+
+
 
 
 export type DiscoveryCandidateRow = {
@@ -61,6 +76,8 @@ export type DiscoveryCandidateRow = {
   cluster_peers: ClusterPeer[];
   is_cluster_representative: boolean;
   cluster_size: number;
+  rank_breakdown: RankBreakdown;
+
 
   signals: Array<{
     source_type: string;
@@ -294,7 +311,47 @@ export const listDiscoveryCandidatesFn = createServerFn({ method: "POST" })
       for (const m of members) clusterSizeById.set(m, members.length);
     }
 
-    return rowsSafe.map((r) => {
+    // Phase 4 — transparent ranking modifiers.
+    // Load prefs + tracked usernames + total tracked count so learning /
+    // novelty / entropy can be computed live per candidate.
+    const [{ data: prefsRow }, { data: trackedRows, count: trackedCount }] =
+      await Promise.all([
+        supabase
+          .from("discovery_preferences")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("tracked_accounts")
+          .select("username", { count: "exact" })
+          .eq("created_by", userId)
+          .eq("status", "active"),
+      ]);
+    const trackedUsernames = new Set(
+      (trackedRows ?? []).map((r) => r.username.toLowerCase()),
+    );
+    const nicheWeights = (prefsRow?.niche_weights ?? {}) as Record<string, number>;
+    const entropyFloor = Math.min(
+      DISCOVERY_WEIGHTS.ENTROPY_CEIL,
+      DISCOVERY_WEIGHTS.ENTROPY_BASE +
+        DISCOVERY_WEIGHTS.ENTROPY_PER_TRACKED * (trackedCount ?? 0),
+    );
+
+    // Cluster root per candidate — for diversity de-duplication across niches.
+    const rootIdByCandidate = new Map<string, string>();
+    for (const id of rowIds) rootIdByCandidate.set(id, find(id));
+
+    // First pass: compute base, learning, novelty per candidate.
+    type Interim = {
+      row: (typeof rowsSafe)[number];
+      peers: ClusterPeer[];
+      sigs: DiscoveryCandidateRow["signals"];
+      base: number;
+      learning: number;
+      novelty: number;
+      novelty_detail: { tracked_peers: number; total_peers: number };
+    };
+    const interim: Interim[] = rowsSafe.map((r) => {
       const sigs = signalsByCandidate.get(r.id) ?? [];
       const peers = (peersByCandidate.get(r.id) ?? [])
         .sort((a, b) => b.count - a.count)
@@ -310,19 +367,101 @@ export const listDiscoveryCandidatesFn = createServerFn({ method: "POST" })
           };
         })
         .filter((p) => p.username.length > 0);
+
+      const base = Number(r.rank_score ?? 0);
+
+      // Learning boost = how much niche_weights lifted this candidate's base.
+      // Base already bakes it in via computeRankScore's nicheMatch term
+      // (0.35 * min(1, weight/3)) with a floor of 0.3 when the niche is
+      // unknown. We back out that contribution vs the neutral 0.3.
+      let learning = 0;
+      if (r.estimated_niche) {
+        const w = nicheWeights[r.estimated_niche.toLowerCase()] ?? 0;
+        const currentMatch = w > 0 ? Math.min(1, w / 3) : 0.3;
+        const negativePenalty = w < 0 ? Math.max(-1, w / 3) * 0.35 : 0;
+        learning = 0.35 * (currentMatch - 0.3) + negativePenalty;
+      }
+
+      // Novelty — reward candidates whose peers are NOT already tracked.
+      const totalPeers = peers.length;
+      const trackedPeers = peers.filter((p) =>
+        trackedUsernames.has(p.username.toLowerCase()),
+      ).length;
+      const novelty =
+        totalPeers === 0
+          ? DISCOVERY_WEIGHTS.NOVELTY_NEUTRAL
+          : DISCOVERY_WEIGHTS.NOVELTY_MAX * (1 - trackedPeers / totalPeers);
+
+      return {
+        row: r,
+        peers,
+        sigs,
+        base,
+        learning,
+        novelty,
+        novelty_detail: { tracked_peers: trackedPeers, total_peers: totalPeers },
+      };
+    });
+
+    // Preliminary composite (before diversity) drives the walk order.
+    interim.sort(
+      (a, b) => b.base + b.learning + b.novelty - (a.base + a.learning + a.novelty),
+    );
+
+    // Second pass: apply diversity penalty top→bottom.
+    const seenNiches = new Map<string, number>();
+    const seenClusters = new Map<string, number>();
+    const withBreakdown = interim.map((it) => {
+      const niche = it.row.estimated_niche?.toLowerCase() ?? null;
+      const cluster = rootIdByCandidate.get(it.row.id) ?? it.row.id;
+      const nicheRepeats = niche ? (seenNiches.get(niche) ?? 0) : 0;
+      const clusterRepeats = seenClusters.get(cluster) ?? 0;
+      const repeats = nicheRepeats + clusterRepeats;
+      const diversity = Math.min(
+        DISCOVERY_WEIGHTS.DIVERSITY_MAX,
+        DISCOVERY_WEIGHTS.DIVERSITY_STEP * repeats,
+      );
+      if (niche) seenNiches.set(niche, nicheRepeats + 1);
+      seenClusters.set(cluster, clusterRepeats + 1);
+
+      const final = it.base + it.learning + it.novelty - diversity;
+      const breakdown: RankBreakdown = {
+        base: it.base,
+        learning: it.learning,
+        diversity: -diversity,
+        novelty: it.novelty,
+        final,
+        entropy_floor: entropyFloor,
+        passes_entropy: final >= entropyFloor,
+        novelty_detail: it.novelty_detail,
+        diversity_detail: {
+          niche_repeats: nicheRepeats,
+          cluster_repeats: clusterRepeats,
+        },
+      };
+      return { it, breakdown, final };
+    });
+
+    // Final sort by composite score.
+    withBreakdown.sort((a, b) => b.final - a.final);
+
+    return withBreakdown.map(({ it, breakdown }) => {
+      const r = it.row;
       return {
         ...r,
         score_reasons: (r.score_reasons ?? {}) as ScoreReasons,
-        headline_signals: buildHeadlineSignals(r, sigs),
+        headline_signals: buildHeadlineSignals(r, it.sigs),
         discovered_via: chainFor(r.id),
-        cluster_peers: peers,
+        cluster_peers: it.peers,
         is_cluster_representative:
           representativeIds.has(r.id) || (clusterSizeById.get(r.id) ?? 1) <= 1,
         cluster_size: clusterSizeById.get(r.id) ?? 1,
-        signals: sigs.slice(0, 6),
+        rank_breakdown: breakdown,
+        signals: it.sigs.slice(0, 6),
       };
     }) as DiscoveryCandidateRow[];
   });
+
 
 
 
