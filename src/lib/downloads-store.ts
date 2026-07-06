@@ -25,7 +25,10 @@ export type DownloadRow = {
     thumbnail_url: string | null;
     media_url: string | null;
     source_url: string | null;
+    account_id: string | null;
+    location_id: string | null;
     tracked_accounts: { username: string; avatar_url: string | null } | null;
+    tracked_locations: { name: string; location_id: string } | null;
   } | null;
   operator?: {
     id: string;
