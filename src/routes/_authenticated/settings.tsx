@@ -153,6 +153,10 @@ function SettingsPage() {
           </div>
         </section>
 
+        <LocationProviderSection />
+
+
+
         <section className="soft-shadow rounded-xl border border-border bg-card p-6">
           <h2 className="text-sm font-semibold mb-1">Appearance</h2>
           <p className="text-xs text-muted-foreground mb-4">
