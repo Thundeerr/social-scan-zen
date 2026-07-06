@@ -257,6 +257,7 @@ export type Database = {
           avatar_url: string | null
           confidence: number
           created_at: string
+          depth: number
           estimated_niche: string | null
           estimated_post_frequency: string | null
           first_seen_at: string
@@ -272,6 +273,7 @@ export type Database = {
           luxury_score: number | null
           p_commercial_brand: number | null
           p_private_individual: number | null
+          parent_candidate_id: string | null
           posts_count: number | null
           quality_score: number | null
           rank_score: number
@@ -290,6 +292,7 @@ export type Database = {
           avatar_url?: string | null
           confidence?: number
           created_at?: string
+          depth?: number
           estimated_niche?: string | null
           estimated_post_frequency?: string | null
           first_seen_at?: string
@@ -305,6 +308,7 @@ export type Database = {
           luxury_score?: number | null
           p_commercial_brand?: number | null
           p_private_individual?: number | null
+          parent_candidate_id?: string | null
           posts_count?: number | null
           quality_score?: number | null
           rank_score?: number
@@ -323,6 +327,7 @@ export type Database = {
           avatar_url?: string | null
           confidence?: number
           created_at?: string
+          depth?: number
           estimated_niche?: string | null
           estimated_post_frequency?: string | null
           first_seen_at?: string
@@ -338,6 +343,7 @@ export type Database = {
           luxury_score?: number | null
           p_commercial_brand?: number | null
           p_private_individual?: number | null
+          parent_candidate_id?: string | null
           posts_count?: number | null
           quality_score?: number | null
           rank_score?: number
@@ -349,7 +355,15 @@ export type Database = {
           user_id?: string
           username?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "discovery_candidates_parent_candidate_id_fkey"
+            columns: ["parent_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discovery_preferences: {
         Row: {
@@ -722,6 +736,7 @@ export type Database = {
           last_scan_at: string | null
           next_scan_at: string | null
           notes: string | null
+          origin_candidate_id: string | null
           source: string
           status: Database["public"]["Enums"]["account_status"]
           tier: Database["public"]["Enums"]["priority_tier"]
@@ -741,6 +756,7 @@ export type Database = {
           last_scan_at?: string | null
           next_scan_at?: string | null
           notes?: string | null
+          origin_candidate_id?: string | null
           source?: string
           status?: Database["public"]["Enums"]["account_status"]
           tier?: Database["public"]["Enums"]["priority_tier"]
@@ -760,13 +776,22 @@ export type Database = {
           last_scan_at?: string | null
           next_scan_at?: string | null
           notes?: string | null
+          origin_candidate_id?: string | null
           source?: string
           status?: Database["public"]["Enums"]["account_status"]
           tier?: Database["public"]["Enums"]["priority_tier"]
           updated_at?: string
           username?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tracked_accounts_origin_candidate_id_fkey"
+            columns: ["origin_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tracked_locations: {
         Row: {

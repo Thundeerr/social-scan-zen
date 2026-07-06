@@ -59,6 +59,7 @@ async function upsertCandidatesAndSignals(
     weight: number;
   }[],
   seed: { accountId?: string | null; locationId?: string | null },
+  parent?: { candidateId: string | null; depth: number },
 ) {
   if (!signals.length) return 0;
 
@@ -93,8 +94,13 @@ async function upsertCandidatesAndSignals(
     username: string;
     signal_count: number;
     last_seen_at: string;
+    parent_candidate_id?: string | null;
+    depth?: number;
   }> = [];
   const toBump: Array<{ id: string; signal_count: number }> = [];
+
+  const parentId = parent?.candidateId ?? null;
+  const childDepth = parent ? parent.depth + 1 : 0;
 
   for (const sig of kept) {
     const cur = byName.get(sig.username);
@@ -106,6 +112,8 @@ async function upsertCandidatesAndSignals(
         username: sig.username,
         signal_count: sig.weight,
         last_seen_at: nowIso,
+        parent_candidate_id: parentId,
+        depth: childDepth,
       });
     }
   }
@@ -150,20 +158,38 @@ async function upsertCandidatesAndSignals(
   return kept.length;
 }
 
+
 export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
   const { data: acct, error } = await db
     .from("tracked_accounts")
-    .select("id, username, created_by")
+    .select("id, username, created_by, origin_candidate_id")
     .eq("id", accountId)
     .maybeSingle();
   if (error) throw error;
   if (!acct?.created_by) return { candidates: 0 };
 
+  // If this seed was promoted from a discovery candidate, use it as chain parent.
+  let parent: { candidateId: string | null; depth: number } | undefined;
+  if (acct.origin_candidate_id) {
+    const { data: parentRow } = await db
+      .from("discovery_candidates")
+      .select("id, depth")
+      .eq("id", acct.origin_candidate_id)
+      .maybeSingle();
+    if (parentRow) {
+      parent = { candidateId: parentRow.id, depth: parentRow.depth ?? 0 };
+    }
+  }
+
   const assets = await fetchAssetsForAccount(db, accountId);
   const signals = extractSignalsFromAssets(assets, acct.username);
-  const affected = await upsertCandidatesAndSignals(db, acct.created_by, signals, {
-    accountId,
-  });
+  const affected = await upsertCandidatesAndSignals(
+    db,
+    acct.created_by,
+    signals,
+    { accountId },
+    parent,
+  );
 
   await db
     .from("tracked_accounts")
@@ -171,6 +197,7 @@ export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
     .eq("id", accountId);
   return { candidates: affected };
 }
+
 
 export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string) {
   const { data: loc, error } = await db

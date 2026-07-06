@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Gauge,
   ChevronDown,
+  ChevronRight,
+  Anchor,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -26,8 +28,10 @@ import {
   decideDiscoveryCandidateFn,
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
+  type DiscoveredViaHop,
   type ScoreReasons,
 } from "@/lib/discovery.functions";
+
 
 export const Route = createFileRoute("/_authenticated/discovery")({
   head: () => ({
@@ -271,6 +275,12 @@ function CandidateCard({
         </div>
       </div>
 
+      {/* Provenance chain — where in the tracked network this account emerged */}
+      {candidate.discovered_via && candidate.discovered_via.length > 0 && (
+        <DiscoveredViaChain hops={candidate.discovered_via} depth={candidate.depth ?? 0} />
+      )}
+
+
       {/* Signal stack — the "why track this?" answer in <3s */}
       <div className="px-4 space-y-1.5">
         {headlineLines.length === 0 ? (
@@ -471,3 +481,38 @@ function ScoreReasonsBlock({
     </div>
   );
 }
+
+function DiscoveredViaChain({ hops, depth }: { hops: DiscoveredViaHop[]; depth: number }) {
+  if (!hops.length) return null;
+  return (
+    <div className="mx-4 mt-3 flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1.5 text-[10px] text-muted-foreground overflow-hidden">
+      <span className="uppercase tracking-wider mr-1 shrink-0">Discovered via</span>
+      <div className="flex items-center gap-1 min-w-0">
+        {hops.map((hop, i) => (
+          <div key={hop.id} className="flex items-center gap-1 min-w-0">
+            {i > 0 && <ChevronRight className="h-3 w-3 text-border shrink-0" />}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 truncate max-w-[8rem]",
+                hop.kind === "origin"
+                  ? "text-emerald-300/80"
+                  : "text-foreground/70",
+              )}
+              title={hop.kind === "origin" ? "Tracked seed account" : "Previously discovered account"}
+            >
+              {hop.kind === "origin" && <Anchor className="h-3 w-3 shrink-0" />}
+              @{hop.username}
+            </span>
+          </div>
+        ))}
+        {depth > 0 && (
+          <>
+            <ChevronRight className="h-3 w-3 text-border shrink-0" />
+            <span className="text-foreground/80 shrink-0">hop {depth}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
