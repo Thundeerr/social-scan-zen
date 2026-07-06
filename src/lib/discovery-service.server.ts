@@ -59,6 +59,7 @@ async function upsertCandidatesAndSignals(
     weight: number;
   }[],
   seed: { accountId?: string | null; locationId?: string | null },
+  parent?: { candidateId: string | null; depth: number },
 ) {
   if (!signals.length) return 0;
 
@@ -93,8 +94,13 @@ async function upsertCandidatesAndSignals(
     username: string;
     signal_count: number;
     last_seen_at: string;
+    parent_candidate_id?: string | null;
+    depth?: number;
   }> = [];
   const toBump: Array<{ id: string; signal_count: number }> = [];
+
+  const parentId = parent?.candidateId ?? null;
+  const childDepth = parent ? parent.depth + 1 : 0;
 
   for (const sig of kept) {
     const cur = byName.get(sig.username);
@@ -106,6 +112,8 @@ async function upsertCandidatesAndSignals(
         username: sig.username,
         signal_count: sig.weight,
         last_seen_at: nowIso,
+        parent_candidate_id: parentId,
+        depth: childDepth,
       });
     }
   }
@@ -149,6 +157,7 @@ async function upsertCandidatesAndSignals(
 
   return kept.length;
 }
+
 
 export async function runDiscoveryForSeedAccount(db: DB, accountId: string) {
   const { data: acct, error } = await db
