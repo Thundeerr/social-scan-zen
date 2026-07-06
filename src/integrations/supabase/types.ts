@@ -228,6 +228,229 @@ export type Database = {
           },
         ]
       }
+      discovery_blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      discovery_candidates: {
+        Row: {
+          aesthetic_score: number | null
+          ai_summary: string | null
+          authenticity_score: number | null
+          avatar_url: string | null
+          confidence: number
+          created_at: string
+          estimated_niche: string | null
+          estimated_post_frequency: string | null
+          first_seen_at: string
+          followers: number | null
+          following: number | null
+          full_name: string | null
+          id: string
+          is_private: boolean | null
+          is_verified: boolean | null
+          last_ai_at: string | null
+          last_seen_at: string
+          luxury_score: number | null
+          p_commercial_brand: number | null
+          p_private_individual: number | null
+          posts_count: number | null
+          quality_score: number | null
+          rank_score: number
+          signal_count: number
+          state: Database["public"]["Enums"]["discovery_state"]
+          travel_score: number | null
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          aesthetic_score?: number | null
+          ai_summary?: string | null
+          authenticity_score?: number | null
+          avatar_url?: string | null
+          confidence?: number
+          created_at?: string
+          estimated_niche?: string | null
+          estimated_post_frequency?: string | null
+          first_seen_at?: string
+          followers?: number | null
+          following?: number | null
+          full_name?: string | null
+          id?: string
+          is_private?: boolean | null
+          is_verified?: boolean | null
+          last_ai_at?: string | null
+          last_seen_at?: string
+          luxury_score?: number | null
+          p_commercial_brand?: number | null
+          p_private_individual?: number | null
+          posts_count?: number | null
+          quality_score?: number | null
+          rank_score?: number
+          signal_count?: number
+          state?: Database["public"]["Enums"]["discovery_state"]
+          travel_score?: number | null
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          aesthetic_score?: number | null
+          ai_summary?: string | null
+          authenticity_score?: number | null
+          avatar_url?: string | null
+          confidence?: number
+          created_at?: string
+          estimated_niche?: string | null
+          estimated_post_frequency?: string | null
+          first_seen_at?: string
+          followers?: number | null
+          following?: number | null
+          full_name?: string | null
+          id?: string
+          is_private?: boolean | null
+          is_verified?: boolean | null
+          last_ai_at?: string | null
+          last_seen_at?: string
+          luxury_score?: number | null
+          p_commercial_brand?: number | null
+          p_private_individual?: number | null
+          posts_count?: number | null
+          quality_score?: number | null
+          rank_score?: number
+          signal_count?: number
+          state?: Database["public"]["Enums"]["discovery_state"]
+          travel_score?: number | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      discovery_preferences: {
+        Row: {
+          avg_aesthetic: number
+          avg_authenticity: number
+          avg_luxury: number
+          avg_quality: number
+          avg_travel: number
+          niche_weights: Json
+          pref_commercial: number
+          pref_private: number
+          sample_size: number
+          signal_weights: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_aesthetic?: number
+          avg_authenticity?: number
+          avg_luxury?: number
+          avg_quality?: number
+          avg_travel?: number
+          niche_weights?: Json
+          pref_commercial?: number
+          pref_private?: number
+          sample_size?: number
+          signal_weights?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_aesthetic?: number
+          avg_authenticity?: number
+          avg_luxury?: number
+          avg_quality?: number
+          avg_travel?: number
+          niche_weights?: Json
+          pref_commercial?: number
+          pref_private?: number
+          sample_size?: number
+          signal_weights?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      discovery_signals: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          id: string
+          seed_account_id: string | null
+          seed_hashtag: string | null
+          seed_location_id: string | null
+          source_type: Database["public"]["Enums"]["discovery_source_type"]
+          user_id: string
+          username: string
+          weight: number
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          id?: string
+          seed_account_id?: string | null
+          seed_hashtag?: string | null
+          seed_location_id?: string | null
+          source_type: Database["public"]["Enums"]["discovery_source_type"]
+          user_id: string
+          username: string
+          weight?: number
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          seed_account_id?: string | null
+          seed_hashtag?: string | null
+          seed_location_id?: string | null
+          source_type?: Database["public"]["Enums"]["discovery_source_type"]
+          user_id?: string
+          username?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_signals_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_signals_seed_account_id_fkey"
+            columns: ["seed_account_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_signals_seed_location_id_fkey"
+            columns: ["seed_location_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ig_connections: {
         Row: {
           created_at: string
@@ -488,10 +711,12 @@ export type Database = {
           display_name: string
           followers: string | null
           id: string
+          last_discovery_at: string | null
           last_error: string | null
           last_scan_at: string | null
           next_scan_at: string | null
           notes: string | null
+          source: string
           status: Database["public"]["Enums"]["account_status"]
           tier: Database["public"]["Enums"]["priority_tier"]
           updated_at: string
@@ -505,10 +730,12 @@ export type Database = {
           display_name: string
           followers?: string | null
           id?: string
+          last_discovery_at?: string | null
           last_error?: string | null
           last_scan_at?: string | null
           next_scan_at?: string | null
           notes?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["account_status"]
           tier?: Database["public"]["Enums"]["priority_tier"]
           updated_at?: string
@@ -522,10 +749,12 @@ export type Database = {
           display_name?: string
           followers?: string | null
           id?: string
+          last_discovery_at?: string | null
           last_error?: string | null
           last_scan_at?: string | null
           next_scan_at?: string | null
           notes?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["account_status"]
           tier?: Database["public"]["Enums"]["priority_tier"]
           updated_at?: string
@@ -539,6 +768,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          last_discovery_at: string | null
           last_error: string | null
           last_scan_at: string | null
           location_id: string
@@ -554,6 +784,7 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          last_discovery_at?: string | null
           last_error?: string | null
           last_scan_at?: string | null
           location_id: string
@@ -569,6 +800,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          last_discovery_at?: string | null
           last_error?: string | null
           last_scan_at?: string | null
           location_id?: string
@@ -695,6 +927,15 @@ export type Database = {
       account_status: "active" | "paused"
       app_role: "owner" | "cofounder"
       asset_media_type: "image" | "video" | "carousel" | "reel" | "story"
+      discovery_source_type:
+        | "tagged_collaborator"
+        | "tagged_user"
+        | "co_appearance"
+        | "location_cooccurrence"
+        | "hashtag_cooccurrence"
+        | "account_mention"
+        | "provider_recommendation"
+      discovery_state: "new" | "tracked" | "ignored" | "blacklisted"
       priority_tier: "S" | "A" | "B" | "C"
       review_state:
         | "priority"
@@ -835,6 +1076,16 @@ export const Constants = {
       account_status: ["active", "paused"],
       app_role: ["owner", "cofounder"],
       asset_media_type: ["image", "video", "carousel", "reel", "story"],
+      discovery_source_type: [
+        "tagged_collaborator",
+        "tagged_user",
+        "co_appearance",
+        "location_cooccurrence",
+        "hashtag_cooccurrence",
+        "account_mention",
+        "provider_recommendation",
+      ],
+      discovery_state: ["new", "tracked", "ignored", "blacklisted"],
       priority_tier: ["S", "A", "B", "C"],
       review_state: [
         "priority",

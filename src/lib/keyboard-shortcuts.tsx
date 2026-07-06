@@ -94,6 +94,11 @@ export function KeyboardShortcuts() {
           navigate({ to: "/scanner" });
           return;
         }
+        if (key === "x") {
+          e.preventDefault();
+          navigate({ to: "/discovery" });
+          return;
+        }
       }
 
       // Focus global search

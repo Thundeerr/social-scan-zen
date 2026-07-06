@@ -15,6 +15,7 @@ import {
   ArrowDown,
   ArrowUp,
   Undo2,
+  Sparkles,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -47,7 +48,9 @@ export function CommandPalette() {
     setTimeout(fn, 0);
   };
 
-  const go = (path: "/" | "/assets" | "/accounts" | "/scanner" | "/downloads" | "/settings") =>
+  const go = (
+    path: "/" | "/assets" | "/accounts" | "/scanner" | "/downloads" | "/settings" | "/discovery",
+  ) =>
     run(() => {
       if (path === "/assets") navigate({ to: path, search: { day: "all", status: "all" } });
       else navigate({ to: path });
@@ -80,6 +83,10 @@ export function CommandPalette() {
           <CommandItem onSelect={() => go("/accounts")}>
             <Users /> Tracked Accounts
             <CommandShortcut>G T</CommandShortcut>
+          </CommandItem>
+          <CommandItem onSelect={() => go("/discovery")}>
+            <Sparkles /> Discovery Inbox
+            <CommandShortcut>G X</CommandShortcut>
           </CommandItem>
           <CommandItem onSelect={() => go("/scanner")}>
             <Radar /> Scanner
