@@ -756,3 +756,522 @@ export const getDiscoveryDebugFn = createServerFn({ method: "GET" })
       new_state: newState,
     };
   });
+
+/**
+ * Discovery Analytics — measure whether Discovery is becoming smarter over
+ * time. All aggregates are scoped to the authenticated operator. Cross-
+ * operator divergence is only included if the caller has the operator role
+ * (owner / cofounder), which is checked via the `is_operator` RPC.
+ *
+ * The engine itself is the product here — treat this like an ML dashboard.
+ */
+
+const AXES = ["luxury", "quality", "aesthetic", "travel", "authenticity"] as const;
+type Axis = (typeof AXES)[number];
+
+export type SourceMetric = {
+  source_type: string;
+  candidates: number;
+  tracked: number;
+  ignored: number;
+  blacklisted: number;
+  pending: number;
+  track_rate: number;
+  reject_rate: number;
+};
+
+export type SeedMetric = {
+  seed_id: string;
+  kind: "account" | "location" | "hashtag";
+  label: string;
+  candidates: number;
+  tracked: number;
+  ignored: number;
+  blacklisted: number;
+  track_rate: number;
+  reject_rate: number;
+  avg_tracked_quality: number | null;
+  hidden_gem_score: number;
+};
+
+export type BranchMetric = {
+  parent_id: string;
+  parent_username: string;
+  parent_state: string;
+  children: number;
+  tracked: number;
+  rejected: number;
+  reject_rate: number;
+  track_rate: number;
+};
+
+export type AxisCorrelation = {
+  axis: Axis;
+  mean_tracked: number | null;
+  mean_rejected: number | null;
+  gap: number | null;
+  n_tracked: number;
+  n_rejected: number;
+  point_biserial: number | null;
+};
+
+export type NicheMetric = {
+  niche: string;
+  candidates: number;
+  tracked: number;
+  reject_rate: number;
+  track_rate: number;
+  avg_tracked_quality: number | null;
+};
+
+export type OperatorDivergence = {
+  available: boolean;
+  operators: Array<{ user_id: string; display_name: string | null; sample_size: number }>;
+  pairs: Array<{
+    a_user_id: string;
+    b_user_id: string;
+    a_label: string;
+    b_label: string;
+    cosine: number;
+    divergence: number; // 1 - cosine
+    top_disagreement: Array<{ niche: string; a_weight: number; b_weight: number }>;
+  }>;
+};
+
+export type DiscoveryAnalyticsData = {
+  overview: {
+    total_candidates: number;
+    tracked: number;
+    ignored: number;
+    blacklisted: number;
+    pending: number;
+    decisions: number;
+    track_rate: number;
+    reject_rate: number;
+    enriched: number;
+    unenriched: number;
+    sample_size: number;
+  };
+  by_source: SourceMetric[];
+  by_seed: SeedMetric[];
+  by_branch: {
+    high_yield: BranchMetric[];
+    low_yield: BranchMetric[];
+  };
+  score_correlation: AxisCorrelation[];
+  by_niche: NicheMetric[];
+  divergence: OperatorDivergence;
+};
+
+function mean(xs: number[]): number | null {
+  if (!xs.length) return null;
+  return xs.reduce((s, v) => s + v, 0) / xs.length;
+}
+
+// Point-biserial correlation between a continuous score and a binary label.
+// group = 1 for tracked, 0 for rejected (ignored + blacklisted).
+function pointBiserial(scores: number[], groups: number[]): number | null {
+  if (scores.length < 3) return null;
+  const n = scores.length;
+  const m = scores.reduce((s, v) => s + v, 0) / n;
+  const variance = scores.reduce((s, v) => s + (v - m) ** 2, 0) / n;
+  const sd = Math.sqrt(variance);
+  if (sd === 0) return null;
+  const idx1: number[] = [];
+  const idx0: number[] = [];
+  for (let i = 0; i < n; i++) (groups[i] === 1 ? idx1 : idx0).push(scores[i]);
+  if (!idx1.length || !idx0.length) return null;
+  const m1 = idx1.reduce((s, v) => s + v, 0) / idx1.length;
+  const m0 = idx0.reduce((s, v) => s + v, 0) / idx0.length;
+  const p = idx1.length / n;
+  const q = idx0.length / n;
+  return ((m1 - m0) / sd) * Math.sqrt(p * q);
+}
+
+function cosine(a: Record<string, number>, b: Record<string, number>): number {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (const k of keys) {
+    const va = a[k] ?? 0;
+    const vb = b[k] ?? 0;
+    dot += va * vb;
+    na += va * va;
+    nb += vb * vb;
+  }
+  if (na === 0 || nb === 0) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+export const getDiscoveryAnalyticsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<DiscoveryAnalyticsData> => {
+    const { supabase, userId } = context;
+
+    const [
+      { data: cands },
+      { data: sigs },
+      { data: accts },
+      { data: locs },
+      { data: prefs },
+    ] = await Promise.all([
+      supabase
+        .from("discovery_candidates")
+        .select(
+          "id, username, state, estimated_niche, luxury_score, quality_score, aesthetic_score, travel_score, authenticity_score, parent_candidate_id, last_ai_at",
+        )
+        .eq("user_id", userId),
+      supabase
+        .from("discovery_signals")
+        .select("candidate_id, source_type, seed_account_id, seed_location_id, seed_hashtag")
+        .eq("user_id", userId),
+      supabase
+        .from("tracked_accounts")
+        .select("id, username")
+        .eq("created_by", userId),
+      supabase
+        .from("tracked_locations")
+        .select("id, name")
+        .eq("created_by", userId),
+      supabase
+        .from("discovery_preferences")
+        .select("sample_size, niche_weights")
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ]);
+
+    const candidates = cands ?? [];
+    const signals = sigs ?? [];
+    const candById = new Map(candidates.map((c) => [c.id, c]));
+    const acctLabel = new Map((accts ?? []).map((a) => [a.id, `@${a.username}`]));
+    const locLabel = new Map((locs ?? []).map((l) => [l.id, `📍 ${l.name}`]));
+
+    // Overview.
+    let tracked = 0;
+    let ignored = 0;
+    let blacklisted = 0;
+    let pending = 0;
+    let enriched = 0;
+    for (const c of candidates) {
+      if (c.state === "tracked") tracked += 1;
+      else if (c.state === "ignored") ignored += 1;
+      else if (c.state === "blacklisted") blacklisted += 1;
+      else pending += 1;
+      if (c.last_ai_at) enriched += 1;
+    }
+    const decisions = tracked + ignored + blacklisted;
+    const rejected = ignored + blacklisted;
+
+    // ---- by source_type ----
+    // A candidate can have many signals; count each (candidate, source) pair once.
+    const sourceSets = new Map<string, Set<string>>();
+    for (const s of signals) {
+      const set = sourceSets.get(s.source_type) ?? new Set<string>();
+      set.add(s.candidate_id);
+      sourceSets.set(s.source_type, set);
+    }
+    const by_source: SourceMetric[] = [];
+    for (const [src, set] of sourceSets) {
+      let t = 0;
+      let i = 0;
+      let b = 0;
+      let p = 0;
+      for (const id of set) {
+        const c = candById.get(id);
+        if (!c) continue;
+        if (c.state === "tracked") t += 1;
+        else if (c.state === "ignored") i += 1;
+        else if (c.state === "blacklisted") b += 1;
+        else p += 1;
+      }
+      const d = t + i + b;
+      by_source.push({
+        source_type: src,
+        candidates: set.size,
+        tracked: t,
+        ignored: i,
+        blacklisted: b,
+        pending: p,
+        track_rate: d ? t / d : 0,
+        reject_rate: d ? (i + b) / d : 0,
+      });
+    }
+    by_source.sort((a, b) => b.track_rate - a.track_rate || b.candidates - a.candidates);
+
+    // ---- by seed (root sources) ----
+    type Bucket = {
+      seed_id: string;
+      kind: "account" | "location" | "hashtag";
+      label: string;
+      ids: Set<string>;
+    };
+    const buckets = new Map<string, Bucket>();
+    const bucketFor = (
+      key: string,
+      kind: "account" | "location" | "hashtag",
+      label: string,
+    ) => {
+      let b = buckets.get(key);
+      if (!b) {
+        b = { seed_id: key, kind, label, ids: new Set() };
+        buckets.set(key, b);
+      }
+      return b;
+    };
+    for (const s of signals) {
+      if (s.seed_account_id) {
+        bucketFor(
+          `a:${s.seed_account_id}`,
+          "account",
+          acctLabel.get(s.seed_account_id) ?? "tracked account",
+        ).ids.add(s.candidate_id);
+      } else if (s.seed_location_id) {
+        bucketFor(
+          `l:${s.seed_location_id}`,
+          "location",
+          locLabel.get(s.seed_location_id) ?? "tracked location",
+        ).ids.add(s.candidate_id);
+      } else if (s.seed_hashtag) {
+        bucketFor(`h:${s.seed_hashtag}`, "hashtag", `#${s.seed_hashtag}`).ids.add(
+          s.candidate_id,
+        );
+      }
+    }
+    const avgAxes = (c: (typeof candidates)[number]) => {
+      const vals = AXES.map((a) => c[`${a}_score` as const]).filter(
+        (v): v is number => typeof v === "number",
+      );
+      return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+    };
+    const by_seed: SeedMetric[] = [];
+    for (const b of buckets.values()) {
+      let t = 0;
+      let i = 0;
+      let bl = 0;
+      const trackedQualities: number[] = [];
+      for (const id of b.ids) {
+        const c = candById.get(id);
+        if (!c) continue;
+        if (c.state === "tracked") {
+          t += 1;
+          const q = avgAxes(c);
+          if (q !== null) trackedQualities.push(q);
+        } else if (c.state === "ignored") i += 1;
+        else if (c.state === "blacklisted") bl += 1;
+      }
+      const d = t + i + bl;
+      const avgQ = mean(trackedQualities);
+      // hidden gem score = track rate × avg quality of tracked, scaled to 0-100.
+      // Rewards seeds that produce FEWER but HIGHER quality picks.
+      const track_rate = d ? t / d : 0;
+      const hidden_gem_score = avgQ !== null ? track_rate * avgQ : 0;
+      by_seed.push({
+        seed_id: b.seed_id,
+        kind: b.kind,
+        label: b.label,
+        candidates: b.ids.size,
+        tracked: t,
+        ignored: i,
+        blacklisted: bl,
+        track_rate,
+        reject_rate: d ? (i + bl) / d : 0,
+        avg_tracked_quality: avgQ,
+        hidden_gem_score,
+      });
+    }
+    by_seed.sort((a, b) => b.hidden_gem_score - a.hidden_gem_score);
+
+    // ---- branches (parent candidate → children) ----
+    const branchMap = new Map<string, BranchMetric>();
+    for (const c of candidates) {
+      const pid = c.parent_candidate_id;
+      if (!pid) continue;
+      const parent = candById.get(pid);
+      if (!parent) continue;
+      let bm = branchMap.get(pid);
+      if (!bm) {
+        bm = {
+          parent_id: pid,
+          parent_username: parent.username,
+          parent_state: parent.state,
+          children: 0,
+          tracked: 0,
+          rejected: 0,
+          reject_rate: 0,
+          track_rate: 0,
+        };
+        branchMap.set(pid, bm);
+      }
+      bm.children += 1;
+      if (c.state === "tracked") bm.tracked += 1;
+      else if (c.state === "ignored" || c.state === "blacklisted") bm.rejected += 1;
+    }
+    for (const bm of branchMap.values()) {
+      const d = bm.tracked + bm.rejected;
+      bm.track_rate = d ? bm.tracked / d : 0;
+      bm.reject_rate = d ? bm.rejected / d : 0;
+    }
+    const branches = [...branchMap.values()].filter((b) => b.tracked + b.rejected >= 2);
+    const high_yield = [...branches].sort(
+      (a, b) => b.track_rate - a.track_rate || b.tracked - a.tracked,
+    ).slice(0, 10);
+    const low_yield = [...branches].sort(
+      (a, b) => b.reject_rate - a.reject_rate || b.rejected - a.rejected,
+    ).slice(0, 10);
+
+    // ---- AI score correlation with Track ----
+    const score_correlation: AxisCorrelation[] = [];
+    for (const axis of AXES) {
+      const col = `${axis}_score` as const;
+      const tScores: number[] = [];
+      const rScores: number[] = [];
+      const allScores: number[] = [];
+      const groups: number[] = [];
+      for (const c of candidates) {
+        const v = c[col];
+        if (typeof v !== "number") continue;
+        if (c.state === "tracked") {
+          tScores.push(v);
+          allScores.push(v);
+          groups.push(1);
+        } else if (c.state === "ignored" || c.state === "blacklisted") {
+          rScores.push(v);
+          allScores.push(v);
+          groups.push(0);
+        }
+      }
+      const mt = mean(tScores);
+      const mr = mean(rScores);
+      score_correlation.push({
+        axis,
+        mean_tracked: mt,
+        mean_rejected: mr,
+        gap: mt !== null && mr !== null ? mt - mr : null,
+        n_tracked: tScores.length,
+        n_rejected: rScores.length,
+        point_biserial: pointBiserial(allScores, groups),
+      });
+    }
+    score_correlation.sort(
+      (a, b) => Math.abs(b.point_biserial ?? 0) - Math.abs(a.point_biserial ?? 0),
+    );
+
+    // ---- by niche ----
+    const nicheMap = new Map<
+      string,
+      { total: number; tracked: number; rejected: number; qualities: number[] }
+    >();
+    for (const c of candidates) {
+      const n = (c.estimated_niche ?? "").toLowerCase().trim();
+      if (!n) continue;
+      let e = nicheMap.get(n);
+      if (!e) {
+        e = { total: 0, tracked: 0, rejected: 0, qualities: [] };
+        nicheMap.set(n, e);
+      }
+      e.total += 1;
+      if (c.state === "tracked") {
+        e.tracked += 1;
+        const q = avgAxes(c);
+        if (q !== null) e.qualities.push(q);
+      } else if (c.state === "ignored" || c.state === "blacklisted") {
+        e.rejected += 1;
+      }
+    }
+    const by_niche: NicheMetric[] = [];
+    for (const [niche, e] of nicheMap) {
+      const d = e.tracked + e.rejected;
+      by_niche.push({
+        niche,
+        candidates: e.total,
+        tracked: e.tracked,
+        track_rate: d ? e.tracked / d : 0,
+        reject_rate: d ? e.rejected / d : 0,
+        avg_tracked_quality: mean(e.qualities),
+      });
+    }
+    by_niche.sort((a, b) => b.track_rate - a.track_rate || b.candidates - a.candidates);
+
+    // ---- operator divergence (opt-in, operator role only) ----
+    const divergence: OperatorDivergence = { available: false, operators: [], pairs: [] };
+    try {
+      const { data: isOp } = await supabase.rpc("is_operator", { _user_id: userId });
+      if (isOp) {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: allPrefs } = await supabaseAdmin
+          .from("discovery_preferences")
+          .select("user_id, sample_size, niche_weights");
+        const { data: profiles } = await supabaseAdmin
+          .from("profiles")
+          .select("id, display_name, email");
+        const nameById = new Map(
+          (profiles ?? []).map((p) => [
+            p.id,
+            p.display_name ?? p.email ?? p.id.slice(0, 6),
+          ]),
+        );
+        const active = (allPrefs ?? []).filter((p) => (p.sample_size ?? 0) >= 3);
+        divergence.available = true;
+        divergence.operators = active.map((p) => ({
+          user_id: p.user_id,
+          display_name: nameById.get(p.user_id) ?? null,
+          sample_size: p.sample_size ?? 0,
+        }));
+        for (let a = 0; a < active.length; a++) {
+          for (let b = a + 1; b < active.length; b++) {
+            const A = active[a];
+            const B = active[b];
+            const aw = (A.niche_weights ?? {}) as Record<string, number>;
+            const bw = (B.niche_weights ?? {}) as Record<string, number>;
+            const cos = cosine(aw, bw);
+            const keys = new Set([...Object.keys(aw), ...Object.keys(bw)]);
+            const disagreements = [...keys]
+              .map((k) => ({
+                niche: k,
+                a_weight: aw[k] ?? 0,
+                b_weight: bw[k] ?? 0,
+                delta: Math.abs((aw[k] ?? 0) - (bw[k] ?? 0)),
+              }))
+              .sort((x, y) => y.delta - x.delta)
+              .slice(0, 5)
+              .map(({ niche, a_weight, b_weight }) => ({ niche, a_weight, b_weight }));
+            divergence.pairs.push({
+              a_user_id: A.user_id,
+              b_user_id: B.user_id,
+              a_label: nameById.get(A.user_id) ?? A.user_id.slice(0, 6),
+              b_label: nameById.get(B.user_id) ?? B.user_id.slice(0, 6),
+              cosine: cos,
+              divergence: 1 - cos,
+              top_disagreement: disagreements,
+            });
+          }
+        }
+        divergence.pairs.sort((a, b) => b.divergence - a.divergence);
+      }
+    } catch (err) {
+      console.warn("[discovery-analytics] divergence unavailable", err);
+    }
+
+    return {
+      overview: {
+        total_candidates: candidates.length,
+        tracked,
+        ignored,
+        blacklisted,
+        pending,
+        decisions,
+        track_rate: decisions ? tracked / decisions : 0,
+        reject_rate: decisions ? rejected / decisions : 0,
+        enriched,
+        unenriched: candidates.length - enriched,
+        sample_size: prefs?.sample_size ?? 0,
+      },
+      by_source,
+      by_seed,
+      by_branch: { high_yield, low_yield },
+      score_correlation,
+      by_niche,
+      divergence,
+    };
+  });
