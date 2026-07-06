@@ -275,6 +275,12 @@ function CandidateCard({
         </div>
       </div>
 
+      {/* Provenance chain — where in the tracked network this account emerged */}
+      {candidate.discovered_via && candidate.discovered_via.length > 0 && (
+        <DiscoveredViaChain hops={candidate.discovered_via} depth={candidate.depth ?? 0} />
+      )}
+
+
       {/* Signal stack — the "why track this?" answer in <3s */}
       <div className="px-4 space-y-1.5">
         {headlineLines.length === 0 ? (
