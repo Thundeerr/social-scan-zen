@@ -229,6 +229,8 @@ export const providerBudgetFn = createServerFn({ method: "GET" })
  */
 export type BurnForecast = {
   activeAccounts: number;
+  activeLocations: number;
+  activeSources: number;
   scansPerAccountPerDay: number;
   projectedPerDay: number;
   projectedPerWeek: number;
@@ -254,14 +256,22 @@ export const burnForecastFn = createServerFn({ method: "GET" })
     const { getBudgetStatus } = await import("@/lib/scanner-service.server");
     const budget = await getBudgetStatus(context.supabase);
 
-    const { count: activeCount } = await context.supabase
-      .from("tracked_accounts")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "active");
-    const activeAccounts = activeCount ?? 0;
+    const [{ count: accountsCount }, { count: locationsCount }] = await Promise.all([
+      context.supabase
+        .from("tracked_accounts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
+      context.supabase
+        .from("tracked_locations")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active"),
+    ]);
+    const activeAccounts = accountsCount ?? 0;
+    const activeLocations = locationsCount ?? 0;
+    const activeSources = activeAccounts + activeLocations;
 
-    const scansPerAccountPerDay = 4; // 4×/day autonomous cadence
-    const projectedPerDay = activeAccounts * scansPerAccountPerDay;
+    const scansPerAccountPerDay = 4; // 4×/day autonomous cadence — applies to accounts AND locations
+    const projectedPerDay = activeSources * scansPerAccountPerDay;
     const projectedPerWeek = projectedPerDay * 7;
     const projectedPerMonth = projectedPerDay * 30;
 
@@ -282,6 +292,8 @@ export const burnForecastFn = createServerFn({ method: "GET" })
 
     return {
       activeAccounts,
+      activeLocations,
+      activeSources,
       scansPerAccountPerDay,
       projectedPerDay,
       projectedPerWeek,
