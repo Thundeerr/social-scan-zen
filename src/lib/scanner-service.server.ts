@@ -429,7 +429,7 @@ export async function tickQueue(db: DB, maxPerTick = 3): Promise<ScanOutcome[]> 
   let budgetCap = Math.max(0, Math.min(maxPerTick, budget.remaining));
   if (budgetCap === 0) return [];
 
-  const outcomes: ScanOutcome[] = [];
+  const outcomes: Array<ScanOutcome | LocationScanOutcome> = [];
 
   // ---- Accounts pass ----
   const { data: due, error: dueErr } = await db
