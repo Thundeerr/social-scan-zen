@@ -135,16 +135,94 @@ export const listDiscoveryCandidatesFn = createServerFn({ method: "POST" })
       }
     }
 
-    return (rows ?? []).map((r) => {
+    // Build "Discovered via" chains — walk parent_candidate_id up to 3 hops,
+    // then resolve the origin tracked account (created_by = userId).
+    const rowsSafe = rows ?? [];
+    const knownById = new Map<string, { id: string; username: string; parent_candidate_id: string | null }>();
+    for (const r of rowsSafe) {
+      knownById.set(r.id, {
+        id: r.id,
+        username: r.username,
+        parent_candidate_id: r.parent_candidate_id ?? null,
+      });
+    }
+    // Load ancestors up to 3 hops beyond the loaded rows.
+    for (let hop = 0; hop < 3; hop++) {
+      const missing = new Set<string>();
+      for (const v of knownById.values()) {
+        if (v.parent_candidate_id && !knownById.has(v.parent_candidate_id)) {
+          missing.add(v.parent_candidate_id);
+        }
+      }
+      if (!missing.size) break;
+      const { data: parents } = await supabase
+        .from("discovery_candidates")
+        .select("id, username, parent_candidate_id")
+        .eq("user_id", userId)
+        .in("id", [...missing]);
+      for (const p of parents ?? []) {
+        knownById.set(p.id, {
+          id: p.id,
+          username: p.username,
+          parent_candidate_id: p.parent_candidate_id ?? null,
+        });
+      }
+      if (!parents?.length) break;
+    }
+
+    // Resolve origin tracked accounts for the chain roots.
+    const rootParentUsernames = new Set<string>();
+    for (const v of knownById.values()) {
+      if (v.parent_candidate_id === null) rootParentUsernames.add(v.username);
+    }
+    const originByUsername = new Map<string, string>();
+    if (rootParentUsernames.size) {
+      const { data: origins } = await supabase
+        .from("tracked_accounts")
+        .select("username, origin_candidate_id")
+        .eq("created_by", userId)
+        .is("origin_candidate_id", null)
+        .in("username", [...rootParentUsernames]);
+      for (const o of origins ?? []) originByUsername.set(o.username, o.username);
+    }
+
+    function chainFor(id: string): DiscoveredViaHop[] {
+      const chain: DiscoveredViaHop[] = [];
+      const seen = new Set<string>();
+      let cur = knownById.get(id);
+      // walk parents (exclude self)
+      while (cur?.parent_candidate_id) {
+        if (seen.has(cur.parent_candidate_id)) break;
+        seen.add(cur.parent_candidate_id);
+        const parent = knownById.get(cur.parent_candidate_id);
+        if (!parent) break;
+        chain.push({ id: parent.id, username: parent.username, kind: "candidate" });
+        cur = parent;
+        if (chain.length >= 3) break;
+      }
+      // If the topmost candidate corresponds to a manually-tracked account, tag it as origin.
+      if (chain.length) {
+        const top = chain[chain.length - 1];
+        if (originByUsername.has(top.username)) {
+          chain[chain.length - 1] = { ...top, kind: "origin" };
+        }
+      }
+      // Return in root → leaf order.
+      return chain.reverse();
+    }
+
+    return rowsSafe.map((r) => {
       const sigs = signalsByCandidate.get(r.id) ?? [];
       return {
         ...r,
         score_reasons: (r.score_reasons ?? {}) as ScoreReasons,
         headline_signals: buildHeadlineSignals(r, sigs),
+        discovered_via: chainFor(r.id),
         signals: sigs.slice(0, 6),
       };
     }) as DiscoveryCandidateRow[];
   });
+
 
 function buildHeadlineSignals(
   r: {
