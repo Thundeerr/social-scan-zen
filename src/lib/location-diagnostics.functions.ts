@@ -140,6 +140,16 @@ export const testLocationFetchFn = createServerFn({ method: "POST" })
               thumbnail_url: first.thumbnail_url,
             }
           : null,
+        previewPosts: res.posts.slice(0, 6).map((p) => ({
+          external_id: p.external_id,
+          media_type: p.media_type,
+          caption: p.caption.slice(0, 100),
+          likes: p.likes,
+          comments: p.comments,
+          posted_at: p.posted_at,
+          source_url: p.source_url,
+          thumbnail_url: p.thumbnail_url,
+        })),
         rawShape,
       };
     } catch (err) {
