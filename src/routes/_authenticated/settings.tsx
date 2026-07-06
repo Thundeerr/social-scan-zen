@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -215,6 +215,7 @@ function LocationProviderSection() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [locationId, setLocationId] = useState("213385402"); // Berghain — public reference
   const [testing, setTesting] = useState(false);
+  const testingRef = useRef(false);
   const [testResult, setTestResult] = useState<TestPayload | null>(null);
 
   async function refreshStatus() {
@@ -236,10 +237,12 @@ function LocationProviderSection() {
   }, []);
 
   async function onTest() {
+    if (testingRef.current) return;
     if (!/^\d{3,20}$/.test(locationId.trim())) {
       toast.error("Enter a numeric Instagram location id (3–20 digits)");
       return;
     }
+    testingRef.current = true;
     setTesting(true);
     setTestResult(null);
     const t = toast.loading("Contacting provider…");
@@ -259,6 +262,7 @@ function LocationProviderSection() {
       setTestResult({ ok: false, elapsedMs: 0, error: msg });
       toast.error("Provider test failed", { id: t, description: msg });
     } finally {
+      testingRef.current = false;
       setTesting(false);
     }
   }
@@ -363,10 +367,13 @@ function LocationProviderSection() {
             onChange={(e) => setLocationId(e.target.value)}
             placeholder="213385402"
             className="font-mono sm:max-w-xs"
+            disabled={testing}
+            aria-busy={testing}
           />
           <Button
             onClick={() => void onTest()}
             disabled={testing || !status?.host || !status?.keySet}
+            aria-busy={testing}
             className="gap-1.5"
           >
             {testing ? (
@@ -374,7 +381,7 @@ function LocationProviderSection() {
             ) : (
               <Radar className="h-3.5 w-3.5" />
             )}
-            Run test fetch
+            {testing ? "Running…" : "Run test fetch"}
           </Button>
         </div>
 
@@ -390,7 +397,8 @@ function LocationProviderSection() {
                   key={s.id}
                   type="button"
                   onClick={() => setLocationId(s.id)}
-                  className={`text-xs px-2 py-1 rounded border transition-colors ${
+                  disabled={testing}
+                  className={`text-xs px-2 py-1 rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     active
                       ? "border-primary/50 bg-primary/10 text-foreground"
                       : "border-border hover:bg-accent text-muted-foreground hover:text-foreground"
