@@ -63,6 +63,65 @@ export const testLocationFetchFn = createServerFn({ method: "POST" })
       const provider = getInstagramProviderFromEnv();
       const res = await provider.fetchLocation(data.locationId);
       const first = res.posts[0] ?? null;
+
+      // Also do a raw fetch to expose the response shape so the operator can
+      // see what came back when the parser finds 0 posts. Best-effort only.
+      let rawShape: {
+        topLevelKeys: string[];
+        firstArrayPath: string | null;
+        firstArrayLength: number | null;
+        preview: string | null;
+      } | null = null;
+      if (res.posts.length === 0) {
+        try {
+          const host = process.env.RAPIDAPI_HOST!;
+          const key = process.env.RAPIDAPI_KEY!;
+          const path = process.env.RAPIDAPI_LOCATION_PATH ?? "/location-feeds";
+          const idParam = process.env.RAPIDAPI_LOCATION_ID_PARAM ?? "id";
+          const url = new URL(`https://${host}${path}`);
+          url.searchParams.set(idParam, data.locationId);
+          const extra = process.env.RAPIDAPI_LOCATION_EXTRA_PARAMS ?? "";
+          for (const [k, v] of new URLSearchParams(extra)) url.searchParams.set(k, v);
+          const raw = await fetch(url.toString(), {
+            headers: { "X-RapidAPI-Key": key, "X-RapidAPI-Host": host },
+          });
+          const text = await raw.text();
+          let json: unknown = null;
+          try { json = JSON.parse(text); } catch { /* ignore */ }
+          const root = (json ?? {}) as Record<string, unknown>;
+          const topLevelKeys = json && typeof json === "object" && !Array.isArray(json)
+            ? Object.keys(root).slice(0, 20)
+            : [];
+          // Find the first non-empty array anywhere in the tree.
+          let firstArrayPath: string | null = null;
+          let firstArrayLength: number | null = null;
+          const stack: Array<[string, unknown]> = [["$", json]];
+          const seen = new WeakSet<object>();
+          while (stack.length) {
+            const [p, v] = stack.shift()!;
+            if (!v || typeof v !== "object" || seen.has(v as object)) continue;
+            seen.add(v as object);
+            if (Array.isArray(v)) {
+              if (v.length > 0 && firstArrayPath === null) {
+                firstArrayPath = p;
+                firstArrayLength = v.length;
+              }
+              for (let i = 0; i < Math.min(v.length, 2); i++) stack.push([`${p}[${i}]`, v[i]]);
+            } else {
+              for (const [k, vv] of Object.entries(v as Record<string, unknown>)) {
+                stack.push([`${p}.${k}`, vv]);
+              }
+            }
+          }
+          rawShape = {
+            topLevelKeys,
+            firstArrayPath,
+            firstArrayLength,
+            preview: text.slice(0, 400),
+          };
+        } catch { /* ignore diagnostics failure */ }
+      }
+
       return {
         ok: true as const,
         elapsedMs: Date.now() - started,
@@ -81,6 +140,7 @@ export const testLocationFetchFn = createServerFn({ method: "POST" })
               thumbnail_url: first.thumbnail_url,
             }
           : null,
+        rawShape,
       };
     } catch (err) {
       return {

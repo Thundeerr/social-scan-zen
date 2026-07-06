@@ -121,6 +121,49 @@ function normalisePost(raw: Record<string, unknown>): ProviderPost | null {
   };
 }
 
+/**
+ * Walk an object graph and collect anything that looks like a post record.
+ * Used as a fallback when the top-level structure doesn't match any of the
+ * documented shapes (e.g. Instagram's `sections[].layout_content.medias[].media`
+ * nesting used by location-feed endpoints).
+ */
+function collectPostLike(payload: unknown): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  const seen = new WeakSet<object>();
+  const stack: unknown[] = [payload];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object") continue;
+    if (seen.has(node as object)) continue;
+    seen.add(node as object);
+    if (Array.isArray(node)) {
+      for (const v of node) stack.push(v);
+      continue;
+    }
+    const rec = node as Record<string, unknown>;
+    // Instagram's location-feed nesting: unwrap `{ media: {...} }` and
+    // `{ layout_content: { medias: [{ media: {...} }] } }`.
+    if (rec.media && typeof rec.media === "object" && !Array.isArray(rec.media)) {
+      stack.push(rec.media);
+    }
+    const hasId = typeof rec.id === "string" || typeof rec.pk === "string" ||
+      typeof rec.pk === "number" || typeof rec.code === "string" ||
+      typeof rec.shortcode === "string";
+    const looksLikePost = hasId && (
+      "media_type" in rec || "image_versions2" in rec || "caption" in rec ||
+      "taken_at" in rec || "taken_at_timestamp" in rec || "video_versions" in rec ||
+      "display_url" in rec || "thumbnail_url" in rec
+    );
+    if (looksLikePost) {
+      out.push(rec);
+      // don't descend further into a matched post
+      continue;
+    }
+    for (const v of Object.values(rec)) stack.push(v);
+  }
+  return out;
+}
+
 function normaliseResponse(username: string, payload: unknown): ProviderResponse {
   const root = (payload ?? {}) as Record<string, unknown>;
   const user = (pick<Record<string, unknown>>(root, ["user", "owner", "author"]) ?? {}) as Record<string, unknown>;
@@ -137,7 +180,7 @@ function normaliseResponse(username: string, payload: unknown): ProviderResponse
     pick(pick<Record<string, unknown>>(root, ["data"]) ?? {}, ["items", "medias", "posts"]);
   if (!Array.isArray(items)) items = [];
 
-  const posts = (items as unknown[])
+  let posts = (items as unknown[])
     .map((it) => {
       const rec = (it && typeof it === "object" && "node" in it
         ? (it as { node: Record<string, unknown> }).node
@@ -146,8 +189,18 @@ function normaliseResponse(username: string, payload: unknown): ProviderResponse
     })
     .filter((p): p is ProviderPost => Boolean(p));
 
+  // Fallback: the response uses a nested shape (Instagram location-feed style,
+  // `sections[].layout_content.medias[].media`). Walk the graph.
+  if (posts.length === 0) {
+    const candidates = collectPostLike(root);
+    posts = candidates
+      .map((rec) => normalisePost(rec))
+      .filter((p): p is ProviderPost => Boolean(p));
+  }
+
   return { username, display_name, avatar_url, posts };
 }
+
 
 export type InstagramProviderConfig = {
   apiKey: string;

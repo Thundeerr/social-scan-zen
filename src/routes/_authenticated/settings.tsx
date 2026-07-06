@@ -457,8 +457,45 @@ function LocationProviderSection() {
                 Provider returned no posts for this location.
               </div>
             )}
+            {!testResult.firstPost && testResult.rawShape && (
+              <div className="mt-2 rounded-md border border-border bg-muted/20 p-2 space-y-1.5 text-[11px]">
+                <div className="text-muted-foreground uppercase tracking-wider text-[10px]">
+                  Response shape (diagnostic)
+                </div>
+                {testResult.rawShape.topLevelKeys.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Top-level keys:</span>{" "}
+                    <span className="font-mono">
+                      {testResult.rawShape.topLevelKeys.join(", ")}
+                    </span>
+                  </div>
+                )}
+                {testResult.rawShape.firstArrayPath && (
+                  <div>
+                    <span className="text-muted-foreground">First array:</span>{" "}
+                    <span className="font-mono">
+                      {testResult.rawShape.firstArrayPath}
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      ({testResult.rawShape.firstArrayLength} items)
+                    </span>
+                  </div>
+                )}
+                {testResult.rawShape.preview && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      Raw preview (first 400 chars)
+                    </summary>
+                    <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[10px] opacity-80">
+                      {testResult.rawShape.preview}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
           </div>
         )}
+
 
         {testResult && !testResult.ok && (
           <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
