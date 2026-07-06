@@ -365,6 +365,48 @@ export type Database = {
           },
         ]
       }
+      discovery_cooccurrences: {
+        Row: {
+          a_id: string
+          b_id: string
+          count: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          a_id: string
+          b_id: string
+          count?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          a_id?: string
+          b_id?: string
+          count?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_cooccurrences_a_id_fkey"
+            columns: ["a_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_cooccurrences_b_id_fkey"
+            columns: ["b_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discovery_preferences: {
         Row: {
           avg_aesthetic: number
