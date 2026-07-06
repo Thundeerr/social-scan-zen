@@ -481,3 +481,38 @@ function ScoreReasonsBlock({
     </div>
   );
 }
+
+function DiscoveredViaChain({ hops, depth }: { hops: DiscoveredViaHop[]; depth: number }) {
+  if (!hops.length) return null;
+  return (
+    <div className="mx-4 mt-3 flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1.5 text-[10px] text-muted-foreground overflow-hidden">
+      <span className="uppercase tracking-wider mr-1 shrink-0">Discovered via</span>
+      <div className="flex items-center gap-1 min-w-0">
+        {hops.map((hop, i) => (
+          <div key={hop.id} className="flex items-center gap-1 min-w-0">
+            {i > 0 && <ChevronRight className="h-3 w-3 text-border shrink-0" />}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 truncate max-w-[8rem]",
+                hop.kind === "origin"
+                  ? "text-emerald-300/80"
+                  : "text-foreground/70",
+              )}
+              title={hop.kind === "origin" ? "Tracked seed account" : "Previously discovered account"}
+            >
+              {hop.kind === "origin" && <Anchor className="h-3 w-3 shrink-0" />}
+              @{hop.username}
+            </span>
+          </div>
+        ))}
+        {depth > 0 && (
+          <>
+            <ChevronRight className="h-3 w-3 text-border shrink-0" />
+            <span className="text-foreground/80 shrink-0">hop {depth}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
