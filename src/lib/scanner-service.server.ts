@@ -15,6 +15,7 @@ import type { Database } from "@/integrations/supabase/types";
 import {
   getInstagramProviderFromEnv,
   describeProviderRequest,
+  describeLocationProviderRequest,
   type ProviderPost,
 } from "./instagram-provider.server";
 
