@@ -26,6 +26,23 @@ type Decision = "track" | "ignore" | "blacklist";
 const DISCOVERY_INTERVAL_MIN = 6 * 60; // rerun discovery per seed every ~6h
 const ENRICH_THRESHOLD = 1;             // enrich after this many signals
 
+/**
+ * Phase 4 — transparent self-improvement weights. Kept tiny and editable
+ * on purpose. Each modifier is surfaced per candidate in `rank_breakdown`
+ * so the operator can see WHY a candidate scores what it scores.
+ */
+export const DISCOVERY_WEIGHTS = {
+  DIVERSITY_STEP: 0.1, // penalty per prior candidate sharing niche/cluster
+  DIVERSITY_MAX: 0.3,
+  NOVELTY_MAX: 0.15,
+  NOVELTY_NEUTRAL: 0.05, // when we have no peer data at all
+  ENTROPY_BASE: 0.3,
+  ENTROPY_PER_TRACKED: 0.005,
+  ENTROPY_CEIL: 0.55,
+  SIGNAL_WEIGHT_CLAMP: 3,
+} as const;
+
+
 // ---------- Seed passes ---------------------------------------------------
 
 async function fetchAssetsForAccount(db: DB, accountId: string, limit = 60) {
@@ -662,6 +679,24 @@ async function updatePreferences(
   if (cand.estimated_niche) {
     const k = cand.estimated_niche.toLowerCase();
     nicheWeights[k] = (nicheWeights[k] ?? 0) + dir;
+    if (decision === "blacklist") nicheWeights[k] -= 0.5; // extra decay
+  }
+
+  // Signal-weights learning: for each source_type that produced this
+  // candidate, nudge the weight in the same direction as the decision.
+  // Clamped to keep any single loud source from dominating ranking later.
+  const signalWeights = { ...((cur.signal_weights ?? {}) as Record<string, number>) };
+  const { data: sigRows } = await db
+    .from("discovery_signals")
+    .select("source_type")
+    .eq("candidate_id", cand.id);
+  const sourceCounts = new Map<string, number>();
+  for (const s of sigRows ?? [])
+    sourceCounts.set(s.source_type, (sourceCounts.get(s.source_type) ?? 0) + 1);
+  const clamp = DISCOVERY_WEIGHTS.SIGNAL_WEIGHT_CLAMP;
+  for (const [source] of sourceCounts) {
+    const next = (signalWeights[source] ?? 0) + dir;
+    signalWeights[source] = Math.max(-clamp, Math.min(clamp, next));
   }
 
   const patch = {
@@ -680,7 +715,7 @@ async function updatePreferences(
         ? cur.pref_commercial
         : ema(cur.pref_commercial as number, cand.p_commercial_brand * 100) / 100,
     niche_weights: nicheWeights,
-    signal_weights: cur.signal_weights,
+    signal_weights: signalWeights,
     sample_size: sample + 1,
   };
 
