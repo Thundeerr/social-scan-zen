@@ -3,6 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Users,
+  MapPin,
   Images,
   Download,
   Radar,
@@ -19,6 +20,7 @@ import { BrandMark } from "@/components/layout/BrandMark";
 const items = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/accounts", label: "Tracked Accounts", icon: Users },
+  { to: "/locations", label: "Tracked Locations", icon: MapPin },
   { to: "/assets", label: "New Assets", icon: Images },
   { to: "/downloads", label: "Archive", icon: Download },
   { to: "/scanner", label: "Scanner", icon: Radar },
