@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import {
   listDiscoveryCandidatesFn,
   getDiscoveryStatsFn,
+  getDiscoveryDebugFn,
   decideDiscoveryCandidateFn,
   runDiscoveryNowFn,
   type DiscoveryCandidateRow,
@@ -34,6 +35,7 @@ import {
   type ClusterPeer,
   type ScoreReasons,
   type RankBreakdown,
+  type DiscoveryDebugData,
 } from "@/lib/discovery.functions";
 
 
