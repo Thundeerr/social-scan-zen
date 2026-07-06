@@ -58,6 +58,10 @@ export type DiscoveryCandidateRow = {
   last_ai_at: string | null;
   headline_signals: string[];
   discovered_via: DiscoveredViaHop[];
+  cluster_peers: ClusterPeer[];
+  is_cluster_representative: boolean;
+  cluster_size: number;
+
   signals: Array<{
     source_type: string;
     seed_account_id: string | null;
