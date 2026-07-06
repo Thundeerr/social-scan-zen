@@ -263,6 +263,7 @@ export type Database = {
           followers: number | null
           following: number | null
           full_name: string | null
+          headline_signals: Json
           id: string
           is_private: boolean | null
           is_verified: boolean | null
@@ -274,6 +275,7 @@ export type Database = {
           posts_count: number | null
           quality_score: number | null
           rank_score: number
+          score_reasons: Json
           signal_count: number
           state: Database["public"]["Enums"]["discovery_state"]
           travel_score: number | null
@@ -294,6 +296,7 @@ export type Database = {
           followers?: number | null
           following?: number | null
           full_name?: string | null
+          headline_signals?: Json
           id?: string
           is_private?: boolean | null
           is_verified?: boolean | null
@@ -305,6 +308,7 @@ export type Database = {
           posts_count?: number | null
           quality_score?: number | null
           rank_score?: number
+          score_reasons?: Json
           signal_count?: number
           state?: Database["public"]["Enums"]["discovery_state"]
           travel_score?: number | null
@@ -325,6 +329,7 @@ export type Database = {
           followers?: number | null
           following?: number | null
           full_name?: string | null
+          headline_signals?: Json
           id?: string
           is_private?: boolean | null
           is_verified?: boolean | null
@@ -336,6 +341,7 @@ export type Database = {
           posts_count?: number | null
           quality_score?: number | null
           rank_score?: number
+          score_reasons?: Json
           signal_count?: number
           state?: Database["public"]["Enums"]["discovery_state"]
           travel_score?: number | null

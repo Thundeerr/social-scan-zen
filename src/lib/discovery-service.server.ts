@@ -196,12 +196,14 @@ export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string)
 
 // ---------- Enrichment ----------------------------------------------------
 
+type AxisVerdict = { score: number; reasons: string[] };
+
 type AiVerdict = {
-  luxury_score: number;
-  quality_score: number;
-  aesthetic_score: number;
-  travel_score: number;
-  authenticity_score: number;
+  luxury: AxisVerdict;
+  quality: AxisVerdict;
+  aesthetic: AxisVerdict;
+  travel: AxisVerdict;
+  authenticity: AxisVerdict;
   p_private_individual: number;
   p_commercial_brand: number;
   estimated_niche: string;
@@ -226,13 +228,26 @@ async function callLovableAi(payload: {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return null;
 
+  const axis = {
+    type: "object",
+    additionalProperties: false,
+    required: ["score", "reasons"],
+    properties: {
+      score: { type: "integer" },
+      reasons: {
+        type: "array",
+        items: { type: "string" },
+      },
+    },
+  };
+
   const body = {
     model: LOVABLE_MODEL,
     messages: [
       {
         role: "system",
         content:
-          "You are an elite intelligence analyst inside an autonomous account-discovery platform. Rate Instagram accounts on five 0–100 axes (luxury, content quality, aesthetic, travel, authenticity) and estimate whether the account is a private individual versus a commercial brand (each 0–1, must sum to ≤1). Estimate the niche in 1–3 words and the posting frequency in short natural English. Be conservative when data is thin — pull confidence down accordingly. Respond in JSON matching the schema.",
+          "You are an elite intelligence analyst inside an autonomous account-discovery platform. For every Instagram account you evaluate five axes on a 0–100 scale: luxury, content quality, aesthetic consistency, travel intensity, and authenticity. For EACH axis you MUST return between 3 and 5 short, concrete, evidence-based reasons in operator English (e.g. \"Frequently posts from Aman properties\", \"Multiple private aviation appearances\", \"High-end restaurants dominate content\"). Never repeat the axis name inside its own reasons. Also estimate the probability that the account is a private individual vs. a commercial brand (each between 0 and 1, together ≤ 1), a 1–3 word niche, a posting frequency in short natural English, a one-sentence summary, and a confidence between 0 and 1. Be conservative when the data is thin — pull confidence down accordingly. Respond in JSON matching the schema.",
       },
       {
         role: "user",
@@ -248,11 +263,11 @@ async function callLovableAi(payload: {
           type: "object",
           additionalProperties: false,
           required: [
-            "luxury_score",
-            "quality_score",
-            "aesthetic_score",
-            "travel_score",
-            "authenticity_score",
+            "luxury",
+            "quality",
+            "aesthetic",
+            "travel",
+            "authenticity",
             "p_private_individual",
             "p_commercial_brand",
             "estimated_niche",
@@ -261,17 +276,17 @@ async function callLovableAi(payload: {
             "confidence",
           ],
           properties: {
-            luxury_score: { type: "integer", minimum: 0, maximum: 100 },
-            quality_score: { type: "integer", minimum: 0, maximum: 100 },
-            aesthetic_score: { type: "integer", minimum: 0, maximum: 100 },
-            travel_score: { type: "integer", minimum: 0, maximum: 100 },
-            authenticity_score: { type: "integer", minimum: 0, maximum: 100 },
-            p_private_individual: { type: "number", minimum: 0, maximum: 1 },
-            p_commercial_brand: { type: "number", minimum: 0, maximum: 1 },
+            luxury: axis,
+            quality: axis,
+            aesthetic: axis,
+            travel: axis,
+            authenticity: axis,
+            p_private_individual: { type: "number" },
+            p_commercial_brand: { type: "number" },
             estimated_niche: { type: "string" },
             estimated_post_frequency: { type: "string" },
             summary: { type: "string" },
-            confidence: { type: "number", minimum: 0, maximum: 1 },
+            confidence: { type: "number" },
           },
         },
       },
@@ -303,6 +318,14 @@ async function callLovableAi(payload: {
     return null;
   }
 }
+
+const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+const clampReasons = (r: string[] | undefined) =>
+  (r ?? [])
+    .filter((x) => typeof x === "string" && x.trim().length > 0)
+    .slice(0, 5)
+    .map((x) => x.trim());
+
 
 async function fetchProfileSummary(username: string) {
   try {
@@ -362,11 +385,23 @@ export async function enrichCandidate(db: DB, candidateId: string) {
   if (profile?.avatar_url) patch.avatar_url = profile.avatar_url;
 
   if (verdict) {
-    patch.luxury_score = verdict.luxury_score;
-    patch.quality_score = verdict.quality_score;
-    patch.aesthetic_score = verdict.aesthetic_score;
-    patch.travel_score = verdict.travel_score;
-    patch.authenticity_score = verdict.authenticity_score;
+    const luxury = clampScore(verdict.luxury.score);
+    const quality = clampScore(verdict.quality.score);
+    const aesthetic = clampScore(verdict.aesthetic.score);
+    const travel = clampScore(verdict.travel.score);
+    const authenticity = clampScore(verdict.authenticity.score);
+    patch.luxury_score = luxury;
+    patch.quality_score = quality;
+    patch.aesthetic_score = aesthetic;
+    patch.travel_score = travel;
+    patch.authenticity_score = authenticity;
+    patch.score_reasons = {
+      luxury: clampReasons(verdict.luxury.reasons),
+      quality: clampReasons(verdict.quality.reasons),
+      aesthetic: clampReasons(verdict.aesthetic.reasons),
+      travel: clampReasons(verdict.travel.reasons),
+      authenticity: clampReasons(verdict.authenticity.reasons),
+    };
     patch.p_private_individual = verdict.p_private_individual;
     patch.p_commercial_brand = verdict.p_commercial_brand;
     patch.estimated_niche = verdict.estimated_niche;
@@ -379,14 +414,34 @@ export async function enrichCandidate(db: DB, candidateId: string) {
         verdict.confidence * Math.min(1, 0.2 + 0.15 * (cand.signal_count ?? 0)),
       ),
     );
-    patch.rank_score = await computeRankScore(db, cand.user_id, verdict);
+    patch.rank_score = await computeRankScore(db, cand.user_id, {
+      luxury,
+      quality,
+      aesthetic,
+      travel,
+      authenticity,
+      niche: verdict.estimated_niche,
+      confidence: verdict.confidence,
+    });
   }
 
   await db.from("discovery_candidates").update(patch).eq("id", cand.id);
   return { ok: true as const };
 }
 
-async function computeRankScore(db: DB, userId: string, v: AiVerdict) {
+async function computeRankScore(
+  db: DB,
+  userId: string,
+  v: {
+    luxury: number;
+    quality: number;
+    aesthetic: number;
+    travel: number;
+    authenticity: number;
+    niche: string;
+    confidence: number;
+  },
+) {
   const { data: prefs } = await db
     .from("discovery_preferences")
     .select("*")
@@ -402,8 +457,8 @@ async function computeRankScore(db: DB, userId: string, v: AiVerdict) {
   };
   const nicheWeights = (p.niche_weights ?? {}) as Record<string, number>;
   const nicheMatch =
-    v.estimated_niche && nicheWeights[v.estimated_niche.toLowerCase()]
-      ? Math.min(1, (nicheWeights[v.estimated_niche.toLowerCase()] as number) / 3)
+    v.niche && nicheWeights[v.niche.toLowerCase()]
+      ? Math.min(1, (nicheWeights[v.niche.toLowerCase()] as number) / 3)
       : 0.3;
 
   const normalised = (score: number, pref: number) => {
@@ -412,11 +467,11 @@ async function computeRankScore(db: DB, userId: string, v: AiVerdict) {
   };
   return (
     0.35 * nicheMatch +
-    0.15 * normalised(v.luxury_score, p.avg_luxury as number) +
-    0.15 * normalised(v.quality_score, p.avg_quality as number) +
-    0.1 * normalised(v.aesthetic_score, p.avg_aesthetic as number) +
-    0.1 * normalised(v.travel_score, p.avg_travel as number) +
-    0.05 * normalised(v.authenticity_score, p.avg_authenticity as number) +
+    0.15 * normalised(v.luxury, p.avg_luxury as number) +
+    0.15 * normalised(v.quality, p.avg_quality as number) +
+    0.1 * normalised(v.aesthetic, p.avg_aesthetic as number) +
+    0.1 * normalised(v.travel, p.avg_travel as number) +
+    0.05 * normalised(v.authenticity, p.avg_authenticity as number) +
     0.1 * v.confidence
   );
 }

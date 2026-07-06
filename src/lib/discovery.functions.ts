@@ -7,6 +7,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+export type ScoreReasons = Partial<
+  Record<"luxury" | "quality" | "aesthetic" | "travel" | "authenticity", string[]>
+>;
+
 export type DiscoveryCandidateRow = {
   id: string;
   username: string;
@@ -24,6 +28,7 @@ export type DiscoveryCandidateRow = {
   aesthetic_score: number | null;
   travel_score: number | null;
   authenticity_score: number | null;
+  score_reasons: ScoreReasons;
   p_private_individual: number | null;
   p_commercial_brand: number | null;
   estimated_post_frequency: string | null;
@@ -34,6 +39,7 @@ export type DiscoveryCandidateRow = {
   first_seen_at: string;
   last_seen_at: string;
   last_ai_at: string | null;
+  headline_signals: string[];
   signals: Array<{
     source_type: string;
     seed_account_id: string | null;
@@ -119,11 +125,119 @@ export const listDiscoveryCandidatesFn = createServerFn({ method: "POST" })
       }
     }
 
-    return (rows ?? []).map((r) => ({
-      ...r,
-      signals: signalsByCandidate.get(r.id)?.slice(0, 6) ?? [],
-    })) as DiscoveryCandidateRow[];
+    return (rows ?? []).map((r) => {
+      const sigs = signalsByCandidate.get(r.id) ?? [];
+      return {
+        ...r,
+        score_reasons: (r.score_reasons ?? {}) as ScoreReasons,
+        headline_signals: buildHeadlineSignals(r, sigs),
+        signals: sigs.slice(0, 6),
+      };
+    }) as DiscoveryCandidateRow[];
   });
+
+function buildHeadlineSignals(
+  r: {
+    luxury_score: number | null;
+    quality_score: number | null;
+    aesthetic_score: number | null;
+    travel_score: number | null;
+    authenticity_score: number | null;
+    estimated_niche: string | null;
+    estimated_post_frequency: string | null;
+  },
+  sigs: Array<{
+    source_type: string;
+    seed_account_id: string | null;
+    seed_location_id: string | null;
+    seed_hashtag: string | null;
+    seed_label: string | null;
+  }>,
+): string[] {
+  const accountCounts = new Map<string, { label: string; count: number }>();
+  const locationCounts = new Map<string, { label: string; count: number }>();
+  const taggedBy = new Set<string>();
+  const collabWith = new Set<string>();
+
+  for (const s of sigs) {
+    if (s.seed_account_id) {
+      const cur = accountCounts.get(s.seed_account_id) ?? {
+        label: s.seed_label ?? "tracked account",
+        count: 0,
+      };
+      cur.count += 1;
+      accountCounts.set(s.seed_account_id, cur);
+      if (s.source_type === "tagged_user" || s.source_type === "tagged_collaborator") {
+        taggedBy.add(s.seed_account_id);
+      }
+      if (s.source_type === "tagged_collaborator") collabWith.add(s.seed_account_id);
+    }
+    if (s.seed_location_id) {
+      const cur = locationCounts.get(s.seed_location_id) ?? {
+        label: s.seed_label ?? "tracked location",
+        count: 0,
+      };
+      cur.count += 1;
+      locationCounts.set(s.seed_location_id, cur);
+    }
+  }
+
+  const topAccounts = [...accountCounts.values()].sort((a, b) => b.count - a.count);
+  const topLocations = [...locationCounts.values()].sort((a, b) => b.count - a.count);
+
+  const lines: string[] = [];
+
+  if (topAccounts[0]) {
+    const t = topAccounts[0];
+    lines.push(
+      t.count >= 2 ? `Appeared with ${t.label} ${t.count} times` : `Appeared with ${t.label}`,
+    );
+  }
+  if (topLocations[0]) {
+    const t = topLocations[0];
+    lines.push(
+      t.count >= 2 ? `Posted from ${t.label} ${t.count} times` : `Posted from ${t.label}`,
+    );
+  }
+  if (taggedBy.size >= 2) {
+    lines.push(`Tagged by ${taggedBy.size} tracked accounts`);
+  }
+  if (collabWith.size >= 1 && !lines.some((l) => l.startsWith("Tagged by"))) {
+    lines.push(`Collaborated with ${collabWith.size} tracked account${collabWith.size === 1 ? "" : "s"}`);
+  }
+  if (topAccounts.length >= 2 && topAccounts.length > taggedBy.size) {
+    const overlap = topAccounts.length;
+    if (!lines.some((l) => l.startsWith("Tagged by") || l.startsWith("Collaborated"))) {
+      lines.push(`Signals from ${overlap} tracked accounts`);
+    }
+  }
+
+  const strongScores: Array<[string, number | null]> = [
+    ["Luxury", r.luxury_score],
+    ["Aesthetic", r.aesthetic_score],
+    ["Quality", r.quality_score],
+    ["Travel", r.travel_score],
+  ];
+  const strong = strongScores.filter(([, v]) => typeof v === "number" && (v as number) >= 85);
+  if (strong.length) {
+    lines.push(
+      strong
+        .slice(0, 2)
+        .map(([k, v]) => `${k} score ${v}`)
+        .join(" · "),
+    );
+  }
+
+  if (r.estimated_niche && lines.length < 5) {
+    lines.push(
+      r.estimated_post_frequency
+        ? `${r.estimated_niche} · ${r.estimated_post_frequency}`
+        : r.estimated_niche,
+    );
+  }
+
+  return lines.slice(0, 5);
+}
 
 export const getDiscoveryStatsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
