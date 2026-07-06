@@ -11,6 +11,7 @@ import {
   Activity,
   Send,
   Flame,
+  Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/BrandMark";
@@ -21,6 +22,7 @@ const items = [
   { to: "/locations", label: "Tracked Locations", icon: MapPin, hint: "G L" },
   { to: "/assets", label: "New Assets", icon: Images, hint: "G A" },
   { to: "/discovery", label: "Discovery", icon: Sparkles, hint: "G X" },
+  { to: "/discovery/analytics", label: "Discovery Analytics", icon: Gauge, hint: null as string | null },
   { to: "/downloads", label: "Archive", icon: Download, hint: null as string | null },
   { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
   { to: "/burn", label: "Token Burn Rate", icon: Flame, hint: null as string | null },
