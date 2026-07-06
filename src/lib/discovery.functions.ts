@@ -76,6 +76,8 @@ export type DiscoveryCandidateRow = {
   cluster_peers: ClusterPeer[];
   is_cluster_representative: boolean;
   cluster_size: number;
+  rank_breakdown: RankBreakdown;
+
 
   signals: Array<{
     source_type: string;
