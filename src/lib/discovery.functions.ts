@@ -11,6 +11,12 @@ export type ScoreReasons = Partial<
   Record<"luxury" | "quality" | "aesthetic" | "travel" | "authenticity", string[]>
 >;
 
+export type DiscoveredViaHop = {
+  id: string;
+  username: string;
+  kind: "candidate" | "origin";
+};
+
 export type DiscoveryCandidateRow = {
   id: string;
   username: string;
@@ -36,10 +42,13 @@ export type DiscoveryCandidateRow = {
   rank_score: number;
   state: "new" | "tracked" | "ignored" | "blacklisted";
   signal_count: number;
+  depth: number;
+  parent_candidate_id: string | null;
   first_seen_at: string;
   last_seen_at: string;
   last_ai_at: string | null;
   headline_signals: string[];
+  discovered_via: DiscoveredViaHop[];
   signals: Array<{
     source_type: string;
     seed_account_id: string | null;
@@ -50,6 +59,7 @@ export type DiscoveryCandidateRow = {
     seed_label: string | null;
   }>;
 };
+
 
 export const listDiscoveryCandidatesFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
