@@ -196,12 +196,14 @@ export async function runDiscoveryForSeedLocation(db: DB, locationRowId: string)
 
 // ---------- Enrichment ----------------------------------------------------
 
+type AxisVerdict = { score: number; reasons: string[] };
+
 type AiVerdict = {
-  luxury_score: number;
-  quality_score: number;
-  aesthetic_score: number;
-  travel_score: number;
-  authenticity_score: number;
+  luxury: AxisVerdict;
+  quality: AxisVerdict;
+  aesthetic: AxisVerdict;
+  travel: AxisVerdict;
+  authenticity: AxisVerdict;
   p_private_individual: number;
   p_commercial_brand: number;
   estimated_niche: string;
@@ -226,13 +228,26 @@ async function callLovableAi(payload: {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) return null;
 
+  const axis = {
+    type: "object",
+    additionalProperties: false,
+    required: ["score", "reasons"],
+    properties: {
+      score: { type: "integer" },
+      reasons: {
+        type: "array",
+        items: { type: "string" },
+      },
+    },
+  };
+
   const body = {
     model: LOVABLE_MODEL,
     messages: [
       {
         role: "system",
         content:
-          "You are an elite intelligence analyst inside an autonomous account-discovery platform. Rate Instagram accounts on five 0–100 axes (luxury, content quality, aesthetic, travel, authenticity) and estimate whether the account is a private individual versus a commercial brand (each 0–1, must sum to ≤1). Estimate the niche in 1–3 words and the posting frequency in short natural English. Be conservative when data is thin — pull confidence down accordingly. Respond in JSON matching the schema.",
+          "You are an elite intelligence analyst inside an autonomous account-discovery platform. For every Instagram account you evaluate five axes on a 0–100 scale: luxury, content quality, aesthetic consistency, travel intensity, and authenticity. For EACH axis you MUST return between 3 and 5 short, concrete, evidence-based reasons in operator English (e.g. \"Frequently posts from Aman properties\", \"Multiple private aviation appearances\", \"High-end restaurants dominate content\"). Never repeat the axis name inside its own reasons. Also estimate the probability that the account is a private individual vs. a commercial brand (each between 0 and 1, together ≤ 1), a 1–3 word niche, a posting frequency in short natural English, a one-sentence summary, and a confidence between 0 and 1. Be conservative when the data is thin — pull confidence down accordingly. Respond in JSON matching the schema.",
       },
       {
         role: "user",
@@ -248,11 +263,11 @@ async function callLovableAi(payload: {
           type: "object",
           additionalProperties: false,
           required: [
-            "luxury_score",
-            "quality_score",
-            "aesthetic_score",
-            "travel_score",
-            "authenticity_score",
+            "luxury",
+            "quality",
+            "aesthetic",
+            "travel",
+            "authenticity",
             "p_private_individual",
             "p_commercial_brand",
             "estimated_niche",
@@ -261,17 +276,17 @@ async function callLovableAi(payload: {
             "confidence",
           ],
           properties: {
-            luxury_score: { type: "integer", minimum: 0, maximum: 100 },
-            quality_score: { type: "integer", minimum: 0, maximum: 100 },
-            aesthetic_score: { type: "integer", minimum: 0, maximum: 100 },
-            travel_score: { type: "integer", minimum: 0, maximum: 100 },
-            authenticity_score: { type: "integer", minimum: 0, maximum: 100 },
-            p_private_individual: { type: "number", minimum: 0, maximum: 1 },
-            p_commercial_brand: { type: "number", minimum: 0, maximum: 1 },
+            luxury: axis,
+            quality: axis,
+            aesthetic: axis,
+            travel: axis,
+            authenticity: axis,
+            p_private_individual: { type: "number" },
+            p_commercial_brand: { type: "number" },
             estimated_niche: { type: "string" },
             estimated_post_frequency: { type: "string" },
             summary: { type: "string" },
-            confidence: { type: "number", minimum: 0, maximum: 1 },
+            confidence: { type: "number" },
           },
         },
       },
@@ -303,6 +318,14 @@ async function callLovableAi(payload: {
     return null;
   }
 }
+
+const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+const clampReasons = (r: string[] | undefined) =>
+  (r ?? [])
+    .filter((x) => typeof x === "string" && x.trim().length > 0)
+    .slice(0, 5)
+    .map((x) => x.trim());
+
 
 async function fetchProfileSummary(username: string) {
   try {
