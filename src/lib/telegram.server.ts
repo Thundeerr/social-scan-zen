@@ -1,12 +1,14 @@
 /**
  * Telegram send helper — server-only.
  *
- * Routes all Telegram Bot API calls through the Lovable connector gateway
- * so credentials never touch the client. Never import this file from a
- * route/component/loader; only server functions and other .server files.
+ * All network I/O is delegated to `messaging/telegram-transport`, which
+ * chooses between the Lovable connector gateway (default) and the direct
+ * Telegram Bot API based on env `TELEGRAM_PROVIDER`. Never import this
+ * file from a route/component/loader; only server functions and other
+ * .server files.
  */
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+import { telegramApiCall } from "./messaging/telegram-transport";
 
 export type TelegramSendResult = { ok: true; messageId: number } | { ok: false; error: string };
 
@@ -19,40 +21,17 @@ export async function sendTelegramMessage(
   chatId: string,
   text: string,
 ): Promise<TelegramSendResult> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-
-  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
-  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
   if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean;
-      description?: string;
-      result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) {
-      return { ok: false, error: data.description ?? `HTTP ${res.status}` };
-    }
-    return { ok: true, messageId: data.result?.message_id ?? 0 };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
+  const data = await telegramApiCall("sendMessage", {
+    chat_id: chatId.trim(),
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+  });
+  if (!data.ok) return { ok: false, error: data.description ?? `HTTP ${data.status}` };
+  const result = data.result as { message_id?: number } | undefined;
+  return { ok: true, messageId: result?.message_id ?? 0 };
 }
 
 /**
@@ -64,44 +43,25 @@ export async function sendTelegramMessage(
 export async function detectLatestTelegramChatIdForToken(
   userToken: string,
 ): Promise<{ ok: true; chatId: string | null } | { ok: false; error: string }> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
-  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
   if (!userToken?.trim()) return { ok: false, error: "Missing per-user setup token" };
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/getUpdates`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ limit: 50, allowed_updates: ["message"] }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean;
-      description?: string;
-      result?: Array<{ message?: { text?: string; chat?: { id?: number } } }>;
-    };
-    if (!res.ok || data.ok === false) {
-      return { ok: false, error: data.description ?? `HTTP ${res.status}` };
+  const data = await telegramApiCall("getUpdates", {
+    limit: 50,
+    allowed_updates: ["message"],
+  });
+  if (!data.ok) return { ok: false, error: data.description ?? `HTTP ${data.status}` };
+
+  const token = userToken.trim();
+  const updates = (data.result as Array<{ message?: { text?: string; chat?: { id?: number } } }> | undefined) ?? [];
+  for (let i = updates.length - 1; i >= 0; i--) {
+    const msg = updates[i]?.message;
+    const text = msg?.text ?? "";
+    const id = msg?.chat?.id;
+    if (typeof id === "number" && text.includes(token)) {
+      return { ok: true, chatId: String(id) };
     }
-    const token = userToken.trim();
-    const updates = data.result ?? [];
-    for (let i = updates.length - 1; i >= 0; i--) {
-      const msg = updates[i]?.message;
-      const text = msg?.text ?? "";
-      const id = msg?.chat?.id;
-      if (typeof id === "number" && text.includes(token)) {
-        return { ok: true, chatId: String(id) };
-      }
-    }
-    return { ok: true, chatId: null };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+  return { ok: true, chatId: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -193,10 +153,6 @@ export async function sendAssetHandoff(
   chatId: string,
   input: AssetHandoffInput,
 ): Promise<TelegramSendResult> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
-  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
   if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
 
   const caption = buildAssetCaption(input);
@@ -211,39 +167,22 @@ export async function sendAssetHandoff(
   const endpoint = isVideo ? "sendVideo" : "sendPhoto";
   const payloadKey = isVideo ? "video" : "photo";
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/${endpoint}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        [payloadKey]: input.mediaUrl,
-        caption,
-        parse_mode: "HTML",
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean;
-      description?: string;
-      result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) {
-      // Media fetch by Telegram can fail on expiring IG CDN URLs — fall back
-      // to plain text so the operator still gets the handoff signal.
-      const textFallback = await sendTelegramMessage(
-        chatId,
-        `${caption}\n\n<i>Media could not be attached (${escapeHtml(data.description ?? `HTTP ${res.status}`)}). Open in InstaScanner to download.</i>`,
-      );
-      return textFallback;
-    }
-    return { ok: true, messageId: data.result?.message_id ?? 0 };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  const data = await telegramApiCall(endpoint, {
+    chat_id: chatId.trim(),
+    [payloadKey]: input.mediaUrl,
+    caption,
+    parse_mode: "HTML",
+  });
+  if (!data.ok) {
+    // Media fetch by Telegram can fail on expiring IG CDN URLs — fall back
+    // to plain text so the operator still gets the handoff signal.
+    return sendTelegramMessage(
+      chatId,
+      `${caption}\n\n<i>Media could not be attached (${escapeHtml(data.description ?? `HTTP ${data.status}`)}). Open in InstaScanner to download.</i>`,
+    );
   }
+  const result = data.result as { message_id?: number } | undefined;
+  return { ok: true, messageId: result?.message_id ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -358,10 +297,6 @@ export async function sendDetectionCard(
   chatId: string,
   input: DetectionCardInput,
 ): Promise<TelegramSendResult> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
-  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
   if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
 
   const caption = buildDetectionCaption(input);
@@ -370,29 +305,17 @@ export async function sendDetectionCard(
   const isImage = input.mediaType === "image";
   const mediaSrc = input.thumbnailUrl ?? input.mediaUrl;
 
-  const sendText = async () => {
-    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        text: caption,
-        parse_mode: "HTML",
-        disable_web_page_preview: false,
-        reply_markup: keyboard,
-      }),
+  const sendText = async (): Promise<TelegramSendResult> => {
+    const data = await telegramApiCall("sendMessage", {
+      chat_id: chatId.trim(),
+      text: caption,
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+      reply_markup: keyboard,
     });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean; description?: string; result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) {
-      return { ok: false as const, error: data.description ?? `HTTP ${res.status}` };
-    }
-    return { ok: true as const, messageId: data.result?.message_id ?? 0 };
+    if (!data.ok) return { ok: false, error: data.description ?? `HTTP ${data.status}` };
+    const result = data.result as { message_id?: number } | undefined;
+    return { ok: true, messageId: result?.message_id ?? 0 };
   };
 
   if (!mediaSrc || (!isVideo && !isImage)) return sendText();
@@ -401,30 +324,16 @@ export async function sendDetectionCard(
   const payloadKey = endpoint === "sendVideo" ? "video" : "photo";
   const source = endpoint === "sendVideo" ? input.mediaUrl! : mediaSrc;
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/${endpoint}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        [payloadKey]: source,
-        caption,
-        parse_mode: "HTML",
-        reply_markup: keyboard,
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean; description?: string; result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) return sendText();
-    return { ok: true, messageId: data.result?.message_id ?? 0 };
-  } catch {
-    return sendText();
-  }
+  const data = await telegramApiCall(endpoint, {
+    chat_id: chatId.trim(),
+    [payloadKey]: source,
+    caption,
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
+  if (!data.ok) return sendText();
+  const result = data.result as { message_id?: number } | undefined;
+  return { ok: true, messageId: result?.message_id ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -434,25 +343,8 @@ export async function sendDetectionCard(
 async function botCall(method: string, body: Record<string, unknown>): Promise<{
   ok: boolean; description?: string; result?: unknown;
 }> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey || !connKey) return { ok: false, description: "telegram keys missing" };
-  try {
-    const res = await fetch(`${GATEWAY_URL}/${method}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    return (await res.json().catch(() => ({ ok: false }))) as {
-      ok: boolean; description?: string; result?: unknown;
-    };
-  } catch (err) {
-    return { ok: false, description: err instanceof Error ? err.message : String(err) };
-  }
+  const data = await telegramApiCall(method, body);
+  return { ok: data.ok, description: data.description, result: data.result };
 }
 
 export function answerCallbackQuery(

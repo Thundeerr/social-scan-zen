@@ -4,6 +4,20 @@ Goal: make this repo independently deployable and maintainable without any Lovab
 
 ---
 
+## 0. Portability Contract (ALWAYS FOLLOW)
+
+The app is already wired to be host-agnostic through two thin adapters. Every future change MUST respect this contract; otherwise the migration becomes hard again.
+
+- **AI**: every chat/LLM call goes through `src/lib/ai/chat.ts` → `chatCompletion({ model, messages, response_format })`. Never `fetch("https://ai.gateway.lovable.dev/...")` or an OpenAI/Gemini SDK directly from feature code. Provider is picked by env `AI_PROVIDER` (`lovable` default | `openai` | `gemini`).
+- **Telegram**: every Bot API call goes through `src/lib/messaging/telegram-transport.ts` → `telegramApiCall(method, body)`. Never `fetch("https://connector-gateway.lovable.dev/telegram/...")` or `fetch("https://api.telegram.org/bot.../...")` directly from feature code. Provider is picked by env `TELEGRAM_PROVIDER` (`lovable` default | `direct`).
+- **Models**: pass generic aliases `"fast"` or `"smart"` — the adapter maps them per provider. Only pin a provider-specific model id when the user asks for a specific one.
+- **Migrating off Lovable is now an env flip**, not a code change:
+  - `AI_PROVIDER=openai` + `OPENAI_API_KEY=...` (or `gemini` + `GEMINI_API_KEY`)
+  - `TELEGRAM_PROVIDER=direct` + `TELEGRAM_BOT_TOKEN=...`
+
+---
+
+
 ## 1. Current Architecture (audit)
 
 - **Framework**: TanStack Start v1 (React 19, Vite 8), SSR entry in `src/server.ts`, start config in `src/start.ts`.
