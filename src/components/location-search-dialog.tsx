@@ -386,12 +386,37 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
           )}
 
           {showEmptyState && (
-            <div className="p-10 text-center space-y-2">
+            <div className="p-10 text-center space-y-3">
               <Search className="h-6 w-6 mx-auto text-muted-foreground" />
-              <div className="text-sm font-medium">No matching Instagram locations</div>
-              <div className="text-xs text-muted-foreground">
-                Try a broader query (city, landmark, or resort name).
-              </div>
+              {resolvedPlace ? (
+                <>
+                  <div className="text-sm font-medium">
+                    Real-world place resolved — no Instagram location matched
+                  </div>
+                  <div className="mx-auto max-w-sm rounded-lg border border-border/60 bg-card/40 px-3 py-2 text-left text-xs">
+                    <div className="uppercase tracking-wider text-[10px] text-muted-foreground/80 mb-0.5">
+                      Resolved via place index
+                    </div>
+                    <div className="text-foreground">
+                      {resolvedPlace.name}
+                      {resolvedPlace.city ? ` · ${resolvedPlace.city}` : ""}
+                      {resolvedPlace.country ? `, ${resolvedPlace.country}` : ""}
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    The provider returned no Instagram location for this place.
+                    Try a broader landmark (e.g. the neighbourhood or city), or configure
+                    an Instagram location search endpoint.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-medium">No matching Instagram locations</div>
+                  <div className="text-xs text-muted-foreground">
+                    Try a broader query (city, landmark, or resort name).
+                  </div>
+                </>
+              )}
             </div>
           )}
 
