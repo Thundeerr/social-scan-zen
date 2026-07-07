@@ -297,10 +297,6 @@ export async function sendDetectionCard(
   chatId: string,
   input: DetectionCardInput,
 ): Promise<TelegramSendResult> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
-  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
   if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
 
   const caption = buildDetectionCaption(input);
@@ -309,29 +305,17 @@ export async function sendDetectionCard(
   const isImage = input.mediaType === "image";
   const mediaSrc = input.thumbnailUrl ?? input.mediaUrl;
 
-  const sendText = async () => {
-    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        text: caption,
-        parse_mode: "HTML",
-        disable_web_page_preview: false,
-        reply_markup: keyboard,
-      }),
+  const sendText = async (): Promise<TelegramSendResult> => {
+    const data = await telegramApiCall("sendMessage", {
+      chat_id: chatId.trim(),
+      text: caption,
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+      reply_markup: keyboard,
     });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean; description?: string; result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) {
-      return { ok: false as const, error: data.description ?? `HTTP ${res.status}` };
-    }
-    return { ok: true as const, messageId: data.result?.message_id ?? 0 };
+    if (!data.ok) return { ok: false, error: data.description ?? `HTTP ${data.status}` };
+    const result = data.result as { message_id?: number } | undefined;
+    return { ok: true, messageId: result?.message_id ?? 0 };
   };
 
   if (!mediaSrc || (!isVideo && !isImage)) return sendText();
@@ -340,30 +324,16 @@ export async function sendDetectionCard(
   const payloadKey = endpoint === "sendVideo" ? "video" : "photo";
   const source = endpoint === "sendVideo" ? input.mediaUrl! : mediaSrc;
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/${endpoint}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        [payloadKey]: source,
-        caption,
-        parse_mode: "HTML",
-        reply_markup: keyboard,
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean; description?: string; result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) return sendText();
-    return { ok: true, messageId: data.result?.message_id ?? 0 };
-  } catch {
-    return sendText();
-  }
+  const data = await telegramApiCall(endpoint, {
+    chat_id: chatId.trim(),
+    [payloadKey]: source,
+    caption,
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
+  if (!data.ok) return sendText();
+  const result = data.result as { message_id?: number } | undefined;
+  return { ok: true, messageId: result?.message_id ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -373,25 +343,8 @@ export async function sendDetectionCard(
 async function botCall(method: string, body: Record<string, unknown>): Promise<{
   ok: boolean; description?: string; result?: unknown;
 }> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey || !connKey) return { ok: false, description: "telegram keys missing" };
-  try {
-    const res = await fetch(`${GATEWAY_URL}/${method}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    return (await res.json().catch(() => ({ ok: false }))) as {
-      ok: boolean; description?: string; result?: unknown;
-    };
-  } catch (err) {
-    return { ok: false, description: err instanceof Error ? err.message : String(err) };
-  }
+  const data = await telegramApiCall(method, body);
+  return { ok: data.ok, description: data.description, result: data.result };
 }
 
 export function answerCallbackQuery(
