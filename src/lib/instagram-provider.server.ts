@@ -528,13 +528,93 @@ async function fallbackTopsearch(query: string): Promise<LocationSearchResult[]>
   }
 }
 
-export async function searchLocations(query: string): Promise<{
-  results: LocationSearchResult[];
-  source: "provider" | "fallback" | "empty";
-}> {
-  const q = query.trim();
-  if (!q) return { results: [], source: "empty" };
+// ---- Fuzzy matching helpers -----------------------------------------------
 
+function normaliseText(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let curr = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      const next = Math.min(prev[j] + 1, curr + 1, prev[j - 1] + cost);
+      prev[j - 1] = curr;
+      curr = next;
+    }
+    prev[b.length] = curr;
+  }
+  return prev[b.length];
+}
+
+/** 0..1 similarity between query and place, using name + city + country. */
+function similarity(query: string, place: LocationSearchResult): number {
+  const q = normaliseText(query);
+  if (!q) return 0;
+  const haystack = normaliseText(
+    [place.name, place.city, place.country, place.address].filter(Boolean).join(" "),
+  );
+  if (!haystack) return 0;
+  const qTokens = q.split(" ").filter(Boolean);
+  const hTokens = new Set(haystack.split(" ").filter(Boolean));
+
+  // Substring bonus
+  let score = 0;
+  if (haystack.includes(q)) score += 0.5;
+
+  // Token overlap
+  let matched = 0;
+  for (const qt of qTokens) {
+    if (hTokens.has(qt)) matched += 1;
+    else {
+      // partial token match via edit distance
+      for (const ht of hTokens) {
+        if (Math.abs(ht.length - qt.length) > 3) continue;
+        const d = levenshtein(qt, ht);
+        const rel = 1 - d / Math.max(qt.length, ht.length);
+        if (rel >= 0.75) {
+          matched += rel;
+          break;
+        }
+      }
+    }
+  }
+  score += (matched / qTokens.length) * 0.5;
+  return Math.min(1, score);
+}
+
+/** Progressively expand the query into shorter variants for fuzzy retrieval. */
+function buildQueryVariants(query: string): string[] {
+  const norm = normaliseText(query);
+  const original = query.trim();
+  const variants = new Set<string>();
+  if (norm) variants.add(norm);
+  const tokens = norm.split(" ").filter(Boolean);
+  // Drop trailing tokens one by one: "soneva jani maldives" → "soneva jani" → "soneva"
+  for (let i = tokens.length - 1; i > 0; i--) {
+    variants.add(tokens.slice(0, i).join(" "));
+  }
+  // Also try each individual token (helps when only one word is recognisable)
+  for (const t of tokens) if (t.length >= 3) variants.add(t);
+  variants.delete(original.toLowerCase());
+  return [...variants].filter((v) => v.length >= 2).slice(0, 5);
+}
+
+// ---- Provider search adapter ----------------------------------------------
+
+async function queryProvider(q: string): Promise<LocationSearchResult[]> {
   const apiKey = process.env.RAPIDAPI_KEY;
   const host = process.env.RAPIDAPI_HOST;
   const searchPath = process.env.RAPIDAPI_LOCATION_SEARCH_PATH;
@@ -553,23 +633,92 @@ export async function searchLocations(query: string): Promise<{
       });
       if (res.ok) {
         const json = (await res.json()) as unknown;
-        const seen = new Set<string>();
-        const deduped: LocationSearchResult[] = [];
-        for (const p of collectPlaceLike(json)) {
-          const n = normalisePlace(p);
-          if (!n || seen.has(n.location_id)) continue;
-          seen.add(n.location_id);
-          deduped.push(n);
-          if (deduped.length >= 20) break;
-        }
-        if (deduped.length > 0) return { results: deduped, source: "provider" };
+        return collectPlaceLike(json)
+          .map((p) => normalisePlace(p))
+          .filter((p): p is LocationSearchResult => Boolean(p));
       }
     } catch {
       /* fall through */
     }
   }
-
-  const fallback = await fallbackTopsearch(q);
-  if (fallback.length > 0) return { results: fallback, source: "fallback" };
-  return { results: [], source: "empty" };
+  return fallbackTopsearch(q);
 }
+
+export async function searchLocations(query: string): Promise<{
+  results: LocationSearchResult[];
+  source: "provider" | "fallback" | "fuzzy" | "empty";
+  fuzzy?: boolean;
+}> {
+  const q = query.trim();
+  if (!q) return { results: [], source: "empty" };
+
+  // 1) Exact query
+  const primary = await queryProvider(q);
+  const seen = new Set<string>();
+  const dedupe = (list: LocationSearchResult[]) => {
+    const out: LocationSearchResult[] = [];
+    for (const r of list) {
+      if (seen.has(r.location_id)) continue;
+      seen.add(r.location_id);
+      out.push(r);
+    }
+    return out;
+  };
+
+  const primaryDeduped = dedupe(primary);
+
+  // Strong match if any result scores well against the query.
+  const withScores = primaryDeduped.map((r) => ({ r, s: similarity(q, r) }));
+  const hasStrong = withScores.some((x) => x.s >= 0.6);
+
+  if (hasStrong) {
+    withScores.sort((a, b) => b.s - a.s);
+    return {
+      results: withScores.slice(0, 20).map((x) => x.r),
+      source: primary === primaryDeduped ? "provider" : "provider",
+    };
+  }
+
+  // 2) Fuzzy: expand into variants, collect candidates, rank by similarity.
+  const variants = buildQueryVariants(q);
+  const pool: LocationSearchResult[] = [...primaryDeduped];
+  for (const v of variants) {
+    if (pool.length >= 60) break;
+    try {
+      const more = await queryProvider(v);
+      for (const r of more) {
+        if (seen.has(r.location_id)) continue;
+        seen.add(r.location_id);
+        pool.push(r);
+        if (pool.length >= 60) break;
+      }
+    } catch {
+      /* keep going */
+    }
+  }
+
+  if (pool.length === 0) {
+    return { results: [], source: "empty" };
+  }
+
+  const ranked = pool
+    .map((r) => ({ r, s: similarity(q, r) }))
+    .filter((x) => x.s >= 0.15)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 15)
+    .map((x) => x.r);
+
+  if (ranked.length === 0) {
+    // Nothing scored — return raw pool as best-effort suggestions
+    return { results: pool.slice(0, 10), source: "fuzzy", fuzzy: true };
+  }
+
+  // If the primary query itself returned nothing, everything is fuzzy.
+  const isFuzzy = primaryDeduped.length === 0 || !hasStrong;
+  return {
+    results: ranked,
+    source: isFuzzy ? "fuzzy" : "provider",
+    fuzzy: isFuzzy,
+  };
+}
+
