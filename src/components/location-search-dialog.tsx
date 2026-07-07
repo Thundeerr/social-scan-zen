@@ -202,10 +202,20 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
       const r = await search({ data: { query: q } });
       setResults(r.results as Place[]);
       setSource(r.source);
+      setResolvedPlace(
+        r.resolvedPlace
+          ? {
+              name: r.resolvedPlace.name,
+              city: r.resolvedPlace.city,
+              country: r.resolvedPlace.country,
+            }
+          : null,
+      );
       if (r.results.length > 0) pushRecent(q);
     } catch (e) {
       setResults([]);
       setSource(null);
+      setResolvedPlace(null);
       setError(e instanceof Error ? e.message : "Search failed");
     } finally {
       setLoading(false);
