@@ -406,3 +406,170 @@ export function describeLocationProviderRequest(locationId: string): string {
   const param = process.env.RAPIDAPI_LOCATION_ID_PARAM ?? "id";
   return `GET https://${host}${path}?${param}=${locationId}`;
 }
+
+// ---------------------------------------------------------------------------
+// Location search
+// ---------------------------------------------------------------------------
+
+export type LocationSearchResult = {
+  location_id: string;
+  name: string;
+  city: string | null;
+  country: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  media_count: number | null;
+  thumbnail_url: string | null;
+};
+
+function collectPlaceLike(payload: unknown): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  const seen = new WeakSet<object>();
+  const stack: unknown[] = [payload];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object") continue;
+    if (seen.has(node as object)) continue;
+    seen.add(node as object);
+    if (Array.isArray(node)) {
+      for (const v of node) stack.push(v);
+      continue;
+    }
+    const rec = node as Record<string, unknown>;
+    if (rec.place && typeof rec.place === "object") stack.push(rec.place);
+    if (rec.location && typeof rec.location === "object") stack.push(rec.location);
+    if (rec.node && typeof rec.node === "object") stack.push(rec.node);
+
+    const idCandidate =
+      (rec.pk ?? rec.id ?? rec.external_id ?? rec.facebook_places_id ?? rec.location_id) as unknown;
+    const hasId =
+      (typeof idCandidate === "string" && /^\d{3,20}$/.test(idCandidate)) ||
+      (typeof idCandidate === "number" && Number.isFinite(idCandidate));
+    const hasName = typeof rec.name === "string" || typeof rec.title === "string";
+    const looksLikePlace = hasId && hasName && !("media_type" in rec) && !("taken_at" in rec);
+    if (looksLikePlace) {
+      out.push(rec);
+      continue;
+    }
+    for (const v of Object.values(rec)) stack.push(v);
+  }
+  return out;
+}
+
+function normalisePlace(raw: Record<string, unknown>): LocationSearchResult | null {
+  const idRaw =
+    (raw.pk ?? raw.id ?? raw.external_id ?? raw.facebook_places_id ?? raw.location_id) as unknown;
+  const location_id =
+    typeof idRaw === "number" ? String(idRaw) : typeof idRaw === "string" ? idRaw : "";
+  if (!location_id || !/^\d{3,20}$/.test(location_id)) return null;
+
+  const name = pick<string>(raw, ["name", "title", "short_name"]);
+  if (!name) return null;
+
+  const city = pick<string>(raw, ["city", "city_name"]);
+  const country = pick<string>(raw, ["country", "country_name", "country_code"]);
+  const address = pick<string>(raw, ["address", "street_address", "address_street"]);
+  const lat = (raw.lat ?? raw.latitude) as unknown;
+  const lng = (raw.lng ?? raw.longitude ?? raw.lon) as unknown;
+  const media_count = pick<number | string>(raw, [
+    "media_count",
+    "post_count",
+    "posts_count",
+    "count",
+  ]);
+  const thumbnail_url = pick<string>(raw, [
+    "profile_pic_url",
+    "thumbnail_url",
+    "image_url",
+    "cover_photo_url",
+  ]);
+
+  return {
+    location_id,
+    name,
+    city: city ?? null,
+    country: country ?? null,
+    address: address ?? null,
+    lat: typeof lat === "number" ? lat : typeof lat === "string" ? Number(lat) || null : null,
+    lng: typeof lng === "number" ? lng : typeof lng === "string" ? Number(lng) || null : null,
+    media_count:
+      typeof media_count === "number"
+        ? media_count
+        : typeof media_count === "string"
+          ? Number(media_count) || null
+          : null,
+    thumbnail_url: thumbnail_url ?? null,
+  };
+}
+
+/** Public Instagram topsearch fallback — no API key, best-effort. */
+async function fallbackTopsearch(query: string): Promise<LocationSearchResult[]> {
+  try {
+    const url = new URL("https://www.instagram.com/web/search/topsearch/");
+    url.searchParams.set("context", "place");
+    url.searchParams.set("query", query);
+    const res = await fetch(url.toString(), {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        Accept: "application/json",
+        "X-IG-App-ID": "936619743392459",
+      },
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as unknown;
+    return collectPlaceLike(json)
+      .map((p) => normalisePlace(p))
+      .filter((p): p is LocationSearchResult => Boolean(p))
+      .slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+export async function searchLocations(query: string): Promise<{
+  results: LocationSearchResult[];
+  source: "provider" | "fallback" | "empty";
+}> {
+  const q = query.trim();
+  if (!q) return { results: [], source: "empty" };
+
+  const apiKey = process.env.RAPIDAPI_KEY;
+  const host = process.env.RAPIDAPI_HOST;
+  const searchPath = process.env.RAPIDAPI_LOCATION_SEARCH_PATH;
+  const searchParam = process.env.RAPIDAPI_LOCATION_SEARCH_QUERY_PARAM ?? "query";
+
+  if (apiKey && host && searchPath) {
+    try {
+      const url = new URL(`https://${host}${searchPath}`);
+      url.searchParams.set(searchParam, q);
+      const extraRaw = process.env.RAPIDAPI_LOCATION_SEARCH_EXTRA_PARAMS;
+      if (extraRaw) {
+        for (const [k, v] of new URLSearchParams(extraRaw)) url.searchParams.set(k, v);
+      }
+      const res = await fetch(url.toString(), {
+        headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": host },
+      });
+      if (res.ok) {
+        const json = (await res.json()) as unknown;
+        const seen = new Set<string>();
+        const deduped: LocationSearchResult[] = [];
+        for (const p of collectPlaceLike(json)) {
+          const n = normalisePlace(p);
+          if (!n || seen.has(n.location_id)) continue;
+          seen.add(n.location_id);
+          deduped.push(n);
+          if (deduped.length >= 20) break;
+        }
+        if (deduped.length > 0) return { results: deduped, source: "provider" };
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const fallback = await fallbackTopsearch(q);
+  if (fallback.length > 0) return { results: fallback, source: "fallback" };
+  return { results: [], source: "empty" };
+}
