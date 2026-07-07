@@ -315,8 +315,6 @@ type AiVerdict = {
   confidence: number;
 };
 
-const LOVABLE_MODEL = "google/gemini-2.5-flash";
-
 async function callLovableAi(payload: {
   username: string;
   full_name: string | null;
@@ -328,8 +326,7 @@ async function callLovableAi(payload: {
   signals: Array<{ source_type: string; count: number }>;
   captions: string[];
 }): Promise<AiVerdict | null> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) return null;
+  const { chatCompletion } = await import("./ai/chat");
 
   const axis = {
     type: "object",
@@ -344,18 +341,15 @@ async function callLovableAi(payload: {
     },
   };
 
-  const body = {
-    model: LOVABLE_MODEL,
+  const result = await chatCompletion({
+    model: "fast",
     messages: [
       {
         role: "system",
         content:
           "You are an elite intelligence analyst inside an autonomous account-discovery platform. For every Instagram account you evaluate five axes on a 0–100 scale: luxury, content quality, aesthetic consistency, travel intensity, and authenticity. For EACH axis you MUST return between 3 and 5 short, concrete, evidence-based reasons in operator English (e.g. \"Frequently posts from Aman properties\", \"Multiple private aviation appearances\", \"High-end restaurants dominate content\"). Never repeat the axis name inside its own reasons. Also estimate the probability that the account is a private individual vs. a commercial brand (each between 0 and 1, together ≤ 1), a 1–3 word niche, a posting frequency in short natural English, a one-sentence summary, and a confidence between 0 and 1. Be conservative when the data is thin — pull confidence down accordingly. Respond in JSON matching the schema.",
       },
-      {
-        role: "user",
-        content: JSON.stringify(payload),
-      },
+      { role: "user", content: JSON.stringify(payload) },
     ],
     response_format: {
       type: "json_schema",
@@ -394,29 +388,14 @@ async function callLovableAi(payload: {
         },
       },
     },
-  };
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.warn("[discovery] AI call failed", res.status, text.slice(0, 200));
+  if (!result.ok) {
+    console.warn("[discovery] AI call failed", result.status, result.error.slice(0, 200));
     return null;
   }
-
-  const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = json.choices?.[0]?.message?.content ?? "";
   try {
-    return JSON.parse(content) as AiVerdict;
+    return JSON.parse(result.content) as AiVerdict;
   } catch {
     return null;
   }
