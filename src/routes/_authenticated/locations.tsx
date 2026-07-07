@@ -29,7 +29,7 @@ import { TierChip } from "@/components/operator-score";
 import { scanLocationNowFn } from "@/lib/locations.functions";
 import {
   useTrackedLocations,
-  useCreateTrackedLocation,
+  
   useUpdateTrackedLocation,
   useDeleteTrackedLocation,
   trackedLocationsKey,
@@ -61,7 +61,7 @@ function timeAgo(iso: string | null) {
 
 function LocationsPage() {
   const { data: rows = [], isLoading } = useTrackedLocations();
-  const createLocation = useCreateTrackedLocation();
+  
   const updateLocation = useUpdateTrackedLocation();
   const deleteLocation = useDeleteTrackedLocation();
   const scanNow = useServerFn(scanLocationNowFn);
