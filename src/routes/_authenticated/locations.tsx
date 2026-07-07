@@ -146,50 +146,8 @@ function LocationsPage() {
     }
   }
 
-  const [locationId, setLocationId] = useState("");
-  const [name, setName] = useState("");
-  const [tier, setTier] = useState<Tier>("B");
 
-  function reset() {
-    setLocationId("");
-    setName("");
-    setTier("B");
-  }
 
-  function handleCreate() {
-    const raw = locationId.trim();
-    if (!LOCATION_ID_RE.test(raw)) {
-      toast.error("Enter a numeric Instagram location id (3–20 digits)");
-      return;
-    }
-    if (!name.trim()) {
-      toast.error("Give the location a display name");
-      return;
-    }
-    createLocation.mutate(
-      {
-        location_id: raw,
-        name: name.trim(),
-        tier,
-        status: "active",
-      } as never,
-      {
-        onSuccess: (row) => {
-          toast.success(`Tracking "${row.name}"`);
-          setAddOpen(false);
-          reset();
-        },
-        onError: (e: unknown) => {
-          const msg = e instanceof Error ? e.message : "Failed to add location";
-          if (/duplicate|unique/i.test(msg)) {
-            toast.error("Already tracking this location");
-          } else {
-            toast.error(msg);
-          }
-        },
-      },
-    );
-  }
 
   async function handleScanNow(loc: TrackedLocation) {
     if (scanning[loc.id]) return;
