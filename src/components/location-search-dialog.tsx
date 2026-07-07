@@ -146,7 +146,14 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [results, setResults] = useState<Place[]>([]);
-  const [source, setSource] = useState<"provider" | "fallback" | "fuzzy" | "empty" | null>(null);
+  const [source, setSource] = useState<
+    "provider" | "fuzzy" | "resolved" | "suggestions" | "empty" | null
+  >(null);
+  const [resolvedPlace, setResolvedPlace] = useState<{
+    name: string;
+    city: string | null;
+    country: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState<Record<string, boolean>>({});
