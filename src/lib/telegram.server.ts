@@ -1,12 +1,14 @@
 /**
  * Telegram send helper — server-only.
  *
- * Routes all Telegram Bot API calls through the Lovable connector gateway
- * so credentials never touch the client. Never import this file from a
- * route/component/loader; only server functions and other .server files.
+ * All network I/O is delegated to `messaging/telegram-transport`, which
+ * chooses between the Lovable connector gateway (default) and the direct
+ * Telegram Bot API based on env `TELEGRAM_PROVIDER`. Never import this
+ * file from a route/component/loader; only server functions and other
+ * .server files.
  */
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+import { telegramApiCall } from "./messaging/telegram-transport";
 
 export type TelegramSendResult = { ok: true; messageId: number } | { ok: false; error: string };
 
