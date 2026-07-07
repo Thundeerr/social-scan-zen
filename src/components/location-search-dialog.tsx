@@ -381,8 +381,18 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
             <div className="p-4 space-y-2">
               <div className="flex items-center justify-between px-1">
                 <div className="text-xs text-muted-foreground">
-                  {results.length} result{results.length === 1 ? "" : "s"}
-                  {source === "fallback" ? " · public index" : source === "provider" ? " · provider" : ""}
+                  {source === "fuzzy" ? (
+                    <span>
+                      No exact match — showing {results.length} closest suggestion
+                      {results.length === 1 ? "" : "s"} for{" "}
+                      <span className="text-foreground">"{submitted}"</span>
+                    </span>
+                  ) : (
+                    <>
+                      {results.length} result{results.length === 1 ? "" : "s"}
+                      {source === "fallback" ? " · public index" : source === "provider" ? " · provider" : ""}
+                    </>
+                  )}
                 </div>
                 {results.length > 1 && results.some((r) => !trackedIds.has(r.location_id)) && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={trackAll}>
