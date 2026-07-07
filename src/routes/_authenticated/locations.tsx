@@ -68,7 +68,7 @@ function LocationsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [addOpen, setAddOpen] = useState(false);
+  
   const [scanning, setScanning] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkPending, setBulkPending] = useState(false);
