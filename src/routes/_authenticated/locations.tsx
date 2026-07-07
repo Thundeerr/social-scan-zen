@@ -50,8 +50,6 @@ const TIER_LABEL: Record<Tier, string> = {
   C: "C — Low Priority",
 };
 
-const LOCATION_ID_RE = /^\d{3,20}$/;
-
 function timeAgo(iso: string | null) {
   if (!iso) return "—";
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
