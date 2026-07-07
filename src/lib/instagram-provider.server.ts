@@ -644,16 +644,122 @@ async function queryProvider(q: string): Promise<LocationSearchResult[]> {
   return fallbackTopsearch(q);
 }
 
-export async function searchLocations(query: string): Promise<{
+// ---- Real-world place resolver (OpenStreetMap Nominatim) -------------------
+//
+// When Instagram doesn't recognise the query directly, resolve it against a
+// real-world place index so we can re-query IG with the canonical name, city
+// and country. Nominatim is free, requires no API key, and mandates a
+// descriptive User-Agent. Callers are rate-limited but at operator typing
+// speed this is fine.
+
+export type ResolvedPlace = {
+  name: string;
+  aliases: string[];
+  city: string | null;
+  country: string | null;
+  lat: number | null;
+  lng: number | null;
+  category: string | null;
+};
+
+async function resolvePlace(query: string): Promise<ResolvedPlace | null> {
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("q", query);
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("namedetails", "1");
+    url.searchParams.set("limit", "1");
+    url.searchParams.set("accept-language", "en");
+    const res = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": "InstaScanner/1.0 (location resolver)",
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) return null;
+    const arr = (await res.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const hit = arr[0];
+    const address = (hit.address as Record<string, string> | undefined) ?? {};
+    const namedetails = (hit.namedetails as Record<string, string> | undefined) ?? {};
+    const displayName = (hit.display_name as string | undefined) ?? "";
+    const canonicalName =
+      namedetails["name:en"] ||
+      namedetails.name ||
+      (hit.name as string | undefined) ||
+      displayName.split(",")[0]?.trim() ||
+      query;
+    const city =
+      address.city ??
+      address.town ??
+      address.village ??
+      address.municipality ??
+      address.county ??
+      null;
+    const country = address.country ?? null;
+    const aliasSet = new Set<string>();
+    for (const [k, v] of Object.entries(namedetails)) {
+      if (typeof v === "string" && (k === "name" || k.startsWith("name:") || k === "alt_name")) {
+        aliasSet.add(v);
+      }
+    }
+    aliasSet.delete(canonicalName);
+    const lat = hit.lat ? Number(hit.lat) : null;
+    const lng = hit.lon ? Number(hit.lon) : null;
+    const category =
+      (hit.type as string | undefined) ??
+      (hit.category as string | undefined) ??
+      (hit.class as string | undefined) ??
+      null;
+    return {
+      name: canonicalName,
+      aliases: [...aliasSet].slice(0, 5),
+      city,
+      country,
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      category,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Score a candidate given the query AND optional resolved place context. */
+function contextualScore(
+  query: string,
+  candidate: LocationSearchResult,
+  place: ResolvedPlace | null,
+): number {
+  let score = similarity(query, candidate);
+  if (!place) return score;
+  const cCity = candidate.city ? normaliseText(candidate.city) : "";
+  const cCountry = candidate.country ? normaliseText(candidate.country) : "";
+  const pCity = place.city ? normaliseText(place.city) : "";
+  const pCountry = place.country ? normaliseText(place.country) : "";
+  if (pCity && cCity && cCity.includes(pCity)) score += 0.25;
+  if (pCountry && cCountry && cCountry.includes(pCountry)) score += 0.15;
+  const nameSim = similarity(place.name, candidate);
+  if (nameSim > score) score = (score + nameSim) / 2 + 0.1;
+  // Popularity boost — logarithmic, small weight
+  if (candidate.media_count && candidate.media_count > 0) {
+    score += Math.min(0.15, Math.log10(candidate.media_count + 1) / 20);
+  }
+  return Math.min(1, score);
+}
+
+export type SearchLocationsResponse = {
   results: LocationSearchResult[];
-  source: "provider" | "fallback" | "fuzzy" | "empty";
+  source: "provider" | "fuzzy" | "resolved" | "suggestions" | "empty";
+  resolvedPlace?: ResolvedPlace | null;
   fuzzy?: boolean;
-}> {
+};
+
+export async function searchLocations(query: string): Promise<SearchLocationsResponse> {
   const q = query.trim();
   if (!q) return { results: [], source: "empty" };
 
-  // 1) Exact query
-  const primary = await queryProvider(q);
   const seen = new Set<string>();
   const dedupe = (list: LocationSearchResult[]) => {
     const out: LocationSearchResult[] = [];
@@ -665,60 +771,89 @@ export async function searchLocations(query: string): Promise<{
     return out;
   };
 
-  const primaryDeduped = dedupe(primary);
-
-  // Strong match if any result scores well against the query.
-  const withScores = primaryDeduped.map((r) => ({ r, s: similarity(q, r) }));
-  const hasStrong = withScores.some((x) => x.s >= 0.6);
-
+  // ---- Stage 1: exact provider query ----
+  const primary = dedupe(await queryProvider(q));
+  const primaryScored = primary.map((r) => ({ r, s: similarity(q, r) }));
+  const hasStrong = primaryScored.some((x) => x.s >= 0.6);
   if (hasStrong) {
-    withScores.sort((a, b) => b.s - a.s);
+    primaryScored.sort((a, b) => b.s - a.s);
     return {
-      results: withScores.slice(0, 20).map((x) => x.r),
-      source: primary === primaryDeduped ? "provider" : "provider",
+      results: primaryScored.slice(0, 20).map((x) => x.r),
+      source: "provider",
     };
   }
 
-  // 2) Fuzzy: expand into variants, collect candidates, rank by similarity.
+  // ---- Stage 2: fuzzy variants of the raw query ----
   const variants = buildQueryVariants(q);
-  const pool: LocationSearchResult[] = [...primaryDeduped];
+  const pool: LocationSearchResult[] = [...primary];
   for (const v of variants) {
     if (pool.length >= 60) break;
-    try {
-      const more = await queryProvider(v);
-      for (const r of more) {
+    for (const r of await queryProvider(v).catch(() => [])) {
+      if (seen.has(r.location_id)) continue;
+      seen.add(r.location_id);
+      pool.push(r);
+      if (pool.length >= 60) break;
+    }
+  }
+  const fuzzyScored = pool
+    .map((r) => ({ r, s: similarity(q, r) }))
+    .sort((a, b) => b.s - a.s);
+  if (fuzzyScored[0]?.s >= 0.5) {
+    return {
+      results: fuzzyScored.filter((x) => x.s >= 0.2).slice(0, 15).map((x) => x.r),
+      source: "fuzzy",
+      fuzzy: true,
+    };
+  }
+
+  // ---- Stage 3: real-world place resolution ----
+  const place = await resolvePlace(q);
+  if (place) {
+    const placeQueries = new Set<string>();
+    placeQueries.add(place.name);
+    for (const a of place.aliases) placeQueries.add(a);
+    if (place.city) placeQueries.add(`${place.name} ${place.city}`);
+    if (place.city) placeQueries.add(place.city);
+    for (const pq of placeQueries) {
+      if (pool.length >= 80) break;
+      for (const r of await queryProvider(pq).catch(() => [])) {
         if (seen.has(r.location_id)) continue;
         seen.add(r.location_id);
         pool.push(r);
-        if (pool.length >= 60) break;
+        if (pool.length >= 80) break;
       }
-    } catch {
-      /* keep going */
+    }
+    const resolvedScored = pool
+      .map((r) => ({ r, s: contextualScore(q, r, place) }))
+      .sort((a, b) => b.s - a.s);
+
+    // Prefer resolved-place matches over pure name fuzz
+    if (resolvedScored[0]?.s >= 0.35) {
+      return {
+        results: resolvedScored.filter((x) => x.s >= 0.15).slice(0, 15).map((x) => x.r),
+        source: "resolved",
+        resolvedPlace: place,
+      };
+    }
+
+    // ---- Stage 4: nothing matched — offer nearby suggestions ----
+    if (resolvedScored.length > 0) {
+      return {
+        results: resolvedScored.slice(0, 10).map((x) => x.r),
+        source: "suggestions",
+        resolvedPlace: place,
+      };
     }
   }
 
-  if (pool.length === 0) {
-    return { results: [], source: "empty" };
+  // Last resort: any pool we collected
+  if (pool.length > 0) {
+    return {
+      results: pool.slice(0, 10),
+      source: "suggestions",
+      resolvedPlace: place,
+    };
   }
-
-  const ranked = pool
-    .map((r) => ({ r, s: similarity(q, r) }))
-    .filter((x) => x.s >= 0.15)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 15)
-    .map((x) => x.r);
-
-  if (ranked.length === 0) {
-    // Nothing scored — return raw pool as best-effort suggestions
-    return { results: pool.slice(0, 10), source: "fuzzy", fuzzy: true };
-  }
-
-  // If the primary query itself returned nothing, everything is fuzzy.
-  const isFuzzy = primaryDeduped.length === 0 || !hasStrong;
-  return {
-    results: ranked,
-    source: isFuzzy ? "fuzzy" : "provider",
-    fuzzy: isFuzzy,
-  };
+  return { results: [], source: "empty", resolvedPlace: place };
 }
 
