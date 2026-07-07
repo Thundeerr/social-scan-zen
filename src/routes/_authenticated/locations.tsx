@@ -258,66 +258,13 @@ function LocationsPage() {
         description={`${rows.length} location${rows.length === 1 ? "" : "s"} under active monitoring. Provider polls each location on the same 6-hour cadence as accounts.`}
         status={{ label: "Monitoring", tone: "success", live: true }}
         actions={
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
+          <LocationSearchDialog
+            trigger={
               <Button className="gap-1.5">
-                <Plus className="h-4 w-4" /> Add Location
+                <Search className="h-4 w-4" /> Track Location
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Track new location</DialogTitle>
-                <DialogDescription>
-                  Instagram location IDs are numeric. You can find them in the URL of any location page,
-                  e.g. <span className="font-mono">instagram.com/explore/locations/<b>213385402</b>/berghain</span>.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="loc-id">Location ID</Label>
-                  <Input
-                    id="loc-id"
-                    value={locationId}
-                    onChange={(e) => setLocationId(e.target.value)}
-                    placeholder="213385402"
-                    className="font-mono"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loc-name">Display name</Label>
-                  <Input
-                    id="loc-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Berghain, Berlin"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loc-tier">Priority tier</Label>
-                  <Select value={tier} onValueChange={(v) => setTier(v as Tier)}>
-                    <SelectTrigger id="loc-tier">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIERS.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {TIER_LABEL[t]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="ghost">Cancel</Button>
-                </DialogClose>
-                <Button onClick={handleCreate} disabled={createLocation.isPending}>
-                  {createLocation.isPending ? "Adding…" : "Start monitoring"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            }
+          />
         }
       />
 
