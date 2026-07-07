@@ -396,19 +396,42 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
 
           {!loading && results.length > 0 && (
             <div className="p-4 space-y-2">
+              {resolvedPlace && (source === "resolved" || source === "suggestions") && (
+                <div className="rounded-lg border border-border/60 bg-card/40 px-3 py-2 mb-1 text-xs">
+                  <div className="uppercase tracking-wider text-[10px] text-muted-foreground/80 mb-0.5">
+                    {source === "resolved" ? "Resolved via place index" : "No Instagram location — nearby suggestions"}
+                  </div>
+                  <div className="text-foreground">
+                    {resolvedPlace.name}
+                    {resolvedPlace.city ? ` · ${resolvedPlace.city}` : ""}
+                    {resolvedPlace.country ? `, ${resolvedPlace.country}` : ""}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between px-1">
                 <div className="text-xs text-muted-foreground">
-                  {source === "fuzzy" ? (
+                  {source === "fuzzy" && (
                     <span>
                       No exact match — showing {results.length} closest suggestion
                       {results.length === 1 ? "" : "s"} for{" "}
                       <span className="text-foreground">"{submitted}"</span>
                     </span>
-                  ) : (
-                    <>
-                      {results.length} result{results.length === 1 ? "" : "s"}
-                      {source === "fallback" ? " · public index" : source === "provider" ? " · provider" : ""}
-                    </>
+                  )}
+                  {source === "resolved" && (
+                    <span>
+                      {results.length} Instagram location{results.length === 1 ? "" : "s"} matched via place index
+                    </span>
+                  )}
+                  {source === "suggestions" && (
+                    <span>
+                      No exact Instagram location — {results.length} nearby suggestion
+                      {results.length === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {source === "provider" && (
+                    <span>
+                      {results.length} result{results.length === 1 ? "" : "s"} · provider
+                    </span>
                   )}
                 </div>
                 {results.length > 1 && results.some((r) => !trackedIds.has(r.location_id)) && (
