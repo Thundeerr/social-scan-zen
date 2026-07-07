@@ -21,40 +21,17 @@ export async function sendTelegramMessage(
   chatId: string,
   text: string,
 ): Promise<TelegramSendResult> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  const connKey = process.env.TELEGRAM_API_KEY;
-
-  if (!lovableKey) return { ok: false, error: "LOVABLE_API_KEY is not configured" };
-  if (!connKey) return { ok: false, error: "TELEGRAM_API_KEY is not configured" };
   if (!chatId?.trim()) return { ok: false, error: "Missing Telegram chat ID" };
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": connKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId.trim(),
-        text,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      ok?: boolean;
-      description?: string;
-      result?: { message_id?: number };
-    };
-    if (!res.ok || data.ok === false) {
-      return { ok: false, error: data.description ?? `HTTP ${res.status}` };
-    }
-    return { ok: true, messageId: data.result?.message_id ?? 0 };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
+  const data = await telegramApiCall("sendMessage", {
+    chat_id: chatId.trim(),
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+  });
+  if (!data.ok) return { ok: false, error: data.description ?? `HTTP ${data.status}` };
+  const result = data.result as { message_id?: number } | undefined;
+  return { ok: true, messageId: result?.message_id ?? 0 };
 }
 
 /**
