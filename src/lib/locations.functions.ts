@@ -9,6 +9,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const LOCATION_ID_RE = /^\d{3,20}$/;
 
+export const searchLocationsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { query: string }) =>
+    z.object({ query: z.string().trim().min(1).max(120) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { searchLocations } = await import("@/lib/instagram-provider.server");
+    return searchLocations(data.query);
+  });
+
 export const scanLocationNowFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { locationRowId: string }) =>

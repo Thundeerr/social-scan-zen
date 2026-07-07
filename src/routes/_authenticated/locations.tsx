@@ -2,22 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { MapPin, Plus, Radar, Loader2, Trash2, Pause, Play, X } from "lucide-react";
+import { MapPin, Radar, Loader2, Trash2, Pause, Play, X, Search } from "lucide-react";
+import { LocationSearchDialog } from "@/components/location-search-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+
+
 import {
   Select,
   SelectContent,
@@ -38,7 +29,7 @@ import { TierChip } from "@/components/operator-score";
 import { scanLocationNowFn } from "@/lib/locations.functions";
 import {
   useTrackedLocations,
-  useCreateTrackedLocation,
+  
   useUpdateTrackedLocation,
   useDeleteTrackedLocation,
   trackedLocationsKey,
@@ -59,8 +50,6 @@ const TIER_LABEL: Record<Tier, string> = {
   C: "C — Low Priority",
 };
 
-const LOCATION_ID_RE = /^\d{3,20}$/;
-
 function timeAgo(iso: string | null) {
   if (!iso) return "—";
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -72,14 +61,14 @@ function timeAgo(iso: string | null) {
 
 function LocationsPage() {
   const { data: rows = [], isLoading } = useTrackedLocations();
-  const createLocation = useCreateTrackedLocation();
+  
   const updateLocation = useUpdateTrackedLocation();
   const deleteLocation = useDeleteTrackedLocation();
   const scanNow = useServerFn(scanLocationNowFn);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [addOpen, setAddOpen] = useState(false);
+  
   const [scanning, setScanning] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkPending, setBulkPending] = useState(false);
@@ -157,50 +146,8 @@ function LocationsPage() {
     }
   }
 
-  const [locationId, setLocationId] = useState("");
-  const [name, setName] = useState("");
-  const [tier, setTier] = useState<Tier>("B");
 
-  function reset() {
-    setLocationId("");
-    setName("");
-    setTier("B");
-  }
 
-  function handleCreate() {
-    const raw = locationId.trim();
-    if (!LOCATION_ID_RE.test(raw)) {
-      toast.error("Enter a numeric Instagram location id (3–20 digits)");
-      return;
-    }
-    if (!name.trim()) {
-      toast.error("Give the location a display name");
-      return;
-    }
-    createLocation.mutate(
-      {
-        location_id: raw,
-        name: name.trim(),
-        tier,
-        status: "active",
-      } as never,
-      {
-        onSuccess: (row) => {
-          toast.success(`Tracking "${row.name}"`);
-          setAddOpen(false);
-          reset();
-        },
-        onError: (e: unknown) => {
-          const msg = e instanceof Error ? e.message : "Failed to add location";
-          if (/duplicate|unique/i.test(msg)) {
-            toast.error("Already tracking this location");
-          } else {
-            toast.error(msg);
-          }
-        },
-      },
-    );
-  }
 
   async function handleScanNow(loc: TrackedLocation) {
     if (scanning[loc.id]) return;
@@ -257,66 +204,13 @@ function LocationsPage() {
         description={`${rows.length} location${rows.length === 1 ? "" : "s"} under active monitoring. Provider polls each location on the same 6-hour cadence as accounts.`}
         status={{ label: "Monitoring", tone: "success", live: true }}
         actions={
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
+          <LocationSearchDialog
+            trigger={
               <Button className="gap-1.5">
-                <Plus className="h-4 w-4" /> Add Location
+                <Search className="h-4 w-4" /> Track Location
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Track new location</DialogTitle>
-                <DialogDescription>
-                  Instagram location IDs are numeric. You can find them in the URL of any location page,
-                  e.g. <span className="font-mono">instagram.com/explore/locations/<b>213385402</b>/berghain</span>.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="loc-id">Location ID</Label>
-                  <Input
-                    id="loc-id"
-                    value={locationId}
-                    onChange={(e) => setLocationId(e.target.value)}
-                    placeholder="213385402"
-                    className="font-mono"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loc-name">Display name</Label>
-                  <Input
-                    id="loc-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Berghain, Berlin"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="loc-tier">Priority tier</Label>
-                  <Select value={tier} onValueChange={(v) => setTier(v as Tier)}>
-                    <SelectTrigger id="loc-tier">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIERS.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {TIER_LABEL[t]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="ghost">Cancel</Button>
-                </DialogClose>
-                <Button onClick={handleCreate} disabled={createLocation.isPending}>
-                  {createLocation.isPending ? "Adding…" : "Start monitoring"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            }
+          />
         }
       />
 
