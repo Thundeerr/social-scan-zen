@@ -179,6 +179,7 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
       setSubmitted("");
       setResults([]);
       setSource(null);
+      setResolvedPlace(null);
       setError(null);
     }
   }, [open]);
