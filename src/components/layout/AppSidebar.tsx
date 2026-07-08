@@ -34,6 +34,14 @@ const items = [
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Longest-prefix wins so /discovery/analytics doesn't also light up /discovery.
+  const activeTo = items.reduce<string | null>((best, { to }) => {
+    const match = to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(to + "/");
+    if (!match) return best;
+    if (!best || to.length > best.length) return to;
+    return best;
+  }, null);
+
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
@@ -53,7 +61,7 @@ export function AppSidebar() {
           Workspace
         </div>
         {items.map(({ to, label, icon: Icon, hint }) => {
-          const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
+          const active = to === activeTo;
           return (
             <Link
               key={to}
