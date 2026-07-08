@@ -201,9 +201,11 @@ export function useCreateTrackedLocation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: TrackedLocationInsert) => {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user) throw new Error("Not signed in");
       const { data, error } = await supabase
         .from("tracked_locations")
-        .insert(input)
+        .insert({ ...input, created_by: userData.user.id })
         .select()
         .single();
       if (error) throw error;
