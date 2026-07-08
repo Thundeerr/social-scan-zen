@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { searchLocationsFn } from "@/lib/locations.functions";
+import { LocationNameLink } from "@/components/location-name-link";
 import { useCreateTrackedLocation, useTrackedLocations } from "@/lib/db-queries";
 
 // ---------------------------------------------------------------------------
@@ -490,16 +491,11 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <a
-                        href={`https://www.instagram.com/explore/locations/${p.location_id}/`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm font-medium truncate hover:underline hover:text-primary transition-colors block"
-                        title="Open on Instagram"
-                      >
-                        {p.name}
-                      </a>
+                      <LocationNameLink
+                        locationId={p.location_id}
+                        name={p.name}
+                        className="block"
+                      />
                       <div className="text-xs text-muted-foreground truncate">
                         {location || p.address || "—"}
                       </div>
