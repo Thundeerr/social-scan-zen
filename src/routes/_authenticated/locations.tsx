@@ -307,7 +307,7 @@ function LocationsPage() {
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <a
-                          href={`https://www.instagram.com/explore/locations/${loc.location_id}/`}
+                          href={instagramLocationUrl(loc.location_id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium hover:underline hover:text-primary transition-colors"
