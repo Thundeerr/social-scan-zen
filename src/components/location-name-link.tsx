@@ -37,14 +37,20 @@ export function LocationNameLink({
         onClick={(e) => e.stopPropagation()}
         className={
           baseCls +
-          " inline-flex items-center gap-1 hover:underline hover:text-primary transition-colors"
+          " group/loclink inline-flex items-center gap-1 hover:underline hover:text-primary transition-colors"
         }
         title="Open on Instagram"
       >
         <span className="truncate">{name}</span>
-        {showExternalIcon && (
-          <ExternalLink className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
-        )}
+        <ExternalLink
+          className={
+            "h-3 w-3 shrink-0 transition-opacity " +
+            (showExternalIcon
+              ? "opacity-60"
+              : "opacity-0 group-hover/loclink:opacity-70 group-focus-visible/loclink:opacity-70")
+          }
+          aria-hidden
+        />
       </a>
     );
   }
