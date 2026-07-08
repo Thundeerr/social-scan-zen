@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { searchLocationsFn } from "@/lib/locations.functions";
+import { LocationNameLink } from "@/components/location-name-link";
 import { useCreateTrackedLocation, useTrackedLocations } from "@/lib/db-queries";
 
 // ---------------------------------------------------------------------------
