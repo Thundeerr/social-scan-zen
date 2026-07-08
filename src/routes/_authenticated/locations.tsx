@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { MapPin, Radar, Loader2, Trash2, Pause, Play, X, Search } from "lucide-react";
 import { LocationSearchDialog } from "@/components/location-search-dialog";
-import { instagramLocationUrl } from "@/lib/instagram-links";
+import { LocationNameLink } from "@/components/location-name-link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
