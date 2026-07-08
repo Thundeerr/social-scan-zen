@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { MapPin, Radar, Loader2, Trash2, Pause, Play, X, Search } from "lucide-react";
 import { LocationSearchDialog } from "@/components/location-search-dialog";
+import { instagramLocationUrl } from "@/lib/instagram-links";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -307,7 +308,7 @@ function LocationsPage() {
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <a
-                          href={`https://www.instagram.com/explore/locations/${loc.location_id}/`}
+                          href={instagramLocationUrl(loc.location_id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium hover:underline hover:text-primary transition-colors"

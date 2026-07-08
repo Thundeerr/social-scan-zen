@@ -490,7 +490,16 @@ export function LocationSearchDialog({ trigger }: { trigger: React.ReactNode }) 
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{p.name}</div>
+                      <a
+                        href={`https://www.instagram.com/explore/locations/${p.location_id}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-sm font-medium truncate hover:underline hover:text-primary transition-colors block"
+                        title="Open on Instagram"
+                      >
+                        {p.name}
+                      </a>
                       <div className="text-xs text-muted-foreground truncate">
                         {location || p.address || "—"}
                       </div>
