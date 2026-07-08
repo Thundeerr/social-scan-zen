@@ -307,15 +307,10 @@ function LocationsPage() {
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <a
-                          href={instagramLocationUrl(loc.location_id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium hover:underline hover:text-primary transition-colors"
-                          title="Open on Instagram"
-                        >
-                          {loc.name}
-                        </a>
+                        <LocationNameLink
+                          locationId={loc.location_id}
+                          name={loc.name}
+                        />
                         <div className="text-xs text-muted-foreground font-mono">
                           {loc.location_id}
                         </div>
