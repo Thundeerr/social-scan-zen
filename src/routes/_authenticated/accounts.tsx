@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
-import { getAvatar } from "@/lib/mock-data";
+
 import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 import {
