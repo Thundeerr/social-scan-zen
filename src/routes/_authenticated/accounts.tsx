@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/page-header";
-import { getAvatar } from "@/lib/mock-data";
+
 import { TierChip } from "@/components/operator-score";
 import { cn } from "@/lib/utils";
 import {
@@ -569,17 +569,24 @@ function AccountsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <img
-                        src={accountAvatars[a.username] ?? getAvatar(a.username)}
-                        alt=""
-                        loading="lazy"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          const fb = getAvatar(a.username);
-                          if (img.src !== fb) img.src = fb;
-                        }}
-                        className="h-9 w-9 shrink-0 rounded-full ring-1 ring-border bg-muted object-cover"
-                      />
+                      {accountAvatars[a.username] ? (
+                        <img
+                          src={accountAvatars[a.username]}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                          className="h-9 w-9 shrink-0 rounded-full ring-1 ring-border bg-muted object-cover"
+                        />
+                      ) : (
+                        <div
+                          aria-hidden
+                          className="h-9 w-9 shrink-0 rounded-full ring-1 ring-border bg-muted flex items-center justify-center text-[11px] font-medium uppercase text-muted-foreground tracking-wide"
+                        >
+                          {a.username.slice(0, 2)}
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">
                           @{a.username}
