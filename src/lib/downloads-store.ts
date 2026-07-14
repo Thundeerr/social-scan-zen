@@ -78,8 +78,8 @@ async function loadAll() {
   );
   if (userIds.length) {
     const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, display_name, email")
+      .from("profiles_public")
+      .select("id, display_name")
       .in("id", userIds);
     const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
     for (const r of rows) {
