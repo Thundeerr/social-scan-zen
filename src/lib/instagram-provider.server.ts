@@ -336,7 +336,9 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     return url.toString();
   }
 
-  async function fetchLocation(locationId: string): Promise<LocationProviderResponse> {
+  async function fetchLocation(locationId: string): Promise<LocationProviderResponse & {
+    topLevelKeys: string[];
+  }> {
     const url = buildLocationUrl(locationId);
     const res = await fetch(url, { headers });
     if (!res.ok) {
@@ -345,15 +347,19 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     }
     const json = (await res.json()) as unknown;
     const normalised = normaliseResponse(locationId, json);
-    // Location endpoints often include a `name` or `location.name` field.
     let name: string | null = null;
-    if (json && typeof json === "object") {
+    let topLevelKeys: string[] = [];
+    if (json && typeof json === "object" && !Array.isArray(json)) {
       const root = json as Record<string, unknown>;
+      topLevelKeys = Object.keys(root);
       const loc = (pick<Record<string, unknown>>(root, ["location", "data"]) ?? root) as Record<string, unknown>;
       name = pick<string>(loc, ["name", "title", "short_name"]) ?? null;
+    } else if (Array.isArray(json)) {
+      topLevelKeys = [`(array length ${json.length})`];
     }
-    return { location_id: locationId, name, posts: normalised.posts };
+    return { location_id: locationId, name, posts: normalised.posts, topLevelKeys };
   }
+
 
   /**
    * Diagnostic-only: makes the same location request and returns the raw
