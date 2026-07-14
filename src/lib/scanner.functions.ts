@@ -209,6 +209,8 @@ export type LocationProbeResult = {
   topLevelKeys: string[];
   parsedPostCount: number;
   parsedName: string | null;
+  attempts: number;
+  triedTabs: string[];
   configured: boolean;
   host: string | null;
   locationPath: string;
