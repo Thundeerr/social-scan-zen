@@ -331,8 +331,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function DownloadRowView({ row }: { row: DownloadRow }) {
   const thumb = row.asset?.thumbnail_url ?? row.asset?.media_url ?? null;
   const source = row.asset?.source_url ?? null;
-  const operator =
-    row.operator?.display_name || row.operator?.email || "operator";
+  const operator = row.operator?.display_name || "operator";
   const origin = rowOrigin(row);
   const locationName = row.asset?.tracked_locations?.name ?? null;
   const locationId = row.asset?.tracked_locations?.location_id ?? null;
