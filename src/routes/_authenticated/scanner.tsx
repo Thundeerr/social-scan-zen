@@ -953,6 +953,12 @@ function LocationProbePanel() {
               tone={r.parsedPostCount > 0 ? "success" : "danger"}
             />
             <ProbeRow label="Top-level keys" value={r.topLevelKeys.join(", ") || "—"} />
+            <ProbeRow
+              label="Upstream attempts"
+              value={String(r.attempts)}
+              tone={r.attempts >= 3 ? "danger" : undefined}
+            />
+            <ProbeRow label="Tabs tried" value={r.triedTabs.join(" → ") || "—"} />
           </div>
           {r.error && (
             <div className="text-destructive text-[11px]">Error: {r.error}</div>
