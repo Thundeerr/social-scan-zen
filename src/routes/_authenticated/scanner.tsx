@@ -778,7 +778,111 @@ function ProviderStatusPanel() {
         </button>
       </div>
 
+      <LocationTestScanPanel disabled={state === "down"} />
+
       <LocationProbePanel />
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Location test scan — mirrors the account test scan, but for tracked
+// locations. Operator picks any active tracked_location and fires a single
+// on-demand scan through the same pipeline the scheduler uses.
+// -----------------------------------------------------------------------------
+
+type TrackedLocationOption = {
+  id: string;
+  name: string;
+  location_id: string;
+};
+
+function LocationTestScanPanel({ disabled }: { disabled: boolean }) {
+  const qc = useQueryClient();
+  const scan = useServerFn(scanSingleLocationFn);
+  const [locationRowId, setLocationRowId] = useState<string>("");
+
+  const locationsQ = useQuery<TrackedLocationOption[]>({
+    queryKey: ["tracked-locations-options"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tracked_locations")
+        .select("id, name, location_id")
+        .eq("status", "active")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as TrackedLocationOption[];
+    },
+  });
+
+  const mut = useMutation({
+    mutationFn: (id: string) => scan({ data: { locationRowId: id } }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success(
+          `${res.name} · ${res.inserted} new · ${res.duplicates} already archived`,
+        );
+      } else {
+        toast.error(`${res.name} scan failed: ${res.error ?? "unknown"}`);
+      }
+      qc.invalidateQueries({ queryKey: ["scanner_runs", 20] });
+      qc.invalidateQueries({ queryKey: ["scanner_queue"] });
+      qc.invalidateQueries({ queryKey: ["scanner_stats"] });
+    },
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : "Scan failed");
+    },
+  });
+
+  const locations = locationsQ.data ?? [];
+  const isDown = disabled;
+
+  return (
+    <div className="flex items-end gap-3 flex-wrap">
+      <div className="flex-1 min-w-[220px]">
+        <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Test scan · single location
+        </label>
+        <div className="mt-1 flex items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-2">
+          <select
+            value={locationRowId}
+            onChange={(e) => setLocationRowId(e.target.value)}
+            className="bg-transparent outline-none flex-1 text-sm"
+          >
+            <option value="">
+              {locations.length === 0
+                ? locationsQ.isLoading
+                  ? "Loading locations…"
+                  : "No active tracked locations"
+                : "Select a tracked location…"}
+            </option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id} className="bg-background">
+                {l.name} · {l.location_id}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => locationRowId && mut.mutate(locationRowId)}
+        disabled={!locationRowId || mut.isPending || isDown}
+        className={cn(
+          "h-10 px-4 rounded-md border text-xs uppercase tracking-[0.18em] transition-colors",
+          mut.isPending || isDown || !locationRowId
+            ? "border-border text-muted-foreground cursor-not-allowed"
+            : "border-primary/50 text-primary hover:bg-primary/10",
+        )}
+      >
+        {mut.isPending ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Scanning…
+          </span>
+        ) : (
+          "Run scan"
+        )}
+      </button>
     </div>
   );
 }
