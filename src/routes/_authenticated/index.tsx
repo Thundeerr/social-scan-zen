@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   ArrowRight,
@@ -6,13 +7,17 @@ import {
   Clock,
   Download,
   Gauge,
+  Loader2,
   Plug,
   Radio,
   Sparkles,
   Timer,
   Users,
+  Zap,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
 // Provider is static configuration, not simulation data.
@@ -20,6 +25,7 @@ const API_PROVIDER = "Instagram Looter";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useTrackedAccounts, useActivityLog } from "@/lib/db-queries";
+import { runQueueTickFn } from "@/lib/scanner.functions";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
