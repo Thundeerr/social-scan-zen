@@ -80,7 +80,11 @@ async function loadAll() {
       .from("profiles_public")
       .select("id, display_name")
       .in("id", userIds);
-    const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const byId = new Map(
+      (profiles ?? [])
+        .filter((p): p is { id: string; display_name: string | null } => !!p.id)
+        .map((p) => [p.id, p]),
+    );
     for (const r of rows) {
       r.operator = r.downloaded_by ? byId.get(r.downloaded_by) ?? null : null;
     }
