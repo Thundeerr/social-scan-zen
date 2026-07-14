@@ -138,6 +138,48 @@ export const scanSingleAccountFn = createServerFn({ method: "POST" })
     }
   });
 
+// ---------- Test entry: scan by tracked location -----------------------------
+
+export type LocationScanResult = {
+  ok: boolean;
+  locationId: string;
+  externalLocationId: string;
+  name: string;
+  runId: string;
+  status: "completed" | "failed";
+  detected: number;
+  inserted: number;
+  duplicates: number;
+  error?: string;
+};
+
+export const scanSingleLocationFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { locationRowId: string }) =>
+    z.object({ locationRowId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }): Promise<LocationScanResult> => {
+    const { scanLocationNow } = await import("@/lib/scanner-service.server");
+    try {
+      const outcome = await scanLocationNow(context.supabase, data.locationRowId);
+      return {
+        ok: outcome.status === "completed",
+        locationId: outcome.locationId,
+        externalLocationId: outcome.externalLocationId,
+        name: outcome.name,
+        runId: outcome.runId,
+        status: outcome.status,
+        detected: outcome.detected,
+        inserted: outcome.inserted,
+        duplicates: outcome.duplicates,
+        error: outcome.error,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(message);
+    }
+  });
+
 // ---------- Autonomous tick trigger (kept for debugging) ----------------------
 
 export const runQueueTickFn = createServerFn({ method: "POST" })
@@ -146,6 +188,7 @@ export const runQueueTickFn = createServerFn({ method: "POST" })
     const { tickQueue } = await import("@/lib/scanner-service.server");
     return tickQueue(context.supabase);
   });
+
 
 // ---------- Diagnostics: probe location provider endpoint ---------------------
 
