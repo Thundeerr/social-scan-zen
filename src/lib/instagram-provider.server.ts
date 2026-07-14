@@ -325,40 +325,119 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     };
   }
 
-  function buildLocationUrl(locationId: string): string {
+  function buildLocationUrl(locationId: string, tabOverride?: string | null): string {
     const locationPath = cfg.locationPath ?? "/location-feeds";
     const paramName = cfg.locationIdParam ?? "id";
     const url = new URL(`https://${cfg.host}${locationPath}`);
     url.searchParams.set(paramName, locationId);
     for (const [k, v] of Object.entries(cfg.locationExtraParams ?? {})) {
+      if (k === "tab" && tabOverride !== undefined) continue; // handled below
       url.searchParams.set(k, v);
     }
+    if (tabOverride) url.searchParams.set("tab", tabOverride);
     return url.toString();
   }
 
-  async function fetchLocation(locationId: string): Promise<LocationProviderResponse & {
-    topLevelKeys: string[];
-  }> {
-    const url = buildLocationUrl(locationId);
-    const res = await fetch(url, { headers });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Instagram location provider ${res.status}: ${body.slice(0, 200)}`);
-    }
-    const json = (await res.json()) as unknown;
+  /**
+   * Parse the response, and read the looter2-specific `attempts` field
+   * which indicates upstream Instagram scrape retries. When `edges: []`
+   * ships with a high `attempts` count, the provider itself gave up.
+   */
+  function summariseLocationResponse(locationId: string, json: unknown) {
     const normalised = normaliseResponse(locationId, json);
     let name: string | null = null;
     let topLevelKeys: string[] = [];
+    let attempts = 0;
+    let hasEmptyEdges = false;
     if (json && typeof json === "object" && !Array.isArray(json)) {
       const root = json as Record<string, unknown>;
       topLevelKeys = Object.keys(root);
       const loc = (pick<Record<string, unknown>>(root, ["location", "data"]) ?? root) as Record<string, unknown>;
       name = pick<string>(loc, ["name", "title", "short_name"]) ?? null;
+      const rawAttempts = root.attempts;
+      if (typeof rawAttempts === "number") attempts = rawAttempts;
+      else if (typeof rawAttempts === "string") attempts = Number(rawAttempts) || 0;
+      if (Array.isArray(root.edges) && root.edges.length === 0) hasEmptyEdges = true;
     } else if (Array.isArray(json)) {
       topLevelKeys = [`(array length ${json.length})`];
     }
-    return { location_id: locationId, name, posts: normalised.posts, topLevelKeys };
+    return { normalised, name, topLevelKeys, attempts, hasEmptyEdges };
   }
+
+  /**
+   * Fetch location feed with a fallback chain. `instagram-looter2` frequently
+   * returns `{ edges: [], attempts: "18" }` for `tab=ranked` — meaning the
+   * upstream Instagram scrape failed silently. We retry with `tab=recent`,
+   * then with no `tab`, and if all attempts return empty-with-retries we
+   * raise a clean error so the run is marked failed with a real reason.
+   */
+  async function fetchLocation(locationId: string): Promise<LocationProviderResponse & {
+    topLevelKeys: string[];
+  }> {
+    // Configured tab (may be undefined if not in locationExtraParams).
+    const configuredTab = cfg.locationExtraParams?.tab ?? null;
+    // Try the configured tab first, then recent, then no tab. Skip duplicates.
+    const tabChain: Array<string | null> = [];
+    for (const t of [configuredTab, "recent", null]) {
+      if (!tabChain.some((existing) => existing === t)) tabChain.push(t);
+    }
+
+    let lastSummary: ReturnType<typeof summariseLocationResponse> | null = null;
+    let lastUrl = "";
+    let lastAttempts = 0;
+    const triedTabs: string[] = [];
+
+    for (const tab of tabChain) {
+      const url = buildLocationUrl(locationId, tab);
+      lastUrl = url;
+      triedTabs.push(tab ?? "(none)");
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Instagram location provider ${res.status}: ${body.slice(0, 200)}`);
+      }
+      const json = (await res.json()) as unknown;
+      const summary = summariseLocationResponse(locationId, json);
+      lastSummary = summary;
+      lastAttempts = Math.max(lastAttempts, summary.attempts);
+
+      if (summary.normalised.posts.length > 0) {
+        return {
+          location_id: locationId,
+          name: summary.name,
+          posts: summary.normalised.posts,
+          topLevelKeys: summary.topLevelKeys,
+        };
+      }
+      // If edges is empty AND attempts is high, provider gave up — try the
+      // next tab. If edges is empty but attempts is 0, it's a genuine empty
+      // feed on that tab — still worth trying the next tab once.
+      if (!summary.hasEmptyEdges && summary.attempts === 0) {
+        // Shape we don't understand and no retry storm — bail with what we have.
+        break;
+      }
+    }
+
+    // All tabs exhausted with no posts. If the provider showed a retry storm
+    // on any attempt, this is a provider-side failure — surface it.
+    if (lastAttempts >= 3) {
+      throw new Error(
+        `Provider returned no data after ${lastAttempts} upstream attempts (tabs tried: ${triedTabs.join(", ")}). Location feed endpoint is unreliable on this host.`,
+      );
+    }
+
+    // Genuinely empty (no retry storm) — return the empty result with the
+    // shape hint so executeLocationScan can persist it.
+    return {
+      location_id: locationId,
+      name: lastSummary?.name ?? null,
+      posts: [],
+      topLevelKeys: lastSummary?.topLevelKeys ?? [],
+    };
+    // lastUrl is intentionally unused externally — kept for potential future logging.
+    void lastUrl;
+  }
+
 
 
   /**
