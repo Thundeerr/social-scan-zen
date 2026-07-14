@@ -46,7 +46,36 @@ function DashboardPage() {
   const sim = useScanSim();
   const { data: trackedAccounts = [] } = useTrackedAccounts();
   const { data: activityRows = [] } = useActivityLog(20);
+  const runTick = useServerFn(runQueueTickFn);
+  const qc = useQueryClient();
+  const [scanning, setScanning] = useState(false);
   void sim.nowTick;
+
+  const handleScanNow = async () => {
+    if (scanning) return;
+    setScanning(true);
+    try {
+      const outcomes = (await runTick({})) as Array<{
+        status: string;
+        inserted?: number;
+      }>;
+      const picked = outcomes?.length ?? 0;
+      const inserted = outcomes?.reduce((sum, o) => sum + (o.inserted ?? 0), 0) ?? 0;
+      if (picked === 0) {
+        toast.info("No sources due — network is caught up.");
+      } else {
+        toast.success(
+          `Scanned ${picked} source${picked === 1 ? "" : "s"} · ${inserted} new asset${inserted === 1 ? "" : "s"}`,
+        );
+      }
+      qc.invalidateQueries();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Scan failed";
+      toast.error(message);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const activityEvents = useMemo(
     () =>
