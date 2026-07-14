@@ -144,6 +144,22 @@ function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleScanNow}
+            disabled={scanning}
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+            title="Trigger one scan cycle across all due sources"
+          >
+            {scanning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="h-3.5 w-3.5" />
+            )}
+            <span className="uppercase tracking-[0.15em] text-[10px]">
+              {scanning ? "Scanning" : "Scan now"}
+            </span>
+          </button>
           <RefreshIndicator />
           <HealthBadge level={health.level} score={health.score} />
         </div>
