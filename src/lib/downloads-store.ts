@@ -33,7 +33,6 @@ export type DownloadRow = {
   operator?: {
     id: string;
     display_name: string | null;
-    email: string | null;
   } | null;
 };
 
@@ -78,10 +77,14 @@ async function loadAll() {
   );
   if (userIds.length) {
     const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, display_name, email")
+      .from("profiles_public")
+      .select("id, display_name")
       .in("id", userIds);
-    const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const byId = new Map(
+      (profiles ?? [])
+        .filter((p): p is { id: string; display_name: string | null } => !!p.id)
+        .map((p) => [p.id, p]),
+    );
     for (const r of rows) {
       r.operator = r.downloaded_by ? byId.get(r.downloaded_by) ?? null : null;
     }

@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Authenticated can view safe profile fields" ON public.profiles;
