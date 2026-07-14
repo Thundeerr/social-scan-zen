@@ -325,11 +325,7 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     };
   }
 
-  async function fetchLocation(locationId: string): Promise<LocationProviderResponse> {
-    // Default to the instagram-looter2 convention (same host as accounts):
-    //   GET https://<host>/location-feeds?id=<location_id>
-    // Override via RAPIDAPI_LOCATION_PATH / RAPIDAPI_LOCATION_ID_PARAM if
-    // the connected RapidAPI host uses a different path (e.g. `/v1/location_media`).
+  function buildLocationUrl(locationId: string): string {
     const locationPath = cfg.locationPath ?? "/location-feeds";
     const paramName = cfg.locationIdParam ?? "id";
     const url = new URL(`https://${cfg.host}${locationPath}`);
@@ -337,7 +333,12 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     for (const [k, v] of Object.entries(cfg.locationExtraParams ?? {})) {
       url.searchParams.set(k, v);
     }
-    const res = await fetch(url.toString(), { headers });
+    return url.toString();
+  }
+
+  async function fetchLocation(locationId: string): Promise<LocationProviderResponse> {
+    const url = buildLocationUrl(locationId);
+    const res = await fetch(url, { headers });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new Error(`Instagram location provider ${res.status}: ${body.slice(0, 200)}`);
@@ -354,7 +355,51 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     return { location_id: locationId, name, posts: normalised.posts };
   }
 
-  return { fetchAccount, fetchLocation };
+  /**
+   * Diagnostic-only: makes the same location request and returns the raw
+   * response body along with parsed post count. Never returns the API key.
+   */
+  async function probeLocation(locationId: string): Promise<{
+    url: string;
+    status: number;
+    ok: boolean;
+    bodyPreview: string;
+    topLevelKeys: string[];
+    parsedPostCount: number;
+    parsedName: string | null;
+  }> {
+    const url = buildLocationUrl(locationId);
+    const res = await fetch(url, { headers });
+    const bodyText = await res.text().catch(() => "");
+    let json: unknown = null;
+    try {
+      json = JSON.parse(bodyText);
+    } catch {
+      /* not json */
+    }
+    const normalised = json ? normaliseResponse(locationId, json) : { posts: [] as ProviderPost[] };
+    let name: string | null = null;
+    let topLevelKeys: string[] = [];
+    if (json && typeof json === "object" && !Array.isArray(json)) {
+      const root = json as Record<string, unknown>;
+      topLevelKeys = Object.keys(root);
+      const loc = (pick<Record<string, unknown>>(root, ["location", "data"]) ?? root) as Record<string, unknown>;
+      name = pick<string>(loc, ["name", "title", "short_name"]) ?? null;
+    } else if (Array.isArray(json)) {
+      topLevelKeys = [`(array length ${json.length})`];
+    }
+    return {
+      url,
+      status: res.status,
+      ok: res.ok,
+      bodyPreview: bodyText.slice(0, 2048),
+      topLevelKeys,
+      parsedPostCount: normalised.posts.length,
+      parsedName: name,
+    };
+  }
+
+  return { fetchAccount, fetchLocation, probeLocation };
 }
 
 export function getInstagramProviderFromEnv() {
