@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Activity,
   ArrowRight,
@@ -6,13 +7,17 @@ import {
   Clock,
   Download,
   Gauge,
+  Loader2,
   Plug,
   Radio,
   Sparkles,
   Timer,
   Users,
+  Zap,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
 // Provider is static configuration, not simulation data.
@@ -20,6 +25,7 @@ const API_PROVIDER = "Instagram Looter";
 import { useAssets } from "@/lib/assets-store";
 import { useScanSim, formatLastScan } from "@/lib/scan-simulator";
 import { useTrackedAccounts, useActivityLog } from "@/lib/db-queries";
+import { runQueueTickFn } from "@/lib/scanner.functions";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -40,7 +46,36 @@ function DashboardPage() {
   const sim = useScanSim();
   const { data: trackedAccounts = [] } = useTrackedAccounts();
   const { data: activityRows = [] } = useActivityLog(20);
+  const runTick = useServerFn(runQueueTickFn);
+  const qc = useQueryClient();
+  const [scanning, setScanning] = useState(false);
   void sim.nowTick;
+
+  const handleScanNow = async () => {
+    if (scanning) return;
+    setScanning(true);
+    try {
+      const outcomes = (await runTick({})) as Array<{
+        status: string;
+        inserted?: number;
+      }>;
+      const picked = outcomes?.length ?? 0;
+      const inserted = outcomes?.reduce((sum, o) => sum + (o.inserted ?? 0), 0) ?? 0;
+      if (picked === 0) {
+        toast.info("No sources due — network is caught up.");
+      } else {
+        toast.success(
+          `Scanned ${picked} source${picked === 1 ? "" : "s"} · ${inserted} new asset${inserted === 1 ? "" : "s"}`,
+        );
+      }
+      qc.invalidateQueries();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Scan failed";
+      toast.error(message);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const activityEvents = useMemo(
     () =>
@@ -109,6 +144,22 @@ function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleScanNow}
+            disabled={scanning}
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-primary/60 hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+            title="Trigger one scan cycle across all due sources"
+          >
+            {scanning ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Zap className="h-3.5 w-3.5" />
+            )}
+            <span className="uppercase tracking-[0.15em] text-[10px]">
+              {scanning ? "Scanning" : "Scan now"}
+            </span>
+          </button>
           <RefreshIndicator />
           <HealthBadge level={health.level} score={health.score} />
         </div>
