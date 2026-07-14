@@ -33,7 +33,6 @@ export type DownloadRow = {
   operator?: {
     id: string;
     display_name: string | null;
-    email: string | null;
   } | null;
 };
 
