@@ -691,6 +691,13 @@ export async function executeLocationScan(
       });
     }
 
+    // Preserve the shape hint on legitimately-empty completed runs so we
+    // can diagnose zero-post outcomes without needing the Probe button.
+    const shapeSuffix =
+      rows.length === 0 && result.topLevelKeys.length > 0
+        ? ` · shape=[${result.topLevelKeys.slice(0, 6).join(",")}]`
+        : "";
+
     await db
       .from("scanner_runs")
       .update({
@@ -704,9 +711,10 @@ export async function executeLocationScan(
         phase_detail:
           inserted > 0
             ? `${inserted} new · ${duplicates} already archived`
-            : `No new assets · ${duplicates} already archived`,
+            : `No new assets · ${duplicates} already archived${shapeSuffix}`,
       })
       .eq("id", runId);
+
 
     await db
       .from("tracked_locations")

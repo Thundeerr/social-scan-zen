@@ -209,6 +209,8 @@ export type LocationProbeResult = {
   topLevelKeys: string[];
   parsedPostCount: number;
   parsedName: string | null;
+  attempts: number;
+  triedTabs: string[];
   configured: boolean;
   host: string | null;
   locationPath: string;
@@ -252,6 +254,8 @@ export const probeLocationFn = createServerFn({ method: "POST" })
         topLevelKeys: [],
         parsedPostCount: 0,
         parsedName: null,
+        attempts: 0,
+        triedTabs: [],
         configured,
         host,
         locationPath,
@@ -270,6 +274,8 @@ export const probeLocationFn = createServerFn({ method: "POST" })
         topLevelKeys: [],
         parsedPostCount: 0,
         parsedName: null,
+        attempts: 0,
+        triedTabs: [],
         configured,
         host,
         locationPath,
@@ -291,6 +297,8 @@ export const probeLocationFn = createServerFn({ method: "POST" })
         topLevelKeys: probe.topLevelKeys,
         parsedPostCount: probe.parsedPostCount,
         parsedName: probe.parsedName,
+        attempts: probe.attempts,
+        triedTabs: probe.triedTabs,
         configured,
         host,
         locationPath,
@@ -307,6 +315,8 @@ export const probeLocationFn = createServerFn({ method: "POST" })
         topLevelKeys: [],
         parsedPostCount: 0,
         parsedName: null,
+        attempts: 0,
+        triedTabs: [],
         configured,
         host,
         locationPath,
