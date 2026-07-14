@@ -75,7 +75,7 @@ const USERNAME_RE = /^[A-Za-z0-9._]{1,30}$/;
 export const scanSingleAccountFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { username: string }) =>
-    z.object({ username: z.string().min(1).max(64) }).parse(data),
+    z.object({ username: z.string().min(1).max(255) }).parse(data),
   )
   .handler(async ({ data, context }): Promise<ScannerResult> => {
     const username = data.username.trim().replace(/^@/, "").toLowerCase();
