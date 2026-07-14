@@ -616,41 +616,11 @@ export async function executeLocationScan(
     const provider = getInstagramProviderFromEnv();
 
     await setPhase(db, runId, "fetching", describeLocationProviderRequest(externalLocationId));
-    // Use probeLocation so a 0-post response captures payload shape for
-    // diagnostics; still throws on non-2xx via the check below.
-    const probe = await provider.probeLocation(externalLocationId);
-    if (!probe.ok) {
-      throw new Error(`Instagram location provider ${probe.status}: ${probe.bodyPreview.slice(0, 200)}`);
-    }
-    const result = {
-      location_id: externalLocationId,
-      name: probe.parsedName,
-      posts: [] as ProviderPost[],
-    };
-    // Re-parse through fetchLocation's path for posts (probeLocation already parsed).
-    // Rather than duplicate work, re-normalise from the preview if valid JSON;
-    // otherwise fall back to fetchLocation.
-    try {
-      const parsed = JSON.parse(probe.bodyPreview.length >= 2048 ? "null" : probe.bodyPreview);
-      if (parsed) {
-        const { fetchLocation } = provider;
-        const full = await fetchLocation(externalLocationId);
-        result.posts = full.posts;
-        result.name = full.name ?? result.name;
-      } else {
-        const full = await provider.fetchLocation(externalLocationId);
-        result.posts = full.posts;
-        result.name = full.name ?? result.name;
-      }
-    } catch {
-      const full = await provider.fetchLocation(externalLocationId);
-      result.posts = full.posts;
-      result.name = full.name ?? result.name;
-    }
+    const result = await provider.fetchLocation(externalLocationId);
 
     const shapeHint =
       result.posts.length === 0
-        ? ` · keys=[${probe.topLevelKeys.slice(0, 8).join(",")}]`
+        ? ` · keys=[${result.topLevelKeys.slice(0, 8).join(",") || "none"}]`
         : "";
 
     await setPhase(
@@ -660,6 +630,7 @@ export async function executeLocationScan(
       `Normalising ${result.posts.length} item${result.posts.length === 1 ? "" : "s"}${shapeHint}`,
       { assets_found: result.posts.length },
     );
+
 
 
     // Sync display name if provider surfaced one and we still have the raw id.
