@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { providerBudgetFn, providerHealthFn, scanSingleAccountFn } from "@/lib/scanner.functions";
+import { providerBudgetFn, providerHealthFn, scanSingleAccountFn, probeLocationFn } from "@/lib/scanner.functions";
 import { intervalShortLabel, useScanInterval } from "@/lib/scan-interval";
 import { cn } from "@/lib/utils";
 
@@ -777,6 +777,117 @@ function ProviderStatusPanel() {
           )}
         </button>
       </div>
+
+      <LocationProbePanel />
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Location probe — diagnoses why location scans return 0 posts by showing
+// exactly what the RapidAPI endpoint returns for one tracked location.
+// -----------------------------------------------------------------------------
+
+function LocationProbePanel() {
+  const probe = useServerFn(probeLocationFn);
+  const mut = useMutation({
+    mutationFn: () => probe({ data: {} }),
+    onError: (e: unknown) => {
+      toast.error(e instanceof Error ? e.message : "Probe failed");
+    },
+  });
+  const r = mut.data;
+
+  return (
+    <div className="rounded-md border border-border/60 bg-background/40 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Diagnostic · location endpoint probe
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            Fires one raw request at the location endpoint and shows what
+            the provider returns. Use this when scans complete but no assets
+            appear.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => mut.mutate()}
+          disabled={mut.isPending}
+          className={cn(
+            "h-9 px-3 rounded-md border text-[11px] uppercase tracking-[0.18em] transition-colors",
+            mut.isPending
+              ? "border-border text-muted-foreground cursor-not-allowed"
+              : "border-primary/40 text-primary hover:bg-primary/10",
+          )}
+        >
+          {mut.isPending ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Probing…
+            </span>
+          ) : (
+            "Probe provider"
+          )}
+        </button>
+      </div>
+
+      {r && (
+        <div className="space-y-2 text-[11px] font-mono">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <ProbeRow label="Location" value={r.location ? `${r.location.name} (${r.location.externalId})` : "—"} />
+            <ProbeRow label="Configured path" value={`${r.locationPath}?${r.locationIdParam}=…`} />
+            <ProbeRow label="URL" value={r.url || "—"} mono />
+            <ProbeRow
+              label="Status"
+              value={`${r.status || "—"}${r.ok ? " OK" : r.status ? " ERR" : ""}`}
+              tone={r.ok ? "success" : r.status ? "danger" : undefined}
+            />
+            <ProbeRow
+              label="Parsed posts"
+              value={String(r.parsedPostCount)}
+              tone={r.parsedPostCount > 0 ? "success" : "danger"}
+            />
+            <ProbeRow label="Top-level keys" value={r.topLevelKeys.join(", ") || "—"} />
+          </div>
+          {r.error && (
+            <div className="text-destructive text-[11px]">Error: {r.error}</div>
+          )}
+          {r.bodyPreview && (
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1">
+                Response preview (first 2 KB)
+              </div>
+              <pre className="max-h-64 overflow-auto rounded border border-border/60 bg-background/60 p-2 text-[10px] leading-relaxed whitespace-pre-wrap break-all">
+                {r.bodyPreview}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProbeRow({
+  label,
+  value,
+  tone,
+  mono,
+}: {
+  label: string;
+  value: string;
+  tone?: "success" | "danger";
+  mono?: boolean;
+}) {
+  const toneClass =
+    tone === "success" ? "text-success" : tone === "danger" ? "text-destructive" : "text-foreground";
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </span>
+      <span className={cn(mono && "font-mono", toneClass, "break-all")}>{value}</span>
     </div>
   );
 }

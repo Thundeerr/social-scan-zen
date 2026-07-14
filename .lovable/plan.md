@@ -1,110 +1,33 @@
-## Phase 4 — Self-improving Discovery
+## Problem
 
-Ship four transparent ranking modifiers on top of Phase 3. All weights live in ONE constant block near the top of `discovery-service.server.ts` so they are trivial to tune. No black boxes: every candidate returns a `rank_breakdown` the UI renders.
+All 27 tracked locations scan cleanly (no error) but every run returns 0 posts, so no assets ever land in the inbox. There are no tracked accounts, so 100% of scanning depends on the location endpoint working.
 
-### Priorities
+Root cause hypothesis: the location endpoint of your RapidAPI Instagram host isn't actually being hit correctly. The code falls back to `/location-feeds?id=<numeric_id>` when `RAPIDAPI_LOCATION_PATH` / `RAPIDAPI_LOCATION_ID_PARAM` secrets are not set — and they aren't. Either the endpoint doesn't exist on your host, or it responds with a payload shape our normaliser doesn't recognise (so `posts = []`).
 
-1. **Learning loop completion** (already partly wired) — must be verifiable in the UI.
-2. **Diversity + novelty** — visible modifiers on the score.
-3. **Entropy floor** — conservative, pass/fail, non-destructive.
-4. **Debug panel** — every candidate card exposes the numbers.
+## Plan
 
----
+1. **Add a raw provider probe** — a small operator-only server function `probeLocationFetchFn` that:
+   - Calls `provider.fetchLocation(locationId)` for one tracked location.
+   - Also runs the raw HTTP request and returns `{ url, status, bodyPreview (first 2 KB), parsedPostCount, sampleKeys }`.
+   - Requires operator role.
+   Wire a tiny "Probe provider" button on the Scanner page (operator-only) that runs it against the first active location and dumps the JSON into a `<pre>` block so we can see exactly what RapidAPI returns.
 
-### 1. Learning loop — finish what's wired
+2. **Log outcome on the run itself** — in `executeLocationScan`, when `result.posts.length === 0`, set `phase_detail` to include the raw payload shape summary (top-level keys + array length) instead of just "Normalising 0 items". That way future zero-post runs are self-diagnosing without a rebuild.
 
-Current state: `applyOperatorDecision → updatePreferences` already updates `avg_*`, `niche_weights`, `pref_private/commercial` via EMA. What's missing:
+3. **Fix the integration based on the probe result** — one of:
+   - Set `RAPIDAPI_LOCATION_PATH` / `RAPIDAPI_LOCATION_ID_PARAM` / `RAPIDAPI_LOCATION_EXTRA_PARAMS` secrets to match your host's real endpoint (e.g. `/v1/location_media`, `location_id`, `count=30`).
+   - Or extend `normaliseResponse` / `collectPostLike` to unwrap whatever nesting the host uses (some hosts return `{ data: { recent: { sections: [...] } } }`, others `{ graphql: { location: { edge_location_to_media: { edges } } } }`).
 
-- **`signal_weights`** is written back unchanged. Fix: read the candidate's `discovery_signals`, group by `source_type`, apply the same directional EMA (`+1 / -0.3 / -1`) per source type, cap between −3 and +3.
-- **Blacklist strengthening**: on `blacklist`, additionally decay `niche_weights[k]` by an extra −0.5 (already −1 direction + the extra), and de-duplicate the blacklist insert (already `.then(()=>...,()=>...)`).
-- **Sample size**: keep the current `sample_size + 1` cap at 200 (already implicit via α = 1/min(50, …)).
+4. **Verify** by triggering "Scan now" from the dashboard and confirming at least one location returns >0 assets, then checking the Asset Inbox.
 
-No new tables. Just a real `signal_weights` update.
+## Technical notes
 
-### 2. Ranking modifiers — computed live in `listDiscoveryCandidatesFn`
+- Scanner service: `src/lib/scanner-service.server.ts` (executeLocationScan around line 590).
+- Provider: `src/lib/instagram-provider.server.ts` — `fetchLocation` at 328, `normaliseResponse` at 167, `collectPostLike` at 130.
+- Existing secrets present: `RAPIDAPI_KEY`, `RAPIDAPI_HOST`, `RAPIDAPI_PATH`, `RAPIDAPI_PROFILE_PATH`, `RAPIDAPI_USERNAME_PARAM`, `RAPIDAPI_EXTRA_PARAMS`, `RAPIDAPI_LOCATION_SEARCH_PATH`, `RAPIDAPI_LOCATION_SEARCH_QUERY_PARAM`, `RAPIDAPI_LOCATION_SEARCH_EXTRA_PARAMS`, `RAPIDAPI_LOCATION_EXTRA_PARAMS`.
+- Not set: `RAPIDAPI_LOCATION_PATH`, `RAPIDAPI_LOCATION_ID_PARAM` — so the code silently uses `/location-feeds?id=`. This is almost certainly the miss.
+- The probe function must never return raw API keys and must be operator-gated via `requireSupabaseAuth` + `is_operator` check.
 
-Move from a single frozen `rank_score` (baked at enrichment) to a **live composite** computed at list time. The stored `rank_score` becomes `base_score`; diversity/novelty/entropy are applied on top per request, because they depend on the current batch and current graph state.
+## What you'll see when this is done
 
-Composite:
-
-```text
-final = base + learning + novelty − diversity
-pass  = final ≥ entropy_floor
-```
-
-Component definitions — small, simple, editable:
-
-```text
-DISCOVERY_WEIGHTS = {
-  DIVERSITY_STEP:      0.10,   // penalty per repeat of same niche OR cluster
-  DIVERSITY_MAX:       0.30,   // cap on total diversity penalty
-  NOVELTY_MAX:         0.15,   // max novelty boost
-  NOVELTY_NEUTRAL:     0.05,   // when no peer data
-  ENTROPY_BASE:        0.30,
-  ENTROPY_PER_TRACKED: 0.005,
-  ENTROPY_CEIL:        0.55,
-}
-```
-
-- **base**: existing `rank_score` at enrichment time (niche match + axes vs prefs + confidence).
-- **learning**: `base − base_without_prefs`. Recomputed cheaply from stored scores + current prefs, so we always see the delta the operator's decisions produced. (No stored value; derived at list time.)
-- **diversity penalty**: walk the ranked list top→bottom; for each candidate, `−DIVERSITY_STEP` per prior candidate sharing the same `estimated_niche` OR the same cluster root, capped at `DIVERSITY_MAX`. This runs after cluster folding, so it mainly punishes repeated niches across clusters.
-- **novelty boost**: from `cluster_peers` — `tracked_density = tracked_peers / total_peers` where `tracked_peers` = peers whose `username` exists in `tracked_accounts` for this user. Boost = `NOVELTY_MAX × (1 − tracked_density)`. If no peers, use `NOVELTY_NEUTRAL`.
-- **entropy floor**: `min(ENTROPY_CEIL, ENTROPY_BASE + ENTROPY_PER_TRACKED × tracked_count)`. Conservative: with 20 tracked accounts, floor = 0.40; with 50, floor = 0.55 (ceiling).
-
-Sort key stays `final` (desc), then `signal_count`, then `last_seen_at`.
-
-### 3. Transparent debug data per candidate
-
-Extend `DiscoveryCandidateRow`:
-
-```ts
-rank_breakdown: {
-  base:      number;
-  learning:  number;  // signed
-  diversity: number;  // negative or 0
-  novelty:   number;  // positive or 0
-  final:     number;
-  entropy_floor: number;
-  passes_entropy: boolean;
-  novelty_detail: { tracked_peers: number; total_peers: number };
-  diversity_detail: { niche_repeats: number; cluster_repeats: number };
-}
-```
-
-Populated in `listDiscoveryCandidatesFn` after cluster folding.
-
-### 4. UI
-
-In `discovery.tsx` `CandidateCard`:
-
-- Small `<Ranking>` collapsible strip under the score chips: "Ranking · 0.62" with a chevron. Expanded rows show:
-  - `Base 0.48`
-  - `Learning +0.09` (green if positive, muted if negative)
-  - `Novelty +0.12` (with tooltip: "3 of 8 peers already tracked")
-  - `Diversity −0.07` (with tooltip: "2 similar niche · 1 same cluster higher up")
-  - `Final 0.62`
-  - `Entropy floor 0.35 · PASS` (or `BELOW` in warning tone)
-- Below the tab bar, add a small toggle `Hide below entropy floor` (default: off, so nothing disappears silently).
-
-Keep it terse — this is operator debug, not a chart.
-
-### 5. What we're NOT doing (yet)
-
-- No new tables, no migration. All new state is derived.
-- No auto-hiding — entropy floor is visual/optional at first.
-- No cross-user normalization. Weights are per-operator via existing `discovery_preferences`.
-- No signal-weight display in the card yet — it feeds base but is visible in future settings.
-
-### Files touched
-
-- `src/lib/discovery-service.server.ts` — finish `signal_weights` EMA in `updatePreferences`; constants block.
-- `src/lib/discovery.functions.ts` — extend row type; compute modifiers in `listDiscoveryCandidatesFn`; count tracked usernames once per request.
-- `src/routes/_authenticated/discovery.tsx` — add `<Ranking>` panel + entropy-floor toggle.
-
-### Verification
-
-- `bunx tsgo --noEmit` clean.
-- Manually: track one candidate → next list refresh shows Learning value moves; card with tracked peers gets lower Novelty; second candidate in the same niche after a same-niche one shows Diversity −0.10.
-
-Confirm and I'll implement.
+Scanner page gets a small "Probe provider" diagnostic panel showing the exact URL, HTTP status, and first 2 KB of the RapidAPI response for one location. Once we can see the shape, we either flip the two missing secrets or teach the parser about the shape — and the next "Scan now" starts filling the Asset Inbox.

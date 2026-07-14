@@ -618,13 +618,20 @@ export async function executeLocationScan(
     await setPhase(db, runId, "fetching", describeLocationProviderRequest(externalLocationId));
     const result = await provider.fetchLocation(externalLocationId);
 
+    const shapeHint =
+      result.posts.length === 0
+        ? ` · keys=[${result.topLevelKeys.slice(0, 8).join(",") || "none"}]`
+        : "";
+
     await setPhase(
       db,
       runId,
       "parsing",
-      `Normalising ${result.posts.length} item${result.posts.length === 1 ? "" : "s"}`,
+      `Normalising ${result.posts.length} item${result.posts.length === 1 ? "" : "s"}${shapeHint}`,
       { assets_found: result.posts.length },
     );
+
+
 
     // Sync display name if provider surfaced one and we still have the raw id.
     if (result.name && result.name !== locationName) {
