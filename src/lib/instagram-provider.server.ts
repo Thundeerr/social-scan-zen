@@ -452,35 +452,56 @@ export function createInstagramProvider(cfg: InstagramProviderConfig) {
     topLevelKeys: string[];
     parsedPostCount: number;
     parsedName: string | null;
+    attempts: number;
+    triedTabs: string[];
   }> {
-    const url = buildLocationUrl(locationId);
-    const res = await fetch(url, { headers });
-    const bodyText = await res.text().catch(() => "");
-    let json: unknown = null;
-    try {
-      json = JSON.parse(bodyText);
-    } catch {
-      /* not json */
+    const configuredTab = cfg.locationExtraParams?.tab ?? null;
+    const tabChain: Array<string | null> = [];
+    for (const t of [configuredTab, "recent", null]) {
+      if (!tabChain.some((existing) => existing === t)) tabChain.push(t);
     }
-    const normalised = json ? normaliseResponse(locationId, json) : { posts: [] as ProviderPost[] };
-    let name: string | null = null;
-    let topLevelKeys: string[] = [];
-    if (json && typeof json === "object" && !Array.isArray(json)) {
-      const root = json as Record<string, unknown>;
-      topLevelKeys = Object.keys(root);
-      const loc = (pick<Record<string, unknown>>(root, ["location", "data"]) ?? root) as Record<string, unknown>;
-      name = pick<string>(loc, ["name", "title", "short_name"]) ?? null;
-    } else if (Array.isArray(json)) {
-      topLevelKeys = [`(array length ${json.length})`];
+
+    let lastUrl = "";
+    let lastStatus = 0;
+    let lastOk = false;
+    let lastBody = "";
+    let lastKeys: string[] = [];
+    let lastCount = 0;
+    let lastName: string | null = null;
+    let maxAttempts = 0;
+    const triedTabs: string[] = [];
+
+    for (const tab of tabChain) {
+      const url = buildLocationUrl(locationId, tab);
+      triedTabs.push(tab ?? "(none)");
+      const res = await fetch(url, { headers });
+      const bodyText = await res.text().catch(() => "");
+      let json: unknown = null;
+      try { json = JSON.parse(bodyText); } catch { /* not json */ }
+      const summary = json ? summariseLocationResponse(locationId, json) : null;
+      lastUrl = url;
+      lastStatus = res.status;
+      lastOk = res.ok;
+      lastBody = bodyText;
+      lastKeys = summary?.topLevelKeys ?? [];
+      lastCount = summary?.normalised.posts.length ?? 0;
+      lastName = summary?.name ?? null;
+      maxAttempts = Math.max(maxAttempts, summary?.attempts ?? 0);
+      if (lastCount > 0) break;
+      // stop early if shape isn't the empty-edges pattern
+      if (summary && !summary.hasEmptyEdges && summary.attempts === 0) break;
     }
+
     return {
-      url,
-      status: res.status,
-      ok: res.ok,
-      bodyPreview: bodyText.slice(0, 2048),
-      topLevelKeys,
-      parsedPostCount: normalised.posts.length,
-      parsedName: name,
+      url: lastUrl,
+      status: lastStatus,
+      ok: lastOk,
+      bodyPreview: lastBody.slice(0, 2048),
+      topLevelKeys: lastKeys,
+      parsedPostCount: lastCount,
+      parsedName: lastName,
+      attempts: maxAttempts,
+      triedTabs,
     };
   }
 
