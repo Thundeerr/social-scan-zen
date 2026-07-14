@@ -147,6 +147,133 @@ export const runQueueTickFn = createServerFn({ method: "POST" })
     return tickQueue(context.supabase);
   });
 
+// ---------- Diagnostics: probe location provider endpoint ---------------------
+
+/**
+ * Fires a single raw request at the configured RapidAPI location endpoint
+ * for one tracked location, and returns the URL hit, HTTP status, first
+ * 2 KB of the response body, top-level keys of the parsed JSON, and how
+ * many posts our normaliser extracted. Never returns the API key.
+ *
+ * Used by the Scanner page to diagnose why location scans return 0 assets.
+ */
+export type LocationProbeResult = {
+  location: { id: string; name: string; externalId: string } | null;
+  url: string;
+  status: number;
+  ok: boolean;
+  bodyPreview: string;
+  topLevelKeys: string[];
+  parsedPostCount: number;
+  parsedName: string | null;
+  configured: boolean;
+  host: string | null;
+  locationPath: string;
+  locationIdParam: string;
+  error?: string;
+};
+
+export const probeLocationFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { locationId?: string }) =>
+    z.object({ locationId: z.string().uuid().optional() }).parse(data ?? {}),
+  )
+  .handler(async ({ data, context }): Promise<LocationProbeResult> => {
+    const host = process.env.RAPIDAPI_HOST ?? null;
+    const locationPath = process.env.RAPIDAPI_LOCATION_PATH ?? "/location-feeds";
+    const locationIdParam = process.env.RAPIDAPI_LOCATION_ID_PARAM ?? "id";
+    const configured = Boolean(process.env.RAPIDAPI_KEY && host);
+
+    // Only operators can probe; enforced via has_role check.
+    const { data: isOp } = await context.supabase.rpc("is_operator", {
+      _user_id: context.userId,
+    });
+    if (!isOp) throw new Error("Operator role required");
+
+    // Pick the requested location, or fall back to the first active one.
+    const q = context.supabase
+      .from("tracked_locations")
+      .select("id, name, location_id")
+      .eq("status", "active")
+      .limit(1);
+    if (data.locationId) q.eq("id", data.locationId);
+    const { data: loc, error } = await q.maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!loc) {
+      return {
+        location: null,
+        url: "",
+        status: 0,
+        ok: false,
+        bodyPreview: "",
+        topLevelKeys: [],
+        parsedPostCount: 0,
+        parsedName: null,
+        configured,
+        host,
+        locationPath,
+        locationIdParam,
+        error: "No active tracked location to probe",
+      };
+    }
+
+    if (!configured) {
+      return {
+        location: { id: loc.id, name: loc.name, externalId: loc.location_id },
+        url: "",
+        status: 0,
+        ok: false,
+        bodyPreview: "",
+        topLevelKeys: [],
+        parsedPostCount: 0,
+        parsedName: null,
+        configured,
+        host,
+        locationPath,
+        locationIdParam,
+        error: "RapidAPI provider not configured",
+      };
+    }
+
+    const { getInstagramProviderFromEnv } = await import("@/lib/instagram-provider.server");
+    try {
+      const provider = getInstagramProviderFromEnv();
+      const probe = await provider.probeLocation(loc.location_id);
+      return {
+        location: { id: loc.id, name: loc.name, externalId: loc.location_id },
+        url: probe.url,
+        status: probe.status,
+        ok: probe.ok,
+        bodyPreview: probe.bodyPreview,
+        topLevelKeys: probe.topLevelKeys,
+        parsedPostCount: probe.parsedPostCount,
+        parsedName: probe.parsedName,
+        configured,
+        host,
+        locationPath,
+        locationIdParam,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        location: { id: loc.id, name: loc.name, externalId: loc.location_id },
+        url: "",
+        status: 0,
+        ok: false,
+        bodyPreview: "",
+        topLevelKeys: [],
+        parsedPostCount: 0,
+        parsedName: null,
+        configured,
+        host,
+        locationPath,
+        locationIdParam,
+        error: message,
+      };
+    }
+  });
+
+
 // ---------- Provider health ---------------------------------------------------
 
 /**
