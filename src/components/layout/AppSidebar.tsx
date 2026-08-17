@@ -36,7 +36,7 @@ type NavGroup = {
 const groups: NavGroup[] = [
   {
     id: "core",
-    label: "InstaScanner",
+    label: "Content Watch",
     defaultOpen: true,
     items: [
       { to: "/", label: "Dashboard", icon: LayoutDashboard, hint: "G D" },
@@ -49,7 +49,7 @@ const groups: NavGroup[] = [
   },
   {
     id: "transition",
-    label: "Transition Watch",
+    label: "Account Status Watch",
     defaultOpen: true,
     items: [
       { to: "/monitor", label: "Monitor", icon: Eye, hint: null },
