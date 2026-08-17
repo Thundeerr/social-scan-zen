@@ -417,16 +417,20 @@ function MonitorPage() {
                     <td className="py-2.5 pr-3 text-xs text-muted-foreground">
                       {fmt(a.last_checked_at)}
                     </td>
-                    <td className="py-2.5 pr-3 text-xs text-muted-foreground">
-                      {fmt(a.next_check_at)}
-                    </td>
-                    <td className="py-2.5 pr-3 text-xs">
-                      {a.last_failed_check_at ? (
-                        <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
+                    {advancedOpen && (
+                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                        {fmt(a.next_check_at)}
+                      </td>
+                    )}
+                    {advancedOpen && (
+                      <td className="py-2.5 pr-3 text-xs">
+                        {a.last_failed_check_at ? (
+                          <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    )}
 
                     <td className="py-2.5 pr-3">
                       <Switch
