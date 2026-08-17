@@ -416,12 +416,32 @@ function MonitorPage() {
                         }
                       />
                     </td>
+                    <td className="py-2.5 pr-3">
+                      <IntervalDialog
+                        accountId={a.id}
+                        username={a.username}
+                        intervalMinutes={a.interval_minutes}
+                        highFrequencyOptIn={a.high_frequency_opt_in}
+                        defaultIntervalMinutes={
+                          settings?.default_interval_minutes ?? STANDARD_MIN_INTERVAL_MINUTES
+                        }
+                        onSaved={invalidateAll}
+                      />
+                    </td>
                     <td className="py-2.5 pr-3 text-xs text-muted-foreground">
                       {fmt(a.last_checked_at)}
                     </td>
                     <td className="py-2.5 pr-3 text-xs text-muted-foreground">
                       {fmt(a.next_check_at)}
                     </td>
+                    <td className="py-2.5 pr-3 text-xs">
+                      {a.last_failed_check_at ? (
+                        <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+
                     <td className="py-2.5 pr-3">
                       <Switch
                         checked={a.enabled}
