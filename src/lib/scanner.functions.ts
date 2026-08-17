@@ -428,6 +428,9 @@ export type BurnForecast = {
     warning: boolean;
     exhausted: boolean;
   };
+  /** Shared pool split per operator — everyone sees the same numbers. */
+  byOperator: { user_id: string | null; name: string; used: number }[];
+
 };
 
 export const burnForecastFn = createServerFn({ method: "GET" })
@@ -455,18 +458,6 @@ export const burnForecastFn = createServerFn({ method: "GET" })
     const projectedPerWeek = projectedPerDay * 7;
     const projectedPerMonth = projectedPerDay * 30;
 
-    const now = Date.now();
-    const dayAgo = new Date(now - 24 * 60 * 60_000).toISOString();
-    const weekAgo = new Date(now - 7 * 24 * 60 * 60_000).toISOString();
-    const { count: c24 } = await context.supabase
-      .from("scanner_runs")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", dayAgo);
-    const { count: c7d } = await context.supabase
-      .from("scanner_runs")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", weekAgo);
-
     const daysUntilCap =
       projectedPerDay > 0 ? budget.remaining / projectedPerDay : null;
 
@@ -478,9 +469,12 @@ export const burnForecastFn = createServerFn({ method: "GET" })
       projectedPerDay,
       projectedPerWeek,
       projectedPerMonth,
-      actualLast24h: c24 ?? 0,
-      actualLast7d: c7d ?? 0,
+      // Shared-pool actuals — identical for every operator.
+      actualLast24h: budget.last24h,
+      actualLast7d: budget.last7d,
+      byOperator: budget.byOperator,
       daysUntilCap,
+
       budget: {
         used: budget.used,
         monthlyCap: budget.monthlyCap,

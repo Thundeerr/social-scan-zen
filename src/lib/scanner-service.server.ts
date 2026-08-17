@@ -72,6 +72,12 @@ export type BudgetStatus = {
   periodEnd: string;   // ISO — first day of next month, UTC (exclusive)
   exhausted: boolean;
   warning: boolean;
+  /** Shared-pool usage in the last 24h / 7d across all operators. */
+  last24h: number;
+  last7d: number;
+  /** Per-operator breakdown of the shared pool for the current period. */
+  byOperator: { user_id: string | null; name: string; used: number }[];
+
 };
 
 function currentPeriod(): { start: Date; end: Date } {
@@ -93,15 +99,24 @@ export async function getBudgetStatus(db: DB): Promise<BudgetStatus> {
     .select("monthly_cap, warn_at_percent")
     .eq("id", true)
     .maybeSingle();
-  const monthlyCap = cfg?.monthly_cap ?? 40_000;
+  const monthlyCap = cfg?.monthly_cap ?? 15_000;
   const warnAtPercent = cfg?.warn_at_percent ?? 85;
 
-  const { count } = await db
-    .from("scanner_runs")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", start.toISOString())
-    .lt("created_at", end.toISOString());
-  const used = count ?? 0;
+  // Shared pool: usage is counted workspace-wide via a security-definer RPC so
+  // every operator sees the SAME remaining balance, regardless of per-operator
+  // row visibility on scanner_runs.
+  const { data: usage } = await db.rpc("provider_budget_usage", {
+    _start: start.toISOString(),
+    _end: end.toISOString(),
+  });
+  const u = (usage ?? null) as {
+    total?: number;
+    last_24h?: number;
+    last_7d?: number;
+    by_operator?: { user_id: string | null; name: string; used: number }[];
+  } | null;
+
+  const used = u?.total ?? 0;
   const remaining = Math.max(0, monthlyCap - used);
   const percentUsed = monthlyCap > 0 ? Math.min(100, (used / monthlyCap) * 100) : 100;
 
@@ -115,8 +130,12 @@ export async function getBudgetStatus(db: DB): Promise<BudgetStatus> {
     periodEnd: end.toISOString(),
     exhausted: remaining <= 0,
     warning: percentUsed >= warnAtPercent,
+    last24h: u?.last_24h ?? 0,
+    last7d: u?.last_7d ?? 0,
+    byOperator: u?.by_operator ?? [],
   };
 }
+
 
 async function logBudgetBlocked(db: DB, budget: BudgetStatus, reason: string) {
   await db.from("activity_log").insert({

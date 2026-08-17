@@ -1382,6 +1382,10 @@ export type Database = {
       is_workspace_owner: { Args: { _user_id: string }; Returns: boolean }
       owns_monitor_account: { Args: { _account_id: string }; Returns: boolean }
       owns_or_is_admin: { Args: { _owner: string }; Returns: boolean }
+      provider_budget_usage: {
+        Args: { _end: string; _start: string }
+        Returns: Json
+      }
     }
     Enums: {
       account_status: "active" | "paused"
