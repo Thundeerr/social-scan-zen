@@ -60,15 +60,21 @@ export function resolveIntervalMinutes(
   return clampInterval(accountInterval ?? defaultInterval, minIntervalFor(Boolean(opts.highFrequencyOptIn)));
 }
 
-
+/**
+ * `intervalMinutes` is expected to be already resolved (see
+ * `resolveIntervalMinutes`), so the absolute floor applies here — clamping to
+ * the standard floor again would silently undo a high-frequency opt-in.
+ */
 export function nextCheckAt(
   intervalMinutes: number,
   now: Date = new Date(),
   jitterMinutes: number = Math.random() * MAX_JITTER_MINUTES,
 ): string {
-  const ms = (clampInterval(intervalMinutes) + Math.max(0, jitterMinutes)) * 60_000;
+  const clamped = clampInterval(intervalMinutes, HIGH_FREQUENCY_MIN_INTERVAL_MINUTES);
+  const ms = (clamped + Math.max(0, jitterMinutes)) * 60_000;
   return new Date(now.getTime() + ms).toISOString();
 }
+
 
 export function retryAt(now: Date = new Date()): string {
   return new Date(now.getTime() + RETRY_AFTER_MINUTES * 60_000).toISOString();
