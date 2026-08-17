@@ -252,10 +252,24 @@ export async function processAccount(
 
 export async function processAccountSafely(
   account: MonitorAccount,
-  opts: { manual?: boolean } = {},
+  opts: { manual?: boolean; alreadyClaimed?: boolean } = {},
 ): Promise<ProcessResult> {
+  if (!opts.alreadyClaimed) {
+    const claimed = await claimAccount(account.id);
+    if (!claimed) {
+      return {
+        ok: false,
+        result: "error",
+        eventCreated: false,
+        cooldownSuppressed: false,
+        actionsCreated: 0,
+        error: "A check for this account is already running",
+      };
+    }
+  }
   try {
     return await processAccount(account, opts);
+
   } catch (err) {
     const message =
       err instanceof MissingApiKeyError
