@@ -35,6 +35,27 @@ export const triggerManualEventFn = createServerFn({ method: "POST" })
       .eq("id", data.accountId)
       .maybeSingle();
     if (error || !account) throw new Error("Account not found");
+
+    // Manual events dispatch paid orders — guard against double clicks and
+    // repeated triggering with a server-side minimum gap.
+    const MIN_GAP_MINUTES = 5;
+    const { data: recent } = await context.supabase
+      .from("monitor_events")
+      .select("detected_at")
+      .eq("account_id", account.id)
+      .eq("trigger_type", "manual")
+      .order("detected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (
+      recent?.detected_at &&
+      Date.now() - new Date(recent.detected_at).getTime() < MIN_GAP_MINUTES * 60_000
+    ) {
+      throw new Error(
+        `A manual event was already triggered for this account less than ${MIN_GAP_MINUTES} minutes ago`,
+      );
+    }
+
     const { createEventWithActions, loadSettings } = await import("@/lib/monitor/monitor.server");
     const settings = await loadSettings(account.user_id);
     return createEventWithActions(account, {
@@ -51,9 +72,11 @@ export const retryActionFn = createServerFn({ method: "POST" })
     z.object({ actionId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {
+    // RLS on monitor_actions scopes SELECT to the caller's own accounts, so a
+    // successful read is the ownership check for this action.
     const { data: action, error } = await context.supabase
       .from("monitor_actions")
-      .select("id, monitor_accounts!inner(user_id)")
+      .select("id")
       .eq("id", data.actionId)
       .maybeSingle();
     if (error || !action) throw new Error("Action not found");
@@ -72,8 +95,11 @@ export const runSchedulerNowFn = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     const { runScheduler } = await import("@/lib/monitor/monitor.server");
-    return runScheduler(settings?.batch_size ?? 10);
+    // Scope the manual run to the caller's own monitors — never spend another
+    // operator's provider quota.
+    return runScheduler(settings?.batch_size ?? 10, { userId: context.userId });
   });
+
 
 export const getMonitorSystemStatusFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
