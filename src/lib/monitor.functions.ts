@@ -110,6 +110,28 @@ export const testProviderConnectionFn = createServerFn({ method: "POST" })
     return fetchProviderBalance(settings?.adapter_base_url ?? null);
   });
 
+
+/**
+ * Read-only provider service catalogue, filtered server-side. Never orders.
+ */
+export const listProviderServicesFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { search?: string }) =>
+    z.object({ search: z.string().max(80).optional() }).parse(data ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: settings } = await context.supabase
+      .from("monitor_settings")
+      .select("adapter_base_url")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const { fetchProviderServices } = await import(
+      "@/lib/monitor/external-action-adapter.server"
+    );
+    return fetchProviderServices(settings?.adapter_base_url ?? null, data.search ?? "");
+  });
+
+
 /** Operational picture of the order path: caps, spend, queue health. */
 export const getOrderOpsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
