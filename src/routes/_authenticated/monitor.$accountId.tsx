@@ -335,69 +335,17 @@ function AccountDetail() {
           </ul>
         )}
 
-        <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              className="h-8 max-w-xs text-xs"
-              placeholder="Search provider services (e.g. followers)"
-              value={serviceSearch}
-              onChange={(e) => setServiceSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") servicesQuery.refetch();
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => servicesQuery.refetch()}
-              disabled={servicesQuery.isFetching}
-            >
-              {servicesQuery.isFetching ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              Load services
-            </Button>
-            <span className="text-[11px] text-muted-foreground">
-              Read-only catalogue lookup — never places an order.
-            </span>
-          </div>
-          {servicesQuery.data && !servicesQuery.data.ok && (
-            <p className="mt-2 text-xs text-destructive">{servicesQuery.data.error}</p>
-          )}
-          {servicesQuery.data?.ok && (
-            <ul className="mt-2 max-h-52 space-y-1 overflow-y-auto">
-              {servicesQuery.data.services.length === 0 ? (
-                <li className="text-xs text-muted-foreground">No matching services.</li>
-              ) : (
-                servicesQuery.data.services.map((s) => (
-                  <li key={s.service}>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                      onClick={() => {
-                        setForm((f) => ({
-                          ...f,
-                          name: f.name || s.name.slice(0, 60),
-                          service_reference: s.service,
-                          quantity: String(Math.max(1, s.min)),
-                        }));
-                        toast.success(`Service ${s.service} selected · min ${s.min}`);
-                      }}
-                    >
-                      <span className="font-mono text-muted-foreground">#{s.service}</span>{" "}
-                      {s.name}
-                      <span className="block text-[11px] text-muted-foreground">
-                        {s.category} · rate {s.rate}/1000 · min {s.min} · max {s.max}
-                      </span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </div>
+        <ServicePicker
+          onSelect={(s: ProviderService) => {
+            setForm((f) => ({
+              ...f,
+              name: f.name || s.name.slice(0, 60),
+              service_reference: s.service,
+              quantity: String(Math.max(1, s.min)),
+            }));
+            toast.success(`Service ${s.service} selected · min ${s.min}`);
+          }}
+        />
 
         <div className="mt-4 grid gap-3 border-t border-border/60 pt-4 sm:grid-cols-6">
 
