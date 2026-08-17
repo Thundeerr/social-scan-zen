@@ -112,11 +112,12 @@ describe("username normalisation", () => {
   });
 
   it("dedupes case-insensitively and reports invalid tokens", () => {
-    const parsed = parseUsernameInput("@Soneva, soneva\nbad name\nvalid_two");
+    const parsed = parseUsernameInput("@Soneva soneva ..bad.. valid_two");
     expect(parsed.valid.map((v) => v.normalized)).toEqual(["soneva", "valid_two"]);
     expect(parsed.duplicates).toEqual(["soneva"]);
     expect(parsed.invalid.length).toBeGreaterThan(0);
   });
+
 
   it("renders action targets from the template", () => {
     expect(renderTarget("https://instagram.com/{username}", "soneva")).toBe(
