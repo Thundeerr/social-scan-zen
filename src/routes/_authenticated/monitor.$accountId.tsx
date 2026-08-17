@@ -269,6 +269,22 @@ function AccountDetail() {
             <Button size="sm" onClick={() => eventMutation.mutate()} disabled={eventMutation.isPending}>
               <Zap className="h-3.5 w-3.5" /> Manual test event
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => previewQuery.refetch()}
+              disabled={previewQuery.isFetching}
+            >
+              <Eye className="h-3.5 w-3.5" /> Preview order
+            </Button>
+            <Button size="sm" onClick={() => testOrderMutation.mutate()} disabled={testOrderMutation.isPending}>
+              {testOrderMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Rocket className="h-3.5 w-3.5" />
+              )}
+              Test order
+            </Button>
           </div>
         }
       />
