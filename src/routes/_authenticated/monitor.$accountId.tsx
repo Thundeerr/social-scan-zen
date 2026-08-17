@@ -3,18 +3,20 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Plus, RefreshCw, Trash2, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, RefreshCw, Trash2, Zap, Eye, Rocket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/monitor/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { ServicePicker, type ProviderService } from "@/components/monitor/service-picker";
 import {
   checkAccountNowFn,
-  listProviderServicesFn,
+  previewTestOrderFn,
   retryActionFn,
   triggerManualEventFn,
+  triggerTestOrderFn,
 } from "@/lib/monitor.functions";
 
 
