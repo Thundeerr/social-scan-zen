@@ -48,12 +48,11 @@ const groups: NavGroup[] = [
     ],
   },
   {
-    id: "discovery",
-    label: "Discovery",
-    defaultOpen: false,
+    id: "transition",
+    label: "Transition Watch",
+    defaultOpen: true,
     items: [
-      { to: "/discovery", label: "Discovery", icon: Sparkles, hint: "G X" },
-      { to: "/discovery/analytics", label: "Analytics", icon: Gauge, hint: null },
+      { to: "/monitor", label: "Monitor", icon: Eye, hint: null },
     ],
   },
   {
@@ -61,7 +60,8 @@ const groups: NavGroup[] = [
     label: "Operations",
     defaultOpen: false,
     items: [
-      { to: "/monitor", label: "Transition Watch", icon: Eye, hint: null },
+      { to: "/discovery", label: "Discovery", icon: Sparkles, hint: "G X" },
+      { to: "/discovery/analytics", label: "Discovery Analytics", icon: Gauge, hint: null },
       { to: "/burn", label: "Token Burn Rate", icon: Flame, hint: null },
       { to: "/activity", label: "Activity", icon: Activity, hint: null },
       { to: "/telegram", label: "Telegram", icon: Send, hint: null },
