@@ -4,10 +4,12 @@
  */
 
 import {
+  HIGH_FREQUENCY_MIN_INTERVAL_MINUTES,
   MAX_INTERVAL_MINUTES as QUOTA_MAX_INTERVAL,
   STANDARD_MIN_INTERVAL_MINUTES,
   minIntervalFor,
 } from "./quota";
+
 
 /** Standard floor. High-frequency accounts opt down to 30 via `minIntervalFor`. */
 export const MIN_INTERVAL_MINUTES = STANDARD_MIN_INTERVAL_MINUTES;
