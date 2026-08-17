@@ -114,20 +114,21 @@ function LoginPage() {
 
             <form onSubmit={onSubmit} className="space-y-5 px-6 py-6">
               <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                <label htmlFor="operator" className="block text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
                   Operator ID
                 </label>
                 <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
+                  id="operator"
+                  type="text"
+                  autoComplete="username"
                   autoFocus
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="operator@domain"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Admin"
                   className="w-full h-10 rounded-md border border-border/70 bg-background/60 px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+
               </div>
 
               <div className="space-y-1.5">
