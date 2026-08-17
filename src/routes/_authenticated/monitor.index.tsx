@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, Play, RefreshCw, Zap, Trash2, ChevronRight } from "lucide-react";
+import { Loader2, Play, RefreshCw, Zap, Trash2, ChevronRight, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/monitor/status-pill";
@@ -12,14 +12,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { parseUsernameInput } from "@/lib/monitor/usernames";
 import { IntervalDialog } from "@/components/monitor/interval-dialog";
 import { STANDARD_MIN_INTERVAL_MINUTES } from "@/lib/monitor/quota";
 import { OrderOpsCard } from "@/components/monitor/order-ops-card";
+import { SystemStrip } from "@/components/monitor/system-strip";
+import { AddMonitorDialog } from "@/components/monitor/add-monitor-dialog";
 
 import {
   checkAccountNowFn,
-  getMonitorSystemStatusFn,
   retryActionFn,
   runSchedulerNowFn,
   triggerManualEventFn,
@@ -85,13 +87,8 @@ function MonitorPage() {
   const manualEvent = useServerFn(triggerManualEventFn);
   const retryAction = useServerFn(retryActionFn);
   const runScheduler = useServerFn(runSchedulerNowFn);
-  const systemStatus = useServerFn(getMonitorSystemStatusFn);
 
-  const statusQuery = useQuery({
-    queryKey: ["monitor-system-status"],
-    queryFn: () => systemStatus(),
-    staleTime: 60_000,
-  });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const accountsQuery = useQuery({
     queryKey: ["monitor-accounts"],
@@ -316,7 +313,6 @@ function MonitorPage() {
   });
 
   const accounts = accountsQuery.data ?? [];
-  const adapterLive = statusQuery.data?.actionAdapterConfigured;
 
   return (
     <div className="space-y-6">
@@ -346,32 +342,18 @@ function MonitorPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          { label: "Status source", ok: statusQuery.data?.statusSourceConfigured },
-          { label: "Cron secret", ok: statusQuery.data?.cronSecretConfigured },
-          { label: "Order adapter", ok: adapterLive },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="soft-shadow flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
-          >
-            <span className="text-xs text-muted-foreground">{s.label}</span>
-            <StatusPill
-              kind={s.ok ? "completed" : "not_configured"}
-              label={s.ok ? "live" : "not configured"}
-            />
-          </div>
-        ))}
-      </div>
+      <SystemStrip expanded={advancedOpen} onToggle={() => setAdvancedOpen((v) => !v)} />
 
       <Card
         title="Monitored accounts"
         description={`${accounts.length} profile${accounts.length === 1 ? "" : "s"} under watch`}
         actions={
-          <Button size="sm" variant="secondary" onClick={invalidateAll}>
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={invalidateAll}>
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
+            <AddMonitorDialog onCreated={invalidateAll} />
+          </div>
         }
       >
         {accountsQuery.isLoading ? (
@@ -594,8 +576,6 @@ function MonitorPage() {
         </Card>
       </div>
 
-      <OrderOpsCard />
-
       <Card title="Scheduler runs" description="Autonomous cycle history">
         {(runsQuery.data?.length ?? 0) === 0 ? (
           <p className="text-sm text-muted-foreground">No cycles recorded yet.</p>
@@ -631,124 +611,126 @@ function MonitorPage() {
         )}
       </Card>
 
-      <Card
-        title="Monitor settings"
-        description="Cadence, cooldown and the order-adapter configuration"
-        actions={
-          <Button
-            size="sm"
-            onClick={() => saveSettings.mutate()}
-            disabled={!draft || saveSettings.isPending}
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleContent className="space-y-6">
+          <OrderOpsCard />
+
+          <Card
+            title="Advanced settings"
+            description="Cadence, cooldown and the order-adapter configuration"
+            actions={
+              <Button
+                size="sm"
+                onClick={() => saveSettings.mutate()}
+                disabled={!draft || saveSettings.isPending}
+              >
+                {saveSettings.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Save
+              </Button>
+            }
           >
-            {saveSettings.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Save
-          </Button>
-        }
-      >
-        {!draft ? (
-          <p className="text-sm text-muted-foreground">Loading settings…</p>
-        ) : (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-sm font-medium">Automation</div>
-                <div className="text-xs text-muted-foreground">
-                  Global pause switch — manual checks still work while paused.
+            {!draft ? (
+              <p className="text-sm text-muted-foreground">Loading settings…</p>
+            ) : (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Automation</div>
+                    <div className="text-xs text-muted-foreground">
+                      Global pause switch — manual checks still work while paused.
+                    </div>
+                  </div>
+                  <Switch
+                    checked={draft.automation_enabled}
+                    onCheckedChange={(v) => setDraft({ ...draft, automation_enabled: v })}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Default check interval</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {(draft.default_interval_minutes / 60).toFixed(1)} h
+                    </span>
+                  </div>
+                  <Slider
+                    className="mt-3"
+                    min={180}
+                    max={2880}
+                    step={30}
+                    value={[draft.default_interval_minutes]}
+                    onValueChange={([v]) => setDraft({ ...draft, default_interval_minutes: v })}
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm">
+                    <span className="font-medium">Cooldown (minutes)</span>
+                    <Input
+                      className="mt-1.5"
+                      type="number"
+                      min={1}
+                      value={draft.cooldown_minutes}
+                      onChange={(e) =>
+                        setDraft({ ...draft, cooldown_minutes: Number(e.target.value) || 1 })
+                      }
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium">Batch size</span>
+                    <Input
+                      className="mt-1.5"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={draft.batch_size}
+                      onChange={(e) =>
+                        setDraft({ ...draft, batch_size: Number(e.target.value) || 1 })
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div className="rounded-lg border border-border/60 p-3">
+                  <div className="mb-3 text-sm font-medium">Order adapter</div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="block text-sm sm:col-span-3">
+                      <span className="text-xs text-muted-foreground">Base URL</span>
+                      <Input
+                        className="mt-1.5 font-mono text-xs"
+                        value={draft.adapter_base_url}
+                        onChange={(e) => setDraft({ ...draft, adapter_base_url: e.target.value })}
+                      />
+                    </label>
+                    <label className="block text-sm sm:col-span-2">
+                      <span className="text-xs text-muted-foreground">Default service reference</span>
+                      <Input
+                        className="mt-1.5"
+                        value={draft.adapter_service_reference}
+                        onChange={(e) =>
+                          setDraft({ ...draft, adapter_service_reference: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      <span className="text-xs text-muted-foreground">Default quantity</span>
+                      <Input
+                        className="mt-1.5"
+                        type="number"
+                        min={1}
+                        value={draft.adapter_default_quantity}
+                        onChange={(e) =>
+                          setDraft({ ...draft, adapter_default_quantity: e.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
-              <Switch
-                checked={draft.automation_enabled}
-                onCheckedChange={(v) => setDraft({ ...draft, automation_enabled: v })}
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Default check interval</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {(draft.default_interval_minutes / 60).toFixed(1)} h
-                </span>
-              </div>
-              <Slider
-                className="mt-3"
-                min={180}
-                max={2880}
-                step={30}
-                value={[draft.default_interval_minutes]}
-                onValueChange={([v]) => setDraft({ ...draft, default_interval_minutes: v })}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm">
-                <span className="font-medium">Cooldown (minutes)</span>
-                <Input
-                  className="mt-1.5"
-                  type="number"
-                  min={1}
-                  value={draft.cooldown_minutes}
-                  onChange={(e) =>
-                    setDraft({ ...draft, cooldown_minutes: Number(e.target.value) || 1 })
-                  }
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="font-medium">Batch size</span>
-                <Input
-                  className="mt-1.5"
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={draft.batch_size}
-                  onChange={(e) => setDraft({ ...draft, batch_size: Number(e.target.value) || 1 })}
-                />
-              </label>
-            </div>
-
-            <div className="rounded-lg border border-border/60 p-3">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-medium">Order adapter</span>
-                <StatusPill
-                  kind={adapterLive ? "completed" : "not_configured"}
-                  label={adapterLive ? "live" : "not configured"}
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block text-sm sm:col-span-3">
-                  <span className="text-xs text-muted-foreground">Base URL</span>
-                  <Input
-                    className="mt-1.5 font-mono text-xs"
-                    value={draft.adapter_base_url}
-                    onChange={(e) => setDraft({ ...draft, adapter_base_url: e.target.value })}
-                  />
-                </label>
-                <label className="block text-sm sm:col-span-2">
-                  <span className="text-xs text-muted-foreground">Default service reference</span>
-                  <Input
-                    className="mt-1.5"
-                    value={draft.adapter_service_reference}
-                    onChange={(e) =>
-                      setDraft({ ...draft, adapter_service_reference: e.target.value })
-                    }
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-xs text-muted-foreground">Default quantity</span>
-                  <Input
-                    className="mt-1.5"
-                    type="number"
-                    min={1}
-                    value={draft.adapter_default_quantity}
-                    onChange={(e) =>
-                      setDraft({ ...draft, adapter_default_quantity: e.target.value })
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
+            )}
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

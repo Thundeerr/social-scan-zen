@@ -3,18 +3,20 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Plus, RefreshCw, Trash2, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, RefreshCw, Trash2, Zap, Eye, Rocket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/monitor/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { ServicePicker, type ProviderService } from "@/components/monitor/service-picker";
 import {
   checkAccountNowFn,
-  listProviderServicesFn,
+  previewTestOrderFn,
   retryActionFn,
   triggerManualEventFn,
+  triggerTestOrderFn,
 } from "@/lib/monitor.functions";
 
 
@@ -147,13 +149,8 @@ function AccountDetail() {
   };
 
   const [form, setForm] = useState(EMPTY_TEMPLATE);
-  const [serviceSearch, setServiceSearch] = useState("");
-  const listServices = useServerFn(listProviderServicesFn);
-  const servicesQuery = useQuery({
-    queryKey: ["provider-services"],
-    queryFn: () => listServices({ data: { search: serviceSearch } }),
-    enabled: false,
-  });
+  const previewTestOrder = useServerFn(previewTestOrderFn);
+  const triggerTestOrder = useServerFn(triggerTestOrderFn);
 
 
   const createTemplate = useMutation({
@@ -205,6 +202,24 @@ function AccountDetail() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Retry failed"),
   });
 
+  const previewQuery = useQuery({
+    queryKey: ["monitor-test-preview", accountId],
+    queryFn: () => previewTestOrder({ data: { accountId } }),
+    enabled: false,
+  });
+
+  const testOrderMutation = useMutation({
+    mutationFn: () => triggerTestOrder({ data: { accountId } }),
+    onSuccess: (res) => {
+      const tick = res.tick;
+      toast.success(
+        `Test order placed — event ${res.eventCreated ? "created" : "exists"}, ${res.actionsCreated} action(s), ${tick.completed} completed`,
+      );
+      invalidate();
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Test order failed"),
+  });
+
   const account = accountQuery.data;
 
   return (
@@ -254,6 +269,22 @@ function AccountDetail() {
             <Button size="sm" onClick={() => eventMutation.mutate()} disabled={eventMutation.isPending}>
               <Zap className="h-3.5 w-3.5" /> Manual test event
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => previewQuery.refetch()}
+              disabled={previewQuery.isFetching}
+            >
+              <Eye className="h-3.5 w-3.5" /> Preview order
+            </Button>
+            <Button size="sm" onClick={() => testOrderMutation.mutate()} disabled={testOrderMutation.isPending}>
+              {testOrderMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Rocket className="h-3.5 w-3.5" />
+              )}
+              Test order
+            </Button>
           </div>
         }
       />
@@ -261,6 +292,45 @@ function AccountDetail() {
       {account?.last_error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {account.last_error}
+        </div>
+      )}
+
+      {previewQuery.data && (
+        <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-medium">Order preview</span>
+            <span className="text-xs text-muted-foreground">
+              {previewQuery.data.targetOk && previewQuery.data.quantityOk && previewQuery.data.spendOk
+                ? "ready"
+                : "blocked"}
+            </span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div>
+              <div className="text-[11px] text-muted-foreground">Target</div>
+              <div className="font-mono text-xs">{previewQuery.data.target ?? "—"}</div>
+              {previewQuery.data.targetReason && (
+                <div className="text-[11px] text-destructive">{previewQuery.data.targetReason}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground">Quantity</div>
+              <div className="font-mono text-xs">{previewQuery.data.quantity ?? "—"}</div>
+              {previewQuery.data.quantityReason && (
+                <div className="text-[11px] text-destructive">{previewQuery.data.quantityReason}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground">Budget</div>
+              <div className="font-mono text-xs">
+                {previewQuery.data.ordersToday}/{previewQuery.data.dailyCap} today ·{" "}
+                {previewQuery.data.ordersThisMonth}/{previewQuery.data.monthlyCap} month
+              </div>
+              {previewQuery.data.spendReason && (
+                <div className="text-[11px] text-destructive">{previewQuery.data.spendReason}</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -320,69 +390,17 @@ function AccountDetail() {
           </ul>
         )}
 
-        <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              className="h-8 max-w-xs text-xs"
-              placeholder="Search provider services (e.g. followers)"
-              value={serviceSearch}
-              onChange={(e) => setServiceSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") servicesQuery.refetch();
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => servicesQuery.refetch()}
-              disabled={servicesQuery.isFetching}
-            >
-              {servicesQuery.isFetching ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              Load services
-            </Button>
-            <span className="text-[11px] text-muted-foreground">
-              Read-only catalogue lookup — never places an order.
-            </span>
-          </div>
-          {servicesQuery.data && !servicesQuery.data.ok && (
-            <p className="mt-2 text-xs text-destructive">{servicesQuery.data.error}</p>
-          )}
-          {servicesQuery.data?.ok && (
-            <ul className="mt-2 max-h-52 space-y-1 overflow-y-auto">
-              {servicesQuery.data.services.length === 0 ? (
-                <li className="text-xs text-muted-foreground">No matching services.</li>
-              ) : (
-                servicesQuery.data.services.map((s) => (
-                  <li key={s.service}>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
-                      onClick={() => {
-                        setForm((f) => ({
-                          ...f,
-                          name: f.name || s.name.slice(0, 60),
-                          service_reference: s.service,
-                          quantity: String(Math.max(1, s.min)),
-                        }));
-                        toast.success(`Service ${s.service} selected · min ${s.min}`);
-                      }}
-                    >
-                      <span className="font-mono text-muted-foreground">#{s.service}</span>{" "}
-                      {s.name}
-                      <span className="block text-[11px] text-muted-foreground">
-                        {s.category} · rate {s.rate}/1000 · min {s.min} · max {s.max}
-                      </span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </div>
+        <ServicePicker
+          onSelect={(s: ProviderService) => {
+            setForm((f) => ({
+              ...f,
+              name: f.name || s.name.slice(0, 60),
+              service_reference: s.service,
+              quantity: String(Math.max(1, s.min)),
+            }));
+            toast.success(`Service ${s.service} selected · min ${s.min}`);
+          }}
+        />
 
         <div className="mt-4 grid gap-3 border-t border-border/60 pt-4 sm:grid-cols-6">
 

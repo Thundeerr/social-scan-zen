@@ -66,6 +66,131 @@ export const triggerManualEventFn = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * One-click test order: creates a manual event, generates actions from the
+ * account's templates, and immediately works the queue for this operator.
+ * All existing guards (cooldown, spend, target validation) remain active.
+ */
+export const triggerTestOrderFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { accountId: string }) =>
+    z.object({ accountId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: account, error } = await context.supabase
+      .from("monitor_accounts")
+      .select("*")
+      .eq("id", data.accountId)
+      .maybeSingle();
+    if (error || !account) throw new Error("Account not found");
+
+    const MIN_GAP_MINUTES = 5;
+    const { data: recent } = await context.supabase
+      .from("monitor_events")
+      .select("detected_at")
+      .eq("account_id", account.id)
+      .eq("trigger_type", "manual")
+      .order("detected_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (
+      recent?.detected_at &&
+      Date.now() - new Date(recent.detected_at).getTime() < MIN_GAP_MINUTES * 60_000
+    ) {
+      throw new Error(
+        `A manual event was already triggered for this account less than ${MIN_GAP_MINUTES} minutes ago`,
+      );
+    }
+
+    const { createEventWithActions, loadSettings } = await import("@/lib/monitor/monitor.server");
+    const { runActionTick } = await import("@/lib/monitor/external-action-adapter.server");
+    const settings = await loadSettings(account.user_id);
+
+    const event = await createEventWithActions(account, {
+      triggerType: "manual",
+      transitionKey: `manual:${new Date().toISOString()}`,
+      cooldownMinutes: settings.cooldown_minutes,
+      suppressed: false,
+    });
+
+    const tick = await runActionTick(10, { userId: context.userId });
+
+    return {
+      eventCreated: event.eventCreated,
+      actionsCreated: event.actionsCreated,
+      eventId: event.eventId,
+      tick,
+    };
+  });
+
+/**
+ * Read-only preview of what a test order would do: target, quantity, service,
+ * estimated cost and current budget headroom. Never places an order.
+ */
+export const previewTestOrderFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { accountId: string }) =>
+    z.object({ accountId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: account, error } = await context.supabase
+      .from("monitor_accounts")
+      .select("*")
+      .eq("id", data.accountId)
+      .maybeSingle();
+    if (error || !account) throw new Error("Account not found");
+
+    const [{ data: templates }, { data: settings }] = await Promise.all([
+      context.supabase
+        .from("monitor_action_templates")
+        .select("*")
+        .eq("account_id", account.id)
+        .eq("enabled", true)
+        .order("position", { ascending: true }),
+      context.supabase
+        .from("monitor_settings")
+        .select("adapter_base_url")
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+    ]);
+
+    const { loadOrderPolicy, loadOrderSpend, checkSpendAllowed } = await import(
+      "@/lib/monitor/action-budget.server"
+    );
+    const { validateTarget, validateQuantity } = await import("@/lib/monitor/action-guard");
+    const { renderTarget } = await import("@/lib/monitor/usernames");
+
+    const policy = await loadOrderPolicy(context.userId);
+    const spend = await loadOrderSpend(policy);
+    const { verdict } = await checkSpendAllowed(policy);
+
+    const firstTemplate = templates?.[0];
+    const target = firstTemplate ? renderTarget(firstTemplate.target_template, account.username) : null;
+    const quantity = firstTemplate?.quantity ?? null;
+
+    const targetVerdict = target ? validateTarget(target, account.username) : { ok: false, reason: "No target" };
+    const quantityVerdict = quantity
+      ? validateQuantity(quantity, policy.maxQuantityPerAction)
+      : { ok: false, reason: "No quantity" };
+
+    return {
+      hasTemplate: Boolean(firstTemplate),
+      service: firstTemplate?.service_reference ?? null,
+      target,
+      quantity,
+      targetOk: targetVerdict.ok,
+      targetReason: targetVerdict.ok ? null : targetVerdict.reason,
+      quantityOk: quantityVerdict.ok,
+      quantityReason: quantityVerdict.ok ? null : quantityVerdict.reason,
+      spendOk: verdict.ok,
+      spendReason: verdict.ok ? null : verdict.reason,
+      ordersToday: spend.ordersToday,
+      dailyCap: spend.dailyCap,
+      ordersThisMonth: spend.ordersThisMonth,
+      monthlyCap: spend.monthlyCap,
+    };
+  });
+
 export const retryActionFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { actionId: string }) =>
