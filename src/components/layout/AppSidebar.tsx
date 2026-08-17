@@ -12,6 +12,8 @@ import {
   Send,
   Flame,
   Gauge,
+  Eye,
+
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/BrandMark";
