@@ -383,12 +383,15 @@ function MonitorPage() {
                 <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Account</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
+                  <th className="py-2 pr-3 font-medium">Interval</th>
                   <th className="py-2 pr-3 font-medium">Last check</th>
                   <th className="py-2 pr-3 font-medium">Next check</th>
+                  <th className="py-2 pr-3 font-medium">Last failure</th>
                   <th className="py-2 pr-3 font-medium">Enabled</th>
                   <th className="py-2 pr-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
+
               <tbody>
                 {accounts.map((a) => (
                   <tr key={a.id} className="border-t border-border/60 align-middle">
