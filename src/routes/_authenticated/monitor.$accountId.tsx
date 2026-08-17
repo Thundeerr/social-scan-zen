@@ -202,6 +202,24 @@ function AccountDetail() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Retry failed"),
   });
 
+  const previewQuery = useQuery({
+    queryKey: ["monitor-test-preview", accountId],
+    queryFn: () => previewTestOrder({ data: { accountId } }),
+    enabled: false,
+  });
+
+  const testOrderMutation = useMutation({
+    mutationFn: () => triggerTestOrder({ data: { accountId } }),
+    onSuccess: (res) => {
+      const tick = res.tick;
+      toast.success(
+        `Test order placed — event ${res.eventCreated ? "created" : "exists"}, ${res.actionsCreated} action(s), ${tick.completed} completed`,
+      );
+      invalidate();
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Test order failed"),
+  });
+
   const account = accountQuery.data;
 
   return (
