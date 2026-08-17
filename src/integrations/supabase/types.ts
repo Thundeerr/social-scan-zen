@@ -559,12 +559,14 @@ export type Database = {
         Row: {
           created_at: string
           enabled: boolean
+          high_frequency_opt_in: boolean
           id: string
           interval_minutes: number | null
           is_private: boolean | null
           last_checked_at: string | null
           last_error: string | null
           last_event_at: string | null
+          last_failed_check_at: string | null
           next_check_at: string
           normalized_username: string
           processing_started_at: string | null
@@ -576,12 +578,14 @@ export type Database = {
         Insert: {
           created_at?: string
           enabled?: boolean
+          high_frequency_opt_in?: boolean
           id?: string
           interval_minutes?: number | null
           is_private?: boolean | null
           last_checked_at?: string | null
           last_error?: string | null
           last_event_at?: string | null
+          last_failed_check_at?: string | null
           next_check_at?: string
           normalized_username: string
           processing_started_at?: string | null
@@ -593,12 +597,14 @@ export type Database = {
         Update: {
           created_at?: string
           enabled?: boolean
+          high_frequency_opt_in?: boolean
           id?: string
           interval_minutes?: number | null
           is_private?: boolean | null
           last_checked_at?: string | null
           last_error?: string | null
           last_event_at?: string | null
+          last_failed_check_at?: string | null
           next_check_at?: string
           normalized_username?: string
           processing_started_at?: string | null
@@ -787,6 +793,7 @@ export type Database = {
           status: string
           transition_key: string
           trigger_type: string
+          user_id: string
         }
         Insert: {
           account_id: string
@@ -798,6 +805,7 @@ export type Database = {
           status?: string
           transition_key: string
           trigger_type: string
+          user_id: string
         }
         Update: {
           account_id?: string
@@ -809,6 +817,7 @@ export type Database = {
           status?: string
           transition_key?: string
           trigger_type?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -1350,12 +1359,14 @@ export type Database = {
         Returns: {
           created_at: string
           enabled: boolean
+          high_frequency_opt_in: boolean
           id: string
           interval_minutes: number | null
           is_private: boolean | null
           last_checked_at: string | null
           last_error: string | null
           last_event_at: string | null
+          last_failed_check_at: string | null
           next_check_at: string
           normalized_username: string
           processing_started_at: string | null
