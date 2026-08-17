@@ -44,3 +44,7 @@ Der Monitoring-Pfad ist gehärtet und live verifiziert. Der ausgehende Aktionspf
 - Migration: neue Spalten für Backoff (`next_attempt_at`), Blockadegrund und Statusabgleich auf `monitor_actions`, Ausgaben-/Pausierungsfelder auf `monitor_settings`; Statuswert `blocked` ergänzen. GRANTs und RLS wie bei den bestehenden Monitor-Tabellen (operator-gebunden).
 - Bestell-Tick als eigener Endpunkt unter `src/routes/api/public/cron/` mit demselben Secret-Schutz wie der bestehende Check-Endpunkt.
 - Keine neuen Secrets nötig; `JAP_API_KEY` bleibt serverseitig und wird nie geloggt oder zurückgegeben.
+
+&nbsp;
+
+Wichtig hier ist das das uns nicht im Alltag behindert sondern nur vor dummen menschlichen Versagen schützt
