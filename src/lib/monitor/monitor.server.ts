@@ -298,8 +298,13 @@ export async function processAccountSafely(
     });
     await supabaseAdmin
       .from("monitor_accounts")
-      .update({ last_error: message, next_check_at: retryAt() })
+      .update({
+        last_error: message,
+        last_failed_check_at: new Date().toISOString(),
+        next_check_at: retryAt(),
+      })
       .eq("id", account.id);
+
     return {
       ok: false,
       result: "error",
