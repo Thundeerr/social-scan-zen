@@ -254,8 +254,10 @@ function MonitorPage() {
     void qc.invalidateQueries({ queryKey: ["monitor-accounts"] });
   };
 
-  const removeAccount = async (id: string) => {
+  const removeAccount = async (id: string, username: string) => {
+    if (!window.confirm(`Remove @${username} from the watch list? This cannot be undone.`)) return;
     await supabase.from("monitor_accounts").delete().eq("id", id);
+    toast.success(`@${username} removed from the watch list`);
     void qc.invalidateQueries({ queryKey: ["monitor-accounts"] });
   };
 
@@ -315,7 +317,7 @@ function MonitorPage() {
   const accounts = accountsQuery.data ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 md:p-8 space-y-6">
       <PageHeader
         eyebrow="Private→Public Monitor"
         eyebrowTone={settings?.automation_enabled === false ? "warning" : "success"}
@@ -364,15 +366,15 @@ function MonitorPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Account</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
                   <th className="py-2 pr-3 font-medium">Interval</th>
-                  <th className="py-2 pr-3 font-medium">Last check</th>
-                  {advancedOpen && <th className="py-2 pr-3 font-medium">Next check</th>}
-                  {advancedOpen && <th className="py-2 pr-3 font-medium">Last failure</th>}
+                  <th className="py-2 pr-3 font-medium whitespace-nowrap">Last check</th>
+                  {advancedOpen && <th className="py-2 pr-3 font-medium whitespace-nowrap">Next check</th>}
+                  {advancedOpen && <th className="py-2 pr-3 font-medium whitespace-nowrap">Last failure</th>}
                   <th className="py-2 pr-3 font-medium">Enabled</th>
                   <th className="py-2 pr-3 font-medium text-right">Actions</th>
                 </tr>
@@ -414,16 +416,16 @@ function MonitorPage() {
                         onSaved={invalidateAll}
                       />
                     </td>
-                    <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                    <td className="py-2.5 pr-3 text-xs whitespace-nowrap text-muted-foreground">
                       {fmt(a.last_checked_at)}
                     </td>
                     {advancedOpen && (
-                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                      <td className="py-2.5 pr-3 text-xs whitespace-nowrap text-muted-foreground">
                         {fmt(a.next_check_at)}
                       </td>
                     )}
                     {advancedOpen && (
-                      <td className="py-2.5 pr-3 text-xs">
+                      <td className="py-2.5 pr-3 text-xs whitespace-nowrap">
                         {a.last_failed_check_at ? (
                           <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
                         ) : (
@@ -467,7 +469,7 @@ function MonitorPage() {
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => void removeAccount(a.id)}
+                          onClick={() => void removeAccount(a.id, a.username)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

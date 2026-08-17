@@ -116,7 +116,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-sidebar">
+    <aside className="hidden md:flex sticky top-0 h-screen w-60 shrink-0 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
         <BrandMark />
         <div className="flex min-w-0 flex-col leading-tight">

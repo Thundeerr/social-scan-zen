@@ -223,7 +223,7 @@ function AccountDetail() {
   const account = accountQuery.data;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 md:p-8 space-y-6">
       <PageHeader
         eyebrow="Monitored profile"
         title={account ? `@${account.username}` : "Loading…"}
