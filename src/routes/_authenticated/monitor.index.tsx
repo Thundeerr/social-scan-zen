@@ -576,8 +576,6 @@ function MonitorPage() {
         </Card>
       </div>
 
-      <OrderOpsCard />
-
       <Card title="Scheduler runs" description="Autonomous cycle history">
         {(runsQuery.data?.length ?? 0) === 0 ? (
           <p className="text-sm text-muted-foreground">No cycles recorded yet.</p>
