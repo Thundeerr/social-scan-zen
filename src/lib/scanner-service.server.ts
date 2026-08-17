@@ -72,6 +72,12 @@ export type BudgetStatus = {
   periodEnd: string;   // ISO — first day of next month, UTC (exclusive)
   exhausted: boolean;
   warning: boolean;
+  /** Shared-pool usage in the last 24h / 7d across all operators. */
+  last24h: number;
+  last7d: number;
+  /** Per-operator breakdown of the shared pool for the current period. */
+  byOperator: { user_id: string | null; name: string; used: number }[];
+
 };
 
 function currentPeriod(): { start: Date; end: Date } {
