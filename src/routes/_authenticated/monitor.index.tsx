@@ -348,9 +348,12 @@ function MonitorPage() {
         title="Monitored accounts"
         description={`${accounts.length} profile${accounts.length === 1 ? "" : "s"} under watch`}
         actions={
-          <Button size="sm" variant="secondary" onClick={invalidateAll}>
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={invalidateAll}>
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
+            <AddMonitorDialog onCreated={invalidateAll} />
+          </div>
         }
       >
         {accountsQuery.isLoading ? (
