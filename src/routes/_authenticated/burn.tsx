@@ -137,8 +137,54 @@ function TokenBurnPage() {
             <Stat label="Actual · 7d" value={(f?.actualLast7d ?? 0).toLocaleString()} />
             <Stat label="Resets" value={resetOn} />
           </div>
+
+          {/* Shared pool split — same numbers for every operator */}
+          <div className="mt-4 rounded-md border border-border/60 bg-background/40 p-3">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Shared pool · consumption by operator
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {(f?.byOperator ?? []).length === 0 ? (
+                <div className="text-[11px] text-muted-foreground font-mono">
+                  No requests spent this period
+                </div>
+              ) : (
+                (f?.byOperator ?? []).map((op) => {
+                  const share =
+                    f && f.budget.monthlyCap > 0
+                      ? Math.min(100, (op.used / f.budget.monthlyCap) * 100)
+                      : 0;
+                  return (
+                    <div
+                      key={op.user_id ?? op.name}
+                      className="flex items-center gap-3 text-[11px] font-mono"
+                    >
+                      <span className="w-28 shrink-0 truncate text-foreground">{op.name}</span>
+                      <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary/70"
+                          style={{ width: `${share}%` }}
+                        />
+                      </div>
+                      <span className="w-16 shrink-0 text-right text-muted-foreground">
+                        {op.used.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="mt-2.5 border-t border-border/60 pt-2 flex items-center justify-between text-[11px] font-mono">
+              <span className="text-muted-foreground">Remaining for the team</span>
+              <span className="text-foreground">
+                {(f?.budget.remaining ?? 0).toLocaleString()} /{" "}
+                {(f?.budget.monthlyCap ?? 0).toLocaleString()}
+              </span>
+            </div>
+          </div>
         </div>
       </section>
+
 
       {/* Forecast */}
       <section className="rounded-xl border border-border bg-card p-4 md:p-5 soft-shadow">
