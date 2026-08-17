@@ -149,13 +149,8 @@ function AccountDetail() {
   };
 
   const [form, setForm] = useState(EMPTY_TEMPLATE);
-  const [serviceSearch, setServiceSearch] = useState("");
-  const listServices = useServerFn(listProviderServicesFn);
-  const servicesQuery = useQuery({
-    queryKey: ["provider-services"],
-    queryFn: () => listServices({ data: { search: serviceSearch } }),
-    enabled: false,
-  });
+  const previewTestOrder = useServerFn(previewTestOrderFn);
+  const triggerTestOrder = useServerFn(triggerTestOrderFn);
 
 
   const createTemplate = useMutation({
