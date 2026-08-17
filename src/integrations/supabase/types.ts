@@ -1344,6 +1344,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_asset: { Args: { _asset_id: string }; Returns: boolean }
       claim_due_monitor_accounts: {
         Args: { _limit?: number; _stale_after_minutes?: number }
         Returns: {
@@ -1378,7 +1379,9 @@ export type Database = {
         Returns: boolean
       }
       is_operator: { Args: { _user_id: string }; Returns: boolean }
+      is_workspace_owner: { Args: { _user_id: string }; Returns: boolean }
       owns_monitor_account: { Args: { _account_id: string }; Returns: boolean }
+      owns_or_is_admin: { Args: { _owner: string }; Returns: boolean }
     }
     Enums: {
       account_status: "active" | "paused"
