@@ -1,12 +1,20 @@
 /**
  * Pure transition logic for the Instagram Private→Public monitor.
- * Browser-safe: no imports, no side effects, fully testable.
+ * Browser-safe: no side effects, fully testable.
  */
 
-export const MIN_INTERVAL_MINUTES = 180;
-export const MAX_INTERVAL_MINUTES = 2880;
+import {
+  MAX_INTERVAL_MINUTES as QUOTA_MAX_INTERVAL,
+  STANDARD_MIN_INTERVAL_MINUTES,
+  minIntervalFor,
+} from "./quota";
+
+/** Standard floor. High-frequency accounts opt down to 30 via `minIntervalFor`. */
+export const MIN_INTERVAL_MINUTES = STANDARD_MIN_INTERVAL_MINUTES;
+export const MAX_INTERVAL_MINUTES = QUOTA_MAX_INTERVAL;
 export const RETRY_AFTER_MINUTES = 15;
 export const MAX_JITTER_MINUTES = 5;
+
 
 export type AccountState = {
   status_initialized: boolean;
