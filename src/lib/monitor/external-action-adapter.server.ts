@@ -413,18 +413,35 @@ export async function reconcileOpenActions(limit = 20): Promise<number> {
  * Works the order queue. Dispatch is deliberately decoupled from the status
  * scheduler so a slow provider can never delay Instagram status checks.
  */
-export async function runActionTick(limit = 10): Promise<ActionTickSummary> {
+export async function runActionTick(
+  limit = 10,
+  opts: { userId?: string } = {},
+): Promise<ActionTickSummary> {
   const db = supabaseAdmin;
   const released = await releaseStaleProcessing();
   const nowIso = new Date().toISOString();
 
-  const { data: due } = await db
+  let scopedAccountIds: string[] | null = null;
+  if (opts.userId) {
+    const { data: accounts } = await db
+      .from("monitor_accounts")
+      .select("id")
+      .eq("user_id", opts.userId);
+    scopedAccountIds = (accounts ?? []).map((a) => a.id);
+    if (scopedAccountIds.length === 0) {
+      return { dispatched: 0, completed: 0, blocked: 0, failed: 0, reconciled: 0, released };
+    }
+  }
+
+  const query = db
     .from("monitor_actions")
     .select("id")
     .eq("status", "queued")
     .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
     .order("created_at", { ascending: true })
     .limit(limit);
+  if (scopedAccountIds) query.in("account_id", scopedAccountIds);
+  const { data: due } = await query;
 
   const summary: ActionTickSummary = {
     dispatched: 0,
