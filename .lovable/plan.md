@@ -1,47 +1,46 @@
-## What the probe actually revealed
+# Provider-Adapter (Bestellpfad) auf dasselbe Niveau bringen
 
-You were right — this isn't "nobody posted", it's a fetching failure the app is silently swallowing.
+Der Monitoring-Pfad ist gehärtet und live verifiziert. Der ausgehende Aktionspfad ist funktional, aber ungeprüft: er kann Geld ausgeben, ohne dass Guthaben, Ausgabenlimit, Zielvalidierung oder Nachverfolgung eines unklaren Ergebnisses existieren. Dieser Plan bringt ihn auf denselben Stand — mit Kostenkontrolle, Nachvollziehbarkeit und einem kontrollierten Live-Test am Ende.
 
-The endpoint is being hit, auth is correct, and it returns HTTP 200 — but the body is:
+## 1. Sicherheit und Zielvalidierung
 
-```
-{ "edges": [], "page_info": {...}, "attempts": "18" }
-```
+- Die Basis-URL des Anbieters ist heute frei durch Operatoren editierbar und wird direkt vom Server aufgerufen. Sie wird künftig gegen eine Allowlist erlaubter Hosts geprüft (HTTPS, kein privates Netz), sonst wird die Aktion als `not_configured` beendet statt abgeschickt.
+- Das Bestellziel (Link) wird vor dem Versand validiert: nur `instagram.com`-URLs mit dem erwarteten Benutzernamen. Ein Template mit kaputtem Platzhalter darf keine Bestellung an eine fremde URL auslösen.
+- Menge wird gegen eine harte Obergrenze pro Aktion geprüft.
 
-`attempts: "18"` is `instagram-looter2` telling us its upstream Instagram scrape retried 18 times and gave up. The provider itself failed silently. Our code sees `edges: []` and records a normal "No new assets · 0 already archived" completed run — so from the operator's seat it looks like the network is quiet, when actually the provider is dead in the water for location feeds.
+## 2. Kostenkontrolle vor jedem Versand
 
-The parser is fine. The endpoint path is fine. The issue is:
-1. **The response shape is different** — `edges` isn't in our fallback key list (we look for `items/posts/medias/data/edges/results` at the root, but the recursive `collectPostLike` walker never triggers because `edges` IS technically found as an array — it's just empty).
-2. **Empty-with-high-attempts is a provider failure**, not a legitimate empty result — we should mark the run failed, not completed.
-3. **`tab=ranked`** (currently in `RAPIDAPI_LOCATION_EXTRA_PARAMS`) is the harder tab for looter2 to scrape. `tab=recent` is far more reliable on this host.
-4. **Zero-post completions overwrite the diagnostic hint** — after the scan, `phase_detail` becomes `"No new assets · 0 already archived"` and the top-level keys hint from the parsing phase is lost, so the DB shows nothing useful.
+- Neues Ausgabenbudget analog zum geteilten API-Kontingent: Obergrenze pro Tag und pro Monat (Anzahl Aktionen und Menge), workspaceweit geteilt, serverseitig erzwungen. Überschreitung → Aktion bleibt in `blocked` statt zu bestellen.
+- Guthabenabfrage beim Anbieter (`balance`) vor dem ersten Versand eines Laufs; bei zu niedrigem Guthaben wird nicht bestellt, sondern blockiert und im Monitor sichtbar gemacht.
+- Globaler Kill-Switch „Bestellungen pausiert" in den Monitor-Einstellungen — sofort wirksam für Scheduler und manuelle Auslösung.
 
-## Plan
+## 3. Zuverlässigkeit
 
-1. **Retry with `tab=recent` before giving up.**  
-   In `fetchLocation`, if the first call returns `edges: []` (or `posts` length 0) AND the response contains an `attempts` field > 1, retry the same URL with `tab=recent` (dropping any conflicting tab from `locationExtraParams`). If that also returns empty, try one more time with no `tab` at all.
+- Wiederholungen mit exponentiellem Backoff und Obergrenze statt sofortigem Endstatus; nur netzwerkbedingte Fehler werden wiederholt, Anbieterfehler nie.
+- Der Scheduler ruft den Anbieter heute innerhalb der Prüfschleife auf. Der Versand wird davon entkoppelt: Aktionen werden nur eingereiht, ein separater Bestell-Tick arbeitet sie ab. Ein hängender Anbieter blockiert dann keine Statusprüfungen mehr.
+- Steckengebliebene `processing`-Aktionen (Absturz mitten im Versand) werden nach einer Karenzzeit automatisch als `unknown_outcome` freigegeben.
 
-2. **Detect and surface provider-side failures.**  
-   When the response body has `edges: []` and a numeric `attempts` field ≥ 3 after all retries, treat it as a provider failure — throw a clean error like `Provider returned no data after 18 upstream attempts (tab=ranked/recent). Location feed endpoint is currently unreliable on this host.` This flips the run to `failed` with a meaningful reason instead of a fake "completed / 0 assets" success.
+## 4. Abgleich unklarer Ergebnisse
 
-3. **Persist the response-shape hint after 0-post completed runs.**  
-   In `executeLocationScan`, when the run legitimately completes with 0 posts (no provider-side retry storm — real empty), keep the shape summary in `phase_detail`: `"No new assets · shape=[edges,page_info,attempts] · attempts=18"`. So future zero-post runs are self-diagnosing without needing to click Probe.
+- Aktionen mit Anbieterreferenz werden regelmäßig gegen die Statusabfrage des Anbieters abgeglichen (`status`), damit `unknown_outcome` sich zu abgeschlossen/fehlgeschlagen auflöst und keine Doppelbestellung entsteht.
+- Vor jedem erneuten Versand wird geprüft, ob für dieses Ereignis bereits eine Anbieterreferenz existiert — Schutz gegen doppelte Bestellung derselben Aktion.
 
-4. **UI: show the real failure on the Scanner page.**  
-   Recent Runs and the Queue already display `error` for failed rows — this comes for free once step 2 flips these to `failed`. Operator instantly sees "Provider returned no data after 18 upstream attempts" instead of a silent success.
+## 5. Transparenz in der Oberfläche
 
-5. **Verify with the existing Probe button.**  
-   After the change, click Probe once — response should now include one of:
-   - `Parsed posts` > 0 (recent tab worked → real fix), or
-   - the probe still shows empty, but the next real scan will be marked `failed` with a clear message (correct diagnosis surfaced).
+- Aktionsdetails zeigen: Status, Versuche, nächster Versuch, Anbieterreferenz, redigierter Request/Response-Auszug, Blockadegrund.
+- Neues Panel unter `/monitor`: Anbieter-Guthaben, heutige/monatliche Ausgaben gegen Limit, pausiert ja/nein, Anzahl blockierter und unklarer Aktionen.
+- Verbindungstest-Knopf: fragt nur Guthaben ab, bestellt nichts.
+- Jede Bestellung, Blockade und Auflösung wird ins Aktivitätsprotokoll geschrieben.
 
-## Technical notes
+## 6. Tests und Abnahme
 
-- Files touched: `src/lib/instagram-provider.server.ts` (retry logic in `fetchLocation` + `probeLocation`), `src/lib/scanner-service.server.ts` (persist shape hint in the terminal `phase_detail`).
-- Zero DB migrations. Zero UI changes — the Scanner page already renders `run.error` for failed rows.
-- The `attempts` field is a looter2-specific tell but harmless to check for on other hosts (missing → treated as 0 → no false positives).
-- No new secrets. If step 1 works, you can also drop `tab=ranked` from `RAPIDAPI_LOCATION_EXTRA_PARAMS` later; the fallback chain keeps it working either way.
+- Unit-Tests mit gemocktem Anbieter: Erfolg, Anbieterfehler, unparsebare Antwort, Netzwerkfehler, doppelter Versand, Budgetblockade, Hostblockade, Zielvalidierung, Backoff, Abgleich.
+- Typecheck, ESLint, Unit-Tests, Produktionsbuild.
+- Abschließend genau **ein** kontrollierter Live-Test mit kleinstmöglicher Menge auf dem Testmonitor, danach Statusabgleich der Bestellung. Erst dann gilt der Anbieterpfad als live verifiziert; die Readiness-Doku wird entsprechend aktualisiert.
 
-## What you'll see when this is done
+## Technische Details
 
-Either the Asset Inbox starts filling because `tab=recent` succeeds where `ranked` fails — or the Scanner page immediately shows every location marked `failed` with `"Provider returned no data after 18 upstream attempts"`, at which point we know the fix isn't in your code, it's a host swap (looter2's location feed is broken today; pick another RapidAPI Instagram host for locations).
+- Anpassungen konzentriert in `src/lib/monitor/external-action-adapter.server.ts` (Portabilitätsvertrag bleibt: nur diese Datei kennt den Anbieter), plus neue Helfer `action-budget.server.ts` und `action-targets.ts` (browser-sicher, damit die UI dieselben Regeln anzeigen kann).
+- Migration: neue Spalten für Backoff (`next_attempt_at`), Blockadegrund und Statusabgleich auf `monitor_actions`, Ausgaben-/Pausierungsfelder auf `monitor_settings`; Statuswert `blocked` ergänzen. GRANTs und RLS wie bei den bestehenden Monitor-Tabellen (operator-gebunden).
+- Bestell-Tick als eigener Endpunkt unter `src/routes/api/public/cron/` mit demselben Secret-Schutz wie der bestehende Check-Endpunkt.
+- Keine neuen Secrets nötig; `JAP_API_KEY` bleibt serverseitig und wird nie geloggt oder zurückgegeben.
