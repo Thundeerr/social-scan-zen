@@ -337,7 +337,7 @@ function MonitorPage() {
             ) : (
               <Play className="h-3.5 w-3.5" />
             )}
-            Run scheduler now
+            Check all now
           </Button>
         }
       />
@@ -360,7 +360,7 @@ function MonitorPage() {
           <p className="text-sm text-muted-foreground">Loading watch list…</p>
         ) : accounts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Standby — no profiles under watch yet. Import a list below to arm the monitor.
+            Standby — no profiles under watch yet. Use “Add account” to arm the monitor.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -371,8 +371,8 @@ function MonitorPage() {
                   <th className="py-2 pr-3 font-medium">Status</th>
                   <th className="py-2 pr-3 font-medium">Interval</th>
                   <th className="py-2 pr-3 font-medium">Last check</th>
-                  <th className="py-2 pr-3 font-medium">Next check</th>
-                  <th className="py-2 pr-3 font-medium">Last failure</th>
+                  {advancedOpen && <th className="py-2 pr-3 font-medium">Next check</th>}
+                  {advancedOpen && <th className="py-2 pr-3 font-medium">Last failure</th>}
                   <th className="py-2 pr-3 font-medium">Enabled</th>
                   <th className="py-2 pr-3 font-medium text-right">Actions</th>
                 </tr>
@@ -417,16 +417,20 @@ function MonitorPage() {
                     <td className="py-2.5 pr-3 text-xs text-muted-foreground">
                       {fmt(a.last_checked_at)}
                     </td>
-                    <td className="py-2.5 pr-3 text-xs text-muted-foreground">
-                      {fmt(a.next_check_at)}
-                    </td>
-                    <td className="py-2.5 pr-3 text-xs">
-                      {a.last_failed_check_at ? (
-                        <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
+                    {advancedOpen && (
+                      <td className="py-2.5 pr-3 text-xs text-muted-foreground">
+                        {fmt(a.next_check_at)}
+                      </td>
+                    )}
+                    {advancedOpen && (
+                      <td className="py-2.5 pr-3 text-xs">
+                        {a.last_failed_check_at ? (
+                          <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    )}
 
                     <td className="py-2.5 pr-3">
                       <Switch
@@ -444,14 +448,16 @@ function MonitorPage() {
                         >
                           <RefreshCw className="h-3.5 w-3.5" /> Check
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => eventMutation.mutate(a.id)}
-                          disabled={eventMutation.isPending}
-                        >
-                          <Zap className="h-3.5 w-3.5" /> Event
-                        </Button>
+                        {advancedOpen && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => eventMutation.mutate(a.id)}
+                            disabled={eventMutation.isPending}
+                          >
+                            <Zap className="h-3.5 w-3.5" /> Event
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" asChild>
                           <Link to="/monitor/$accountId" params={{ accountId: a.id }}>
                             <ChevronRight className="h-4 w-4" />
@@ -475,37 +481,6 @@ function MonitorPage() {
         )}
       </Card>
 
-      <Card
-        title="Bulk import"
-        description="Paste usernames, @handles or profile URLs — separated by lines, commas or spaces. # starts a comment."
-      >
-        <Textarea
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-          rows={5}
-          placeholder={"@example\nhttps://instagram.com/another\nthird.account  # note"}
-          className="font-mono text-xs"
-        />
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span className="text-success">{parsed.valid.length} valid</span>
-          <span className="text-destructive">{parsed.invalid.length} invalid</span>
-          <span className="text-warning">{parsed.duplicates.length} duplicates</span>
-          <div className="flex-1" />
-          <Button
-            size="sm"
-            onClick={() => importMutation.mutate()}
-            disabled={parsed.valid.length === 0 || importMutation.isPending}
-          >
-            {importMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Add {parsed.valid.length || ""} to watch
-          </Button>
-        </div>
-        {parsed.invalid.length > 0 && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Rejected: {parsed.invalid.slice(0, 12).join(", ")}
-          </p>
-        )}
-      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Recent transitions" description="Deduplicated private→public events">
@@ -576,44 +551,80 @@ function MonitorPage() {
         </Card>
       </div>
 
-      <Card title="Scheduler runs" description="Autonomous cycle history">
-        {(runsQuery.data?.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No cycles recorded yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">Started</th>
-                  <th className="py-2 pr-3 font-medium">Checked</th>
-                  <th className="py-2 pr-3 font-medium">Events</th>
-                  <th className="py-2 pr-3 font-medium">Actions</th>
-                  <th className="py-2 pr-3 font-medium">Errors</th>
-                  <th className="py-2 pr-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runsQuery.data!.map((r) => (
-                  <tr key={r.id} className="border-t border-border/60">
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{fmt(r.started_at)}</td>
-                    <td className="py-2 pr-3">{r.checked_accounts}</td>
-                    <td className="py-2 pr-3">{r.created_events}</td>
-                    <td className="py-2 pr-3">{r.created_actions}</td>
-                    <td className="py-2 pr-3">{r.errors}</td>
-                    <td className="py-2 pr-3">
-                      <StatusPill kind={r.status} label={r.status.replace(/_/g, " ")} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
 
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <CollapsibleContent className="space-y-6">
+          <Card
+            title="Bulk import"
+            description="Paste usernames, @handles or profile URLs — separated by lines, commas or spaces. # starts a comment."
+          >
+            <Textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              rows={5}
+              placeholder={"@example\nhttps://instagram.com/another\nthird.account  # note"}
+              className="font-mono text-xs"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span className="text-success">{parsed.valid.length} valid</span>
+              <span className="text-destructive">{parsed.invalid.length} invalid</span>
+              <span className="text-warning">{parsed.duplicates.length} duplicates</span>
+              <div className="flex-1" />
+              <Button
+                size="sm"
+                onClick={() => importMutation.mutate()}
+                disabled={parsed.valid.length === 0 || importMutation.isPending}
+              >
+                {importMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Add {parsed.valid.length || ""} to watch
+              </Button>
+            </div>
+            {parsed.invalid.length > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Rejected: {parsed.invalid.slice(0, 12).join(", ")}
+              </p>
+            )}
+          </Card>
+
+          <Card title="Scheduler runs" description="Autonomous cycle history">
+            {(runsQuery.data?.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground">No cycles recorded yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      <th className="py-2 pr-3 font-medium">Started</th>
+                      <th className="py-2 pr-3 font-medium">Checked</th>
+                      <th className="py-2 pr-3 font-medium">Events</th>
+                      <th className="py-2 pr-3 font-medium">Actions</th>
+                      <th className="py-2 pr-3 font-medium">Errors</th>
+                      <th className="py-2 pr-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runsQuery.data!.map((r) => (
+                      <tr key={r.id} className="border-t border-border/60">
+                        <td className="py-2 pr-3 text-xs text-muted-foreground">
+                          {fmt(r.started_at)}
+                        </td>
+                        <td className="py-2 pr-3">{r.checked_accounts}</td>
+                        <td className="py-2 pr-3">{r.created_events}</td>
+                        <td className="py-2 pr-3">{r.created_actions}</td>
+                        <td className="py-2 pr-3">{r.errors}</td>
+                        <td className="py-2 pr-3">
+                          <StatusPill kind={r.status} label={r.status.replace(/_/g, " ")} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
           <OrderOpsCard />
+
 
           <Card
             title="Advanced settings"
