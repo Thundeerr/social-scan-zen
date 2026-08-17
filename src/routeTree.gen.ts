@@ -22,10 +22,13 @@ import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/b
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
+import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
 import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
+import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -91,6 +94,18 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMonitorIndexRoute =
+  AuthenticatedMonitorIndexRouteImport.update({
+    id: '/monitor/',
+    path: '/monitor/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMonitorAccountIdRoute =
+  AuthenticatedMonitorAccountIdRouteImport.update({
+    id: '/monitor/$accountId',
+    path: '/monitor/$accountId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDiscoveryAnalyticsRoute =
   AuthenticatedDiscoveryAnalyticsRouteImport.update({
     id: '/analytics',
@@ -115,6 +130,11 @@ const ApiPublicHooksDiscoveryTickRoute =
     path: '/api/public/hooks/discovery-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
+  id: '/api/public/cron/check',
+  path: '/api/public/cron/check',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -130,6 +150,9 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/monitor/': typeof AuthenticatedMonitorIndexRoute
+  '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -148,6 +171,9 @@ export interface FileRoutesByTo {
   '/telegram': typeof AuthenticatedTelegramRoute
   '/': typeof AuthenticatedIndexRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/monitor': typeof AuthenticatedMonitorIndexRoute
+  '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -168,6 +194,9 @@ export interface FileRoutesById {
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/_authenticated/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
+  '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -188,6 +217,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/telegram'
     | '/discovery/analytics'
+    | '/monitor/$accountId'
+    | '/monitor/'
+    | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -206,6 +238,9 @@ export interface FileRouteTypes {
     | '/telegram'
     | '/'
     | '/discovery/analytics'
+    | '/monitor/$accountId'
+    | '/monitor'
+    | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -225,6 +260,9 @@ export interface FileRouteTypes {
     | '/_authenticated/telegram'
     | '/_authenticated/'
     | '/_authenticated/discovery/analytics'
+    | '/_authenticated/monitor/$accountId'
+    | '/_authenticated/monitor/'
+    | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -233,6 +271,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
   ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
@@ -331,6 +370,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/monitor/': {
+      id: '/_authenticated/monitor/'
+      path: '/monitor'
+      fullPath: '/monitor/'
+      preLoaderRoute: typeof AuthenticatedMonitorIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/monitor/$accountId': {
+      id: '/_authenticated/monitor/$accountId'
+      path: '/monitor/$accountId'
+      fullPath: '/monitor/$accountId'
+      preLoaderRoute: typeof AuthenticatedMonitorAccountIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/discovery/analytics': {
       id: '/_authenticated/discovery/analytics'
       path: '/analytics'
@@ -357,6 +410,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/discovery-tick'
       fullPath: '/api/public/hooks/discovery-tick'
       preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/check': {
+      id: '/api/public/cron/check'
+      path: '/api/public/cron/check'
+      fullPath: '/api/public/cron/check'
+      preLoaderRoute: typeof ApiPublicCronCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -388,6 +448,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTelegramRoute: typeof AuthenticatedTelegramRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedMonitorAccountIdRoute: typeof AuthenticatedMonitorAccountIdRoute
+  AuthenticatedMonitorIndexRoute: typeof AuthenticatedMonitorIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -402,6 +464,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTelegramRoute: AuthenticatedTelegramRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedMonitorAccountIdRoute: AuthenticatedMonitorAccountIdRoute,
+  AuthenticatedMonitorIndexRoute: AuthenticatedMonitorIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -410,6 +474,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
   ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,

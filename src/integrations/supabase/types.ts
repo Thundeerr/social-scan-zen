@@ -555,6 +555,346 @@ export type Database = {
         }
         Relationships: []
       }
+      monitor_accounts: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          interval_minutes: number | null
+          is_private: boolean | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_event_at: string | null
+          next_check_at: string
+          normalized_username: string
+          processing_started_at: string | null
+          status_initialized: boolean
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          interval_minutes?: number | null
+          is_private?: boolean | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_event_at?: string | null
+          next_check_at?: string
+          normalized_username: string
+          processing_started_at?: string | null
+          status_initialized?: boolean
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          interval_minutes?: number | null
+          is_private?: boolean | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_event_at?: string | null
+          next_check_at?: string
+          normalized_username?: string
+          processing_started_at?: string | null
+          status_initialized?: boolean
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      monitor_action_templates: {
+        Row: {
+          account_id: string
+          created_at: string
+          dry_run: boolean
+          enabled: boolean
+          id: string
+          name: string
+          position: number
+          quantity: number
+          service_reference: string | null
+          target_template: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          dry_run?: boolean
+          enabled?: boolean
+          id?: string
+          name: string
+          position?: number
+          quantity?: number
+          service_reference?: string | null
+          target_template?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          dry_run?: boolean
+          enabled?: boolean
+          id?: string
+          name?: string
+          position?: number
+          quantity?: number
+          service_reference?: string | null
+          target_template?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitor_action_templates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitor_actions: {
+        Row: {
+          account_id: string
+          attempt_count: number
+          created_at: string
+          error_message: string | null
+          event_id: string
+          id: string
+          provider_reference: string | null
+          quantity: number | null
+          request_excerpt: Json | null
+          response_excerpt: Json | null
+          service_reference: string | null
+          status: string
+          target: string
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          attempt_count?: number
+          created_at?: string
+          error_message?: string | null
+          event_id: string
+          id?: string
+          provider_reference?: string | null
+          quantity?: number | null
+          request_excerpt?: Json | null
+          response_excerpt?: Json | null
+          service_reference?: string | null
+          status?: string
+          target: string
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          attempt_count?: number
+          created_at?: string
+          error_message?: string | null
+          event_id?: string
+          id?: string
+          provider_reference?: string | null
+          quantity?: number | null
+          request_excerpt?: Json | null
+          response_excerpt?: Json | null
+          service_reference?: string | null
+          status?: string
+          target?: string
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitor_actions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monitor_actions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monitor_actions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_action_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitor_checks: {
+        Row: {
+          account_id: string
+          checked_at: string
+          current_is_private: boolean | null
+          error_message: string | null
+          id: string
+          previous_is_private: boolean | null
+          response_excerpt: string | null
+          result: string
+        }
+        Insert: {
+          account_id: string
+          checked_at?: string
+          current_is_private?: boolean | null
+          error_message?: string | null
+          id?: string
+          previous_is_private?: boolean | null
+          response_excerpt?: string | null
+          result: string
+        }
+        Update: {
+          account_id?: string
+          checked_at?: string
+          current_is_private?: boolean | null
+          error_message?: string | null
+          id?: string
+          previous_is_private?: boolean | null
+          response_excerpt?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitor_checks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitor_events: {
+        Row: {
+          account_id: string
+          cooldown_minutes: number | null
+          cooldown_suppressed: boolean
+          detected_at: string
+          event_type: string
+          id: string
+          status: string
+          transition_key: string
+          trigger_type: string
+        }
+        Insert: {
+          account_id: string
+          cooldown_minutes?: number | null
+          cooldown_suppressed?: boolean
+          detected_at?: string
+          event_type?: string
+          id?: string
+          status?: string
+          transition_key: string
+          trigger_type: string
+        }
+        Update: {
+          account_id?: string
+          cooldown_minutes?: number | null
+          cooldown_suppressed?: boolean
+          detected_at?: string
+          event_type?: string
+          id?: string
+          status?: string
+          transition_key?: string
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitor_events_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitor_scheduler_runs: {
+        Row: {
+          checked_accounts: number
+          completed_at: string | null
+          created_actions: number
+          created_events: number
+          errors: number
+          id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          checked_accounts?: number
+          completed_at?: string | null
+          created_actions?: number
+          created_events?: number
+          errors?: number
+          id?: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          checked_accounts?: number
+          completed_at?: string | null
+          created_actions?: number
+          created_events?: number
+          errors?: number
+          id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      monitor_settings: {
+        Row: {
+          adapter_base_url: string
+          adapter_configured_at: string | null
+          adapter_default_quantity: number | null
+          adapter_service_reference: string | null
+          automation_enabled: boolean
+          batch_size: number
+          cooldown_minutes: number
+          created_at: string
+          default_interval_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adapter_base_url?: string
+          adapter_configured_at?: string | null
+          adapter_default_quantity?: number | null
+          adapter_service_reference?: string | null
+          automation_enabled?: boolean
+          batch_size?: number
+          cooldown_minutes?: number
+          created_at?: string
+          default_interval_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adapter_base_url?: string
+          adapter_configured_at?: string | null
+          adapter_default_quantity?: number | null
+          adapter_service_reference?: string | null
+          automation_enabled?: boolean
+          batch_size?: number
+          cooldown_minutes?: number
+          created_at?: string
+          default_interval_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1004,6 +1344,32 @@ export type Database = {
       }
     }
     Functions: {
+      claim_due_monitor_accounts: {
+        Args: { _limit?: number; _stale_after_minutes?: number }
+        Returns: {
+          created_at: string
+          enabled: boolean
+          id: string
+          interval_minutes: number | null
+          is_private: boolean | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_event_at: string | null
+          next_check_at: string
+          normalized_username: string
+          processing_started_at: string | null
+          status_initialized: boolean
+          updated_at: string
+          user_id: string
+          username: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "monitor_accounts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1012,6 +1378,7 @@ export type Database = {
         Returns: boolean
       }
       is_operator: { Args: { _user_id: string }; Returns: boolean }
+      owns_monitor_account: { Args: { _account_id: string }; Returns: boolean }
     }
     Enums: {
       account_status: "active" | "paused"
