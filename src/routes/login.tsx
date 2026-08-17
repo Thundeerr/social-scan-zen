@@ -32,7 +32,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,11 +53,21 @@ function LoginPage() {
     return () => sub.subscription.unsubscribe();
   }, [navigate, redirectTo]);
 
+  // Operators may sign in with a bare operator name ("Admin") — it maps to the
+  // internal invite-only address. A full address is passed through untouched.
+  const toOperatorEmail = (raw: string) => {
+    const v = raw.trim();
+    return v.includes("@") ? v : `${v.toLowerCase()}@instascanner.dev`;
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: toOperatorEmail(identifier),
+      password,
+    });
     setLoading(false);
     if (error) {
       setError(error.message);
@@ -104,20 +114,21 @@ function LoginPage() {
 
             <form onSubmit={onSubmit} className="space-y-5 px-6 py-6">
               <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                <label htmlFor="operator" className="block text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
                   Operator ID
                 </label>
                 <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
+                  id="operator"
+                  type="text"
+                  autoComplete="username"
                   autoFocus
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="operator@domain"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Admin"
                   className="w-full h-10 rounded-md border border-border/70 bg-background/60 px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+
               </div>
 
               <div className="space-y-1.5">
