@@ -84,6 +84,88 @@ export const retryActionFn = createServerFn({ method: "POST" })
     return dispatchExternalAction(data.actionId);
   });
 
+/** Works the caller's own order queue once (dispatch + reconcile). */
+export const runActionTickNowFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { runActionTick } = await import("@/lib/monitor/external-action-adapter.server");
+    return runActionTick(10, { userId: context.userId });
+  });
+
+/**
+ * Read-only provider connection test. Asks the provider for the account
+ * balance — never places an order, so it is safe to click at any time.
+ */
+export const testProviderConnectionFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: settings } = await context.supabase
+      .from("monitor_settings")
+      .select("adapter_base_url")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const { fetchProviderBalance } = await import(
+      "@/lib/monitor/external-action-adapter.server"
+    );
+    return fetchProviderBalance(settings?.adapter_base_url ?? null);
+  });
+
+/** Operational picture of the order path: caps, spend, queue health. */
+export const getOrderOpsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { loadOrderPolicy, loadOrderSpend } = await import(
+      "@/lib/monitor/action-budget.server"
+    );
+    const { validateProviderBaseUrl, resolveProviderBaseUrl } = await import(
+      "@/lib/monitor/action-guard"
+    );
+    const policy = await loadOrderPolicy(context.userId);
+    const spend = await loadOrderSpend(policy);
+    const baseUrl = resolveProviderBaseUrl(policy.baseUrl);
+    const endpoint = validateProviderBaseUrl(baseUrl);
+
+    const statuses = ["queued", "processing", "blocked", "failed", "unknown_outcome"] as const;
+    const counts: Record<string, number> = {};
+    for (const status of statuses) {
+      const { count } = await context.supabase
+        .from("monitor_actions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", status);
+      counts[status] = count ?? 0;
+    }
+
+    return {
+      configured: Boolean(process.env.JAP_API_KEY),
+      baseUrl,
+      endpointAllowed: endpoint.ok,
+      endpointReason: endpoint.ok ? null : endpoint.reason,
+      ordersPaused: policy.ordersPaused,
+      dailyCap: policy.dailyCap,
+      monthlyCap: policy.monthlyCap,
+      maxQuantityPerAction: policy.maxQuantityPerAction,
+      minProviderBalance: policy.minProviderBalance,
+      ordersToday: spend.ordersToday,
+      ordersThisMonth: spend.ordersThisMonth,
+      queue: counts,
+    };
+  });
+
+/** Pause/resume all outbound orders for the calling operator. */
+export const setOrdersPausedFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { paused: boolean }) =>
+    z.object({ paused: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("monitor_settings")
+      .update({ orders_paused: data.paused })
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { paused: data.paused };
+  });
+
 export const runSchedulerNowFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
