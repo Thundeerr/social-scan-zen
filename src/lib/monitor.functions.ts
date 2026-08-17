@@ -80,9 +80,7 @@ export const retryActionFn = createServerFn({ method: "POST" })
       .eq("id", data.actionId)
       .maybeSingle();
     if (error || !action) throw new Error("Action not found");
-    const { dispatchExternalAction } = await import(
-      "@/lib/monitor/external-action-adapter.server"
-    );
+    const { dispatchExternalAction } = await import("@/lib/monitor/external-action-adapter.server");
     return dispatchExternalAction(data.actionId);
   });
 
@@ -99,7 +97,6 @@ export const runSchedulerNowFn = createServerFn({ method: "POST" })
     // operator's provider quota.
     return runScheduler(settings?.batch_size ?? 10, { userId: context.userId });
   });
-
 
 export const getMonitorSystemStatusFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

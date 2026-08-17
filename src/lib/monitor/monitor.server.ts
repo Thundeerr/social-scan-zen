@@ -74,7 +74,6 @@ export async function claimAccount(accountId: string): Promise<boolean> {
   return Boolean(data);
 }
 
-
 export async function createActionsForEvent(
   account: MonitorAccount,
   eventId: string,
@@ -110,7 +109,10 @@ export async function createActionsForEvent(
     if (template?.dry_run) {
       await db
         .from("monitor_actions")
-        .update({ status: "not_configured", error_message: "Dry-run template — no order dispatched" })
+        .update({
+          status: "not_configured",
+          error_message: "Dry-run template — no order dispatched",
+        })
         .eq("id", action.id);
       continue;
     }
@@ -213,7 +215,10 @@ export async function processAccount(
   const transition = isPrivateToPublic(previous, status.isPrivate);
   const transitionKey = buildTransitionKey(previous);
 
-  const interval = resolveIntervalMinutes(account.interval_minutes, settings.default_interval_minutes);
+  const interval = resolveIntervalMinutes(
+    account.interval_minutes,
+    settings.default_interval_minutes,
+  );
   await releaseClaim(account.id, {
     is_private: status.isPrivate,
     status_initialized: true,
@@ -269,7 +274,6 @@ export async function processAccountSafely(
   }
   try {
     return await processAccount(account, opts);
-
   } catch (err) {
     const message =
       err instanceof MissingApiKeyError
@@ -360,7 +364,6 @@ export async function runScheduler(
       if (!result.ok) errors += 1;
     }
     if (errors > 0) status = "completed_with_errors";
-
   } catch (err) {
     status = "failed";
     errors += 1;

@@ -13,15 +13,25 @@ import {
 } from "./transition";
 import { extractUsername, isValidUsername, parseUsernameInput, renderTarget } from "./usernames";
 
-const base = { status_initialized: true, is_private: true, last_checked_at: "2026-01-01T00:00:00Z" };
+const base = {
+  status_initialized: true,
+  is_private: true,
+  last_checked_at: "2026-01-01T00:00:00Z",
+};
 
 describe("transition detection", () => {
   it("does not fire on the first successful check (no baseline)", () => {
     expect(
-      isPrivateToPublic({ status_initialized: false, is_private: null, last_checked_at: null }, false),
+      isPrivateToPublic(
+        { status_initialized: false, is_private: null, last_checked_at: null },
+        false,
+      ),
     ).toBe(false);
     expect(
-      isPrivateToPublic({ status_initialized: false, is_private: null, last_checked_at: null }, true),
+      isPrivateToPublic(
+        { status_initialized: false, is_private: null, last_checked_at: null },
+        true,
+      ),
     ).toBe(false);
   });
 
@@ -117,7 +127,6 @@ describe("username normalisation", () => {
     expect(parsed.duplicates).toEqual(["soneva"]);
     expect(parsed.invalid.length).toBeGreaterThan(0);
   });
-
 
   it("renders action targets from the template", () => {
     expect(renderTarget("https://instagram.com/{username}", "soneva")).toBe(
