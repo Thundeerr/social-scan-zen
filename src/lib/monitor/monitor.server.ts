@@ -138,6 +138,8 @@ export async function createEventWithActions(
     .from("monitor_events")
     .insert({
       account_id: account.id,
+      user_id: account.user_id,
+
       trigger_type: opts.triggerType,
       transition_key: opts.transitionKey,
       detected_at: detectedAt,
