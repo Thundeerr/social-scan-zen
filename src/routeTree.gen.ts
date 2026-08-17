@@ -22,6 +22,7 @@ import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/b
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
@@ -92,6 +93,12 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMonitorIndexRoute =
+  AuthenticatedMonitorIndexRouteImport.update({
+    id: '/monitor/',
+    path: '/monitor/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDiscoveryAnalyticsRoute =
   AuthenticatedDiscoveryAnalyticsRouteImport.update({
     id: '/analytics',
@@ -136,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
@@ -155,6 +163,7 @@ export interface FileRoutesByTo {
   '/telegram': typeof AuthenticatedTelegramRoute
   '/': typeof AuthenticatedIndexRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/monitor': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
@@ -176,6 +185,7 @@ export interface FileRoutesById {
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/telegram'
     | '/discovery/analytics'
+    | '/monitor/'
     | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/telegram'
     | '/'
     | '/discovery/analytics'
+    | '/monitor'
     | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
@@ -236,6 +248,7 @@ export interface FileRouteTypes {
     | '/_authenticated/telegram'
     | '/_authenticated/'
     | '/_authenticated/discovery/analytics'
+    | '/_authenticated/monitor/'
     | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
@@ -344,6 +357,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/monitor/': {
+      id: '/_authenticated/monitor/'
+      path: '/monitor'
+      fullPath: '/monitor/'
+      preLoaderRoute: typeof AuthenticatedMonitorIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/discovery/analytics': {
       id: '/_authenticated/discovery/analytics'
       path: '/analytics'
@@ -408,6 +428,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTelegramRoute: typeof AuthenticatedTelegramRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedMonitorIndexRoute: typeof AuthenticatedMonitorIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -422,6 +443,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTelegramRoute: AuthenticatedTelegramRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedMonitorIndexRoute: AuthenticatedMonitorIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
