@@ -343,24 +343,7 @@ function MonitorPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          { label: "Status source", ok: statusQuery.data?.statusSourceConfigured },
-          { label: "Cron secret", ok: statusQuery.data?.cronSecretConfigured },
-          { label: "Order adapter", ok: adapterLive },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="soft-shadow flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
-          >
-            <span className="text-xs text-muted-foreground">{s.label}</span>
-            <StatusPill
-              kind={s.ok ? "completed" : "not_configured"}
-              label={s.ok ? "live" : "not configured"}
-            />
-          </div>
-        ))}
-      </div>
+      <SystemStrip expanded={advancedOpen} onToggle={() => setAdvancedOpen((v) => !v)} />
 
       <Card
         title="Monitored accounts"
