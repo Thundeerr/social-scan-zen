@@ -428,6 +428,9 @@ export type BurnForecast = {
     warning: boolean;
     exhausted: boolean;
   };
+  /** Shared pool split per operator — everyone sees the same numbers. */
+  byOperator: { user_id: string | null; name: string; used: number }[];
+
 };
 
 export const burnForecastFn = createServerFn({ method: "GET" })
