@@ -6,7 +6,7 @@ Leitfrage bleibt: Reduziert es kognitive Last? Nichts wird gelöscht, alles wand
 
 ## 1. Ein geführter Setup-Flow statt verstreuter Formulare
 
-Neuer Dialog **„Monitor hinzufügen"** auf `/monitor` mit drei Schritten in einem Fenster:
+Neuer Dialog **„Account hinzufügen"** auf `/monitor` mit drei Schritten in einem Fenster:
 
 1. **Profil** — Benutzername(n) einfügen (der bestehende Bulk-Parser bleibt darunter als „mehrere hinzufügen").
 2. **Aktion** — Service über den bestehenden Katalog suchen und anklicken; Menge wird automatisch auf das Provider-Minimum gesetzt und ist editierbar. Ziel-URL wird automatisch aus dem Handle gebaut (nicht mehr manuell eintippbar im Standardfall).
