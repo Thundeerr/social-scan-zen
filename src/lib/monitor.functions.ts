@@ -108,6 +108,8 @@ export const testProviderConnectionFn = createServerFn({ method: "POST" })
       "@/lib/monitor/external-action-adapter.server"
     );
     return fetchProviderBalance(settings?.adapter_base_url ?? null);
+  });
+
 
 /**
  * Read-only provider service catalogue, filtered server-side. Never orders.
