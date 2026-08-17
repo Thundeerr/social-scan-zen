@@ -87,13 +87,8 @@ function MonitorPage() {
   const manualEvent = useServerFn(triggerManualEventFn);
   const retryAction = useServerFn(retryActionFn);
   const runScheduler = useServerFn(runSchedulerNowFn);
-  const systemStatus = useServerFn(getMonitorSystemStatusFn);
 
-  const statusQuery = useQuery({
-    queryKey: ["monitor-system-status"],
-    queryFn: () => systemStatus(),
-    staleTime: 60_000,
-  });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const accountsQuery = useQuery({
     queryKey: ["monitor-accounts"],
