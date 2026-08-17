@@ -10,6 +10,7 @@ export type PillKind =
   | "failed"
   | "not_configured"
   | "unknown_outcome"
+  | "blocked"
   | "running"
   | "completed_with_errors";
 
@@ -23,6 +24,7 @@ const STYLES: Record<PillKind, string> = {
   failed: "border-destructive/40 bg-destructive/10 text-destructive",
   not_configured: "border-border bg-muted/40 text-muted-foreground",
   unknown_outcome: "border-warning/40 bg-warning/10 text-warning",
+  blocked: "border-destructive/40 bg-destructive/10 text-destructive",
   running: "border-primary/40 bg-primary/10 text-primary",
   completed_with_errors: "border-warning/40 bg-warning/10 text-warning",
 };
@@ -37,6 +39,7 @@ const LABELS: Record<PillKind, string> = {
   failed: "failed",
   not_configured: "not configured",
   unknown_outcome: "unknown outcome",
+  blocked: "blocked",
   running: "running",
   completed_with_errors: "errors",
 };

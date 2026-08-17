@@ -15,6 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { parseUsernameInput } from "@/lib/monitor/usernames";
 import { IntervalDialog } from "@/components/monitor/interval-dialog";
 import { STANDARD_MIN_INTERVAL_MINUTES } from "@/lib/monitor/quota";
+import { OrderOpsCard } from "@/components/monitor/order-ops-card";
 
 import {
   checkAccountNowFn,
@@ -575,7 +576,7 @@ function MonitorPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusPill kind={a.status} />
-                    {["failed", "not_configured", "unknown_outcome"].includes(a.status) && (
+                    {["failed", "not_configured", "unknown_outcome", "blocked"].includes(a.status) && (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -592,6 +593,8 @@ function MonitorPage() {
           )}
         </Card>
       </div>
+
+      <OrderOpsCard />
 
       <Card title="Scheduler runs" description="Autonomous cycle history">
         {(runsQuery.data?.length ?? 0) === 0 ? (
