@@ -28,6 +28,7 @@ import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_a
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
 import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
+import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron/dispatch'
 import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
 
 const LoginRoute = LoginRouteImport.update({
@@ -130,6 +131,11 @@ const ApiPublicHooksDiscoveryTickRoute =
     path: '/api/public/hooks/discovery-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronDispatchRoute = ApiPublicCronDispatchRouteImport.update({
+  id: '/api/public/cron/dispatch',
+  path: '/api/public/cron/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
   id: '/api/public/cron/check',
   path: '/api/public/cron/check',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
+  '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/monitor': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
+  '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
+  '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/monitor/$accountId'
     | '/monitor/'
     | '/api/public/cron/check'
+    | '/api/public/cron/dispatch'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/monitor/$accountId'
     | '/monitor'
     | '/api/public/cron/check'
+    | '/api/public/cron/dispatch'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/_authenticated/monitor/$accountId'
     | '/_authenticated/monitor/'
     | '/api/public/cron/check'
+    | '/api/public/cron/dispatch'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -272,6 +284,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
+  ApiPublicCronDispatchRoute: typeof ApiPublicCronDispatchRoute
   ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
@@ -412,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/dispatch': {
+      id: '/api/public/cron/dispatch'
+      path: '/api/public/cron/dispatch'
+      fullPath: '/api/public/cron/dispatch'
+      preLoaderRoute: typeof ApiPublicCronDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/check': {
       id: '/api/public/cron/check'
       path: '/api/public/cron/check'
@@ -475,6 +495,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
+  ApiPublicCronDispatchRoute: ApiPublicCronDispatchRoute,
   ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,

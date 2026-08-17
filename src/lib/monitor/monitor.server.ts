@@ -9,7 +9,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchProfileStatus, MissingApiKeyError } from "./instagram.server";
-import { dispatchExternalAction } from "./external-action-adapter.server";
+
 import { renderTarget } from "./usernames";
 import {
   buildTransitionKey,
@@ -116,7 +116,9 @@ export async function createActionsForEvent(
         .eq("id", action.id);
       continue;
     }
-    await dispatchExternalAction(action.id);
+    // Dispatch is deliberately NOT done here: a slow or failing provider must
+    // never delay Instagram status checks. The order queue is worked by
+    // `runActionTick` (cron: /api/public/cron/dispatch).
   }
   return created.length;
 }

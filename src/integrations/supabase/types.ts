@@ -669,11 +669,16 @@ export type Database = {
         Row: {
           account_id: string
           attempt_count: number
+          blocked_reason: string | null
           created_at: string
+          dispatched_at: string | null
           error_message: string | null
           event_id: string
           id: string
+          next_attempt_at: string | null
           provider_reference: string | null
+          provider_status: string | null
+          provider_status_checked_at: string | null
           quantity: number | null
           request_excerpt: Json | null
           response_excerpt: Json | null
@@ -686,11 +691,16 @@ export type Database = {
         Insert: {
           account_id: string
           attempt_count?: number
+          blocked_reason?: string | null
           created_at?: string
+          dispatched_at?: string | null
           error_message?: string | null
           event_id: string
           id?: string
+          next_attempt_at?: string | null
           provider_reference?: string | null
+          provider_status?: string | null
+          provider_status_checked_at?: string | null
           quantity?: number | null
           request_excerpt?: Json | null
           response_excerpt?: Json | null
@@ -703,11 +713,16 @@ export type Database = {
         Update: {
           account_id?: string
           attempt_count?: number
+          blocked_reason?: string | null
           created_at?: string
+          dispatched_at?: string | null
           error_message?: string | null
           event_id?: string
           id?: string
+          next_attempt_at?: string | null
           provider_reference?: string | null
+          provider_status?: string | null
+          provider_status_checked_at?: string | null
           quantity?: number | null
           request_excerpt?: Json | null
           response_excerpt?: Json | null
@@ -872,7 +887,12 @@ export type Database = {
           batch_size: number
           cooldown_minutes: number
           created_at: string
+          daily_action_cap: number
           default_interval_minutes: number
+          max_quantity_per_action: number
+          min_provider_balance: number
+          monthly_action_cap: number
+          orders_paused: boolean
           updated_at: string
           user_id: string
         }
@@ -885,7 +905,12 @@ export type Database = {
           batch_size?: number
           cooldown_minutes?: number
           created_at?: string
+          daily_action_cap?: number
           default_interval_minutes?: number
+          max_quantity_per_action?: number
+          min_provider_balance?: number
+          monthly_action_cap?: number
+          orders_paused?: boolean
           updated_at?: string
           user_id: string
         }
@@ -898,7 +923,12 @@ export type Database = {
           batch_size?: number
           cooldown_minutes?: number
           created_at?: string
+          daily_action_cap?: number
           default_interval_minutes?: number
+          max_quantity_per_action?: number
+          min_provider_balance?: number
+          monthly_action_cap?: number
+          orders_paused?: boolean
           updated_at?: string
           user_id?: string
         }
