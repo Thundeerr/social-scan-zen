@@ -24,7 +24,9 @@ const items = [
   { to: "/discovery", label: "Discovery", icon: Sparkles, hint: "G X" },
   { to: "/discovery/analytics", label: "Discovery Analytics", icon: Gauge, hint: null as string | null },
   { to: "/downloads", label: "Archive", icon: Download, hint: null as string | null },
+  { to: "/monitor", label: "Transition Watch", icon: Eye, hint: null as string | null },
   { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
+
   { to: "/burn", label: "Token Burn Rate", icon: Flame, hint: null as string | null },
   { to: "/activity", label: "Activity", icon: Activity, hint: null as string | null },
   { to: "/telegram", label: "Telegram", icon: Send, hint: null as string | null },
