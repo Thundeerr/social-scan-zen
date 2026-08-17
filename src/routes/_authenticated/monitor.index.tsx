@@ -475,37 +475,6 @@ function MonitorPage() {
         )}
       </Card>
 
-      <Card
-        title="Bulk import"
-        description="Paste usernames, @handles or profile URLs — separated by lines, commas or spaces. # starts a comment."
-      >
-        <Textarea
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-          rows={5}
-          placeholder={"@example\nhttps://instagram.com/another\nthird.account  # note"}
-          className="font-mono text-xs"
-        />
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span className="text-success">{parsed.valid.length} valid</span>
-          <span className="text-destructive">{parsed.invalid.length} invalid</span>
-          <span className="text-warning">{parsed.duplicates.length} duplicates</span>
-          <div className="flex-1" />
-          <Button
-            size="sm"
-            onClick={() => importMutation.mutate()}
-            disabled={parsed.valid.length === 0 || importMutation.isPending}
-          >
-            {importMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Add {parsed.valid.length || ""} to watch
-          </Button>
-        </div>
-        {parsed.invalid.length > 0 && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Rejected: {parsed.invalid.slice(0, 12).join(", ")}
-          </p>
-        )}
-      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Recent transitions" description="Deduplicated private→public events">
