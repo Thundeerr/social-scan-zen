@@ -104,8 +104,10 @@ export async function getBudgetStatus(db: DB): Promise<BudgetStatus> {
 
   // Shared pool: usage is counted workspace-wide via a security-definer RPC so
   // every operator sees the SAME remaining balance, regardless of per-operator
-  // row visibility on scanner_runs.
-  const { data: usage } = await db.rpc("provider_budget_usage", {
+  // row visibility on scanner_runs. The RPC is not exposed to signed-in users;
+  // it is invoked here server-side with the privileged client only.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: usage } = await supabaseAdmin.rpc("provider_budget_usage", {
     _start: start.toISOString(),
     _end: end.toISOString(),
   });
