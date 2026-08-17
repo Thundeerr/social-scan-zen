@@ -118,7 +118,66 @@ export async function fetchProviderBalance(
   }
 }
 
+export type ProviderService = {
+  service: string;
+  name: string;
+  category: string;
+  rate: string;
+  min: number;
+  max: number;
+};
+
+/**
+ * Read-only service catalogue probe. Never places an order — used by the
+ * template editor so an operator can pick a real service id plus its
+ * min/max quantity instead of typing one blind.
+ */
+export async function fetchProviderServices(
+  rawBaseUrl: string | null | undefined,
+  search: string,
+  limit = 40,
+): Promise<{ ok: boolean; services: ProviderService[]; error?: string }> {
+  const baseUrl = resolveProviderBaseUrl(rawBaseUrl);
+  const allowed = validateProviderBaseUrl(baseUrl);
+  if (!allowed.ok) return { ok: false, services: [], error: allowed.reason };
+  try {
+    const res = await providerCall(baseUrl, { action: "services" });
+    const payload = JSON.parse(res.text) as unknown;
+    if (!Array.isArray(payload)) {
+      const err = (payload as Record<string, unknown> | null)?.error;
+      return { ok: false, services: [], error: err ? String(err) : "Unexpected provider response" };
+    }
+    const needle = search.trim().toLowerCase();
+    const rows = payload
+      .map((raw) => {
+        const r = raw as Record<string, unknown>;
+        return {
+          service: String(r.service ?? ""),
+          name: String(r.name ?? ""),
+          category: String(r.category ?? ""),
+          rate: String(r.rate ?? ""),
+          min: Number(r.min ?? 0),
+          max: Number(r.max ?? 0),
+        } satisfies ProviderService;
+      })
+      .filter((s) => {
+        if (!s.service) return false;
+        if (!needle) return true;
+        return (
+          s.service === needle ||
+          s.name.toLowerCase().includes(needle) ||
+          s.category.toLowerCase().includes(needle)
+        );
+      })
+      .slice(0, limit);
+    return { ok: true, services: rows };
+  } catch (err) {
+    return { ok: false, services: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ---------- Dispatch ---------------------------------------------------------
+
 
 export async function dispatchExternalAction(actionId: string): Promise<ExternalActionResult> {
   const db = supabaseAdmin;
