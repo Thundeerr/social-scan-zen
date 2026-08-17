@@ -309,7 +309,10 @@ export type SchedulerSummary = {
   status: string;
 };
 
-export async function runScheduler(batchLimit = 10): Promise<SchedulerSummary> {
+export async function runScheduler(
+  batchLimit = 10,
+  opts: { userId?: string } = {},
+): Promise<SchedulerSummary> {
   const db = supabaseAdmin;
   const { data: run } = await db
     .from("monitor_scheduler_runs")
@@ -324,20 +327,40 @@ export async function runScheduler(batchLimit = 10): Promise<SchedulerSummary> {
   let status = "completed";
 
   try {
-    const { data: claimed, error } = await db.rpc("claim_due_monitor_accounts", {
-      _limit: batchLimit,
-      _stale_after_minutes: 15,
-    });
-    if (error) throw new Error(error.message);
+    let due: MonitorAccount[] = [];
 
-    for (const account of (claimed ?? []) as MonitorAccount[]) {
-      const result = await processAccountSafely(account);
+    if (opts.userId) {
+      // Operator-scoped run: never touch another tenant's accounts or quota.
+      const { data: candidates, error } = await db
+        .from("monitor_accounts")
+        .select("*")
+        .eq("user_id", opts.userId)
+        .eq("enabled", true)
+        .lte("next_check_at", new Date().toISOString())
+        .order("next_check_at", { ascending: true })
+        .limit(batchLimit);
+      if (error) throw new Error(error.message);
+      for (const account of candidates ?? []) {
+        if (await claimAccount(account.id)) due.push(account);
+      }
+    } else {
+      const { data: claimed, error } = await db.rpc("claim_due_monitor_accounts", {
+        _limit: batchLimit,
+        _stale_after_minutes: STALE_CLAIM_MINUTES,
+      });
+      if (error) throw new Error(error.message);
+      due = (claimed ?? []) as MonitorAccount[];
+    }
+
+    for (const account of due) {
+      const result = await processAccountSafely(account, { alreadyClaimed: true });
       checked += 1;
       if (result.eventCreated) events += 1;
       actions += result.actionsCreated;
       if (!result.ok) errors += 1;
     }
     if (errors > 0) status = "completed_with_errors";
+
   } catch (err) {
     status = "failed";
     errors += 1;
