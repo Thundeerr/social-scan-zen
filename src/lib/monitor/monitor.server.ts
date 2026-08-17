@@ -138,6 +138,8 @@ export async function createEventWithActions(
     .from("monitor_events")
     .insert({
       account_id: account.id,
+      user_id: account.user_id,
+
       trigger_type: opts.triggerType,
       transition_key: opts.transitionKey,
       detected_at: detectedAt,
@@ -187,7 +189,12 @@ export async function processAccount(
       error_message: status.error,
     });
     // Never overwrite a known status with an error.
-    await releaseClaim(account.id, { last_error: status.error, next_check_at: retryAt(now) });
+    await releaseClaim(account.id, {
+      last_error: status.error,
+      last_failed_check_at: now.toISOString(),
+      next_check_at: retryAt(now),
+    });
+
     return {
       ok: false,
       result: "error",
@@ -218,7 +225,9 @@ export async function processAccount(
   const interval = resolveIntervalMinutes(
     account.interval_minutes,
     settings.default_interval_minutes,
+    { highFrequencyOptIn: account.high_frequency_opt_in },
   );
+
   await releaseClaim(account.id, {
     is_private: status.isPrivate,
     status_initialized: true,
@@ -289,8 +298,13 @@ export async function processAccountSafely(
     });
     await supabaseAdmin
       .from("monitor_accounts")
-      .update({ last_error: message, next_check_at: retryAt() })
+      .update({
+        last_error: message,
+        last_failed_check_at: new Date().toISOString(),
+        next_check_at: retryAt(),
+      })
       .eq("id", account.id);
+
     return {
       ok: false,
       result: "error",

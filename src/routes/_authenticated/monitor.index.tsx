@@ -13,6 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { parseUsernameInput } from "@/lib/monitor/usernames";
+import { IntervalDialog } from "@/components/monitor/interval-dialog";
+import { STANDARD_MIN_INTERVAL_MINUTES } from "@/lib/monitor/quota";
+
 import {
   checkAccountNowFn,
   getMonitorSystemStatusFn,
@@ -383,12 +386,15 @@ function MonitorPage() {
                 <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Account</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
+                  <th className="py-2 pr-3 font-medium">Interval</th>
                   <th className="py-2 pr-3 font-medium">Last check</th>
                   <th className="py-2 pr-3 font-medium">Next check</th>
+                  <th className="py-2 pr-3 font-medium">Last failure</th>
                   <th className="py-2 pr-3 font-medium">Enabled</th>
                   <th className="py-2 pr-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
+
               <tbody>
                 {accounts.map((a) => (
                   <tr key={a.id} className="border-t border-border/60 align-middle">
@@ -413,12 +419,32 @@ function MonitorPage() {
                         }
                       />
                     </td>
+                    <td className="py-2.5 pr-3">
+                      <IntervalDialog
+                        accountId={a.id}
+                        username={a.username}
+                        intervalMinutes={a.interval_minutes}
+                        highFrequencyOptIn={a.high_frequency_opt_in}
+                        defaultIntervalMinutes={
+                          settings?.default_interval_minutes ?? STANDARD_MIN_INTERVAL_MINUTES
+                        }
+                        onSaved={invalidateAll}
+                      />
+                    </td>
                     <td className="py-2.5 pr-3 text-xs text-muted-foreground">
                       {fmt(a.last_checked_at)}
                     </td>
                     <td className="py-2.5 pr-3 text-xs text-muted-foreground">
                       {fmt(a.next_check_at)}
                     </td>
+                    <td className="py-2.5 pr-3 text-xs">
+                      {a.last_failed_check_at ? (
+                        <span className="text-destructive">{fmt(a.last_failed_check_at)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+
                     <td className="py-2.5 pr-3">
                       <Switch
                         checked={a.enabled}

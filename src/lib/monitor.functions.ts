@@ -101,7 +101,51 @@ export const runSchedulerNowFn = createServerFn({ method: "POST" })
 export const getMonitorSystemStatusFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => ({
+    // Booleans only — never the key material itself.
     statusSourceConfigured: Boolean(process.env.RAPIDAPI_KEY),
     cronSecretConfigured: Boolean(process.env.CRON_SECRET),
     actionAdapterConfigured: Boolean(process.env.JAP_API_KEY),
   }));
+
+/** Shared provider-quota picture used to explain interval costs in the UI. */
+export const getMonitorQuotaFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { getQuotaOverview } = await import("@/lib/monitor/quota.server");
+    return getQuotaOverview();
+  });
+
+/**
+ * Authoritative interval change. Enforces the opt-in floor and the shared
+ * monthly quota server-side; the UI can only ever mirror this decision.
+ */
+export const setAccountIntervalFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { accountId: string; intervalMinutes: number; highFrequencyOptIn: boolean }) =>
+      z
+        .object({
+          accountId: z.string().uuid(),
+          intervalMinutes: z.number().int().min(30).max(2880),
+          highFrequencyOptIn: z.boolean(),
+        })
+        .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    // RLS scopes monitor_accounts to the caller, so a successful read is the
+    // ownership check for this account.
+    const { data: account, error } = await context.supabase
+      .from("monitor_accounts")
+      .select("id")
+      .eq("id", data.accountId)
+      .maybeSingle();
+    if (error || !account) throw new Error("Account not found");
+
+    const { applyIntervalChange } = await import("@/lib/monitor/quota.server");
+    return applyIntervalChange({
+      accountId: data.accountId,
+      intervalMinutes: data.intervalMinutes,
+      highFrequencyOptIn: data.highFrequencyOptIn,
+    });
+  });
+

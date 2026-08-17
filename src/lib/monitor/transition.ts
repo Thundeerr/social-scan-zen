@@ -1,12 +1,22 @@
 /**
  * Pure transition logic for the Instagram Private→Public monitor.
- * Browser-safe: no imports, no side effects, fully testable.
+ * Browser-safe: no side effects, fully testable.
  */
 
-export const MIN_INTERVAL_MINUTES = 180;
-export const MAX_INTERVAL_MINUTES = 2880;
+import {
+  HIGH_FREQUENCY_MIN_INTERVAL_MINUTES,
+  MAX_INTERVAL_MINUTES as QUOTA_MAX_INTERVAL,
+  STANDARD_MIN_INTERVAL_MINUTES,
+  minIntervalFor,
+} from "./quota";
+
+
+/** Standard floor. High-frequency accounts opt down to 30 via `minIntervalFor`. */
+export const MIN_INTERVAL_MINUTES = STANDARD_MIN_INTERVAL_MINUTES;
+export const MAX_INTERVAL_MINUTES = QUOTA_MAX_INTERVAL;
 export const RETRY_AFTER_MINUTES = 15;
 export const MAX_JITTER_MINUTES = 5;
+
 
 export type AccountState = {
   status_initialized: boolean;
@@ -35,26 +45,38 @@ export function isCooldownActive(
   return elapsed < cooldownMinutes * 60_000;
 }
 
-export function clampInterval(minutes: number): number {
-  if (!Number.isFinite(minutes)) return MIN_INTERVAL_MINUTES;
-  return Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(minutes)));
+/**
+ * Clamp to the allowed window. `floor` defaults to the standard 180-minute
+ * minimum; high-frequency accounts pass the lower opt-in floor explicitly.
+ */
+export function clampInterval(minutes: number, floor: number = MIN_INTERVAL_MINUTES): number {
+  if (!Number.isFinite(minutes)) return floor;
+  return Math.min(MAX_INTERVAL_MINUTES, Math.max(floor, Math.round(minutes)));
 }
 
 export function resolveIntervalMinutes(
   accountInterval: number | null | undefined,
   defaultInterval: number,
+  opts: { highFrequencyOptIn?: boolean } = {},
 ): number {
-  return clampInterval(accountInterval ?? defaultInterval);
+  return clampInterval(accountInterval ?? defaultInterval, minIntervalFor(Boolean(opts.highFrequencyOptIn)));
 }
 
+/**
+ * `intervalMinutes` is expected to be already resolved (see
+ * `resolveIntervalMinutes`), so the absolute floor applies here — clamping to
+ * the standard floor again would silently undo a high-frequency opt-in.
+ */
 export function nextCheckAt(
   intervalMinutes: number,
   now: Date = new Date(),
   jitterMinutes: number = Math.random() * MAX_JITTER_MINUTES,
 ): string {
-  const ms = (clampInterval(intervalMinutes) + Math.max(0, jitterMinutes)) * 60_000;
+  const clamped = clampInterval(intervalMinutes, HIGH_FREQUENCY_MIN_INTERVAL_MINUTES);
+  const ms = (clamped + Math.max(0, jitterMinutes)) * 60_000;
   return new Date(now.getTime() + ms).toISOString();
 }
+
 
 export function retryAt(now: Date = new Date()): string {
   return new Date(now.getTime() + RETRY_AFTER_MINUTES * 60_000).toISOString();
