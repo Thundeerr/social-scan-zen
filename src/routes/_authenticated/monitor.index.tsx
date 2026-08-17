@@ -337,7 +337,7 @@ function MonitorPage() {
             ) : (
               <Play className="h-3.5 w-3.5" />
             )}
-            Run scheduler now
+            Check all now
           </Button>
         }
       />
