@@ -576,40 +576,6 @@ function MonitorPage() {
         </Card>
       </div>
 
-      <Card title="Scheduler runs" description="Autonomous cycle history">
-        {(runsQuery.data?.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No cycles recorded yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">Started</th>
-                  <th className="py-2 pr-3 font-medium">Checked</th>
-                  <th className="py-2 pr-3 font-medium">Events</th>
-                  <th className="py-2 pr-3 font-medium">Actions</th>
-                  <th className="py-2 pr-3 font-medium">Errors</th>
-                  <th className="py-2 pr-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runsQuery.data!.map((r) => (
-                  <tr key={r.id} className="border-t border-border/60">
-                    <td className="py-2 pr-3 text-xs text-muted-foreground">{fmt(r.started_at)}</td>
-                    <td className="py-2 pr-3">{r.checked_accounts}</td>
-                    <td className="py-2 pr-3">{r.created_events}</td>
-                    <td className="py-2 pr-3">{r.created_actions}</td>
-                    <td className="py-2 pr-3">{r.errors}</td>
-                    <td className="py-2 pr-3">
-                      <StatusPill kind={r.status} label={r.status.replace(/_/g, " ")} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
 
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <CollapsibleContent className="space-y-6">
