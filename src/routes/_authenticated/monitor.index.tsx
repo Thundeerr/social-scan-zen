@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Loader2, Play, RefreshCw, Zap, Trash2, ChevronRight } from "lucide-react";
+import { Loader2, Play, RefreshCw, Zap, Trash2, ChevronRight, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/monitor/status-pill";
@@ -12,14 +12,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { parseUsernameInput } from "@/lib/monitor/usernames";
 import { IntervalDialog } from "@/components/monitor/interval-dialog";
 import { STANDARD_MIN_INTERVAL_MINUTES } from "@/lib/monitor/quota";
 import { OrderOpsCard } from "@/components/monitor/order-ops-card";
+import { SystemStrip } from "@/components/monitor/system-strip";
+import { AddMonitorDialog } from "@/components/monitor/add-monitor-dialog";
 
 import {
   checkAccountNowFn,
-  getMonitorSystemStatusFn,
   retryActionFn,
   runSchedulerNowFn,
   triggerManualEventFn,
