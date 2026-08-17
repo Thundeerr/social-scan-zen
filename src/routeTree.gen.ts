@@ -26,6 +26,7 @@ import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_a
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
 import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
+import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -115,6 +116,11 @@ const ApiPublicHooksDiscoveryTickRoute =
     path: '/api/public/hooks/discovery-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
+  id: '/api/public/cron/check',
+  path: '/api/public/cron/check',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/telegram': typeof AuthenticatedTelegramRoute
   '/': typeof AuthenticatedIndexRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
+  '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/telegram'
     | '/discovery/analytics'
+    | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/telegram'
     | '/'
     | '/discovery/analytics'
+    | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '/_authenticated/telegram'
     | '/_authenticated/'
     | '/_authenticated/discovery/analytics'
+    | '/api/public/cron/check'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/telegram/webhook'
@@ -233,6 +245,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
   ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
@@ -359,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/check': {
+      id: '/api/public/cron/check'
+      path: '/api/public/cron/check'
+      fullPath: '/api/public/cron/check'
+      preLoaderRoute: typeof ApiPublicCronCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -410,6 +430,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
   ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
