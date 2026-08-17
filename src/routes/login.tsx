@@ -53,11 +53,21 @@ function LoginPage() {
     return () => sub.subscription.unsubscribe();
   }, [navigate, redirectTo]);
 
+  // Operators may sign in with a bare operator name ("Admin") — it maps to the
+  // internal invite-only address. A full address is passed through untouched.
+  const toOperatorEmail = (raw: string) => {
+    const v = raw.trim();
+    return v.includes("@") ? v : `${v.toLowerCase()}@instascanner.dev`;
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: toOperatorEmail(identifier),
+      password,
+    });
     setLoading(false);
     if (error) {
       setError(error.message);
