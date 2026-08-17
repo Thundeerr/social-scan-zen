@@ -313,7 +313,6 @@ function MonitorPage() {
   });
 
   const accounts = accountsQuery.data ?? [];
-  const adapterLive = statusQuery.data?.actionAdapterConfigured;
 
   return (
     <div className="space-y-6">
