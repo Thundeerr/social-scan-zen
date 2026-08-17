@@ -56,6 +56,25 @@ async function releaseClaim(accountId: string, patch: Record<string, unknown> = 
     .eq("id", accountId);
 }
 
+export const STALE_CLAIM_MINUTES = 15;
+
+/**
+ * Compare-and-swap claim so a manual check can never run concurrently with the
+ * scheduler (or with a second manual click) for the same account.
+ */
+export async function claimAccount(accountId: string): Promise<boolean> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MINUTES * 60_000).toISOString();
+  const { data } = await supabaseAdmin
+    .from("monitor_accounts")
+    .update({ processing_started_at: new Date().toISOString() })
+    .eq("id", accountId)
+    .or(`processing_started_at.is.null,processing_started_at.lt.${staleBefore}`)
+    .select("id")
+    .maybeSingle();
+  return Boolean(data);
+}
+
+
 export async function createActionsForEvent(
   account: MonitorAccount,
   eventId: string,
