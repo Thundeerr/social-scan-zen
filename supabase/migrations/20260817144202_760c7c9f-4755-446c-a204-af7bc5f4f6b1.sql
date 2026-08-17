@@ -1,0 +1,1 @@
+DELETE FROM public.monitor_accounts WHERE normalized_username = 'leontestacc';
