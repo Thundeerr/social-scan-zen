@@ -56,6 +56,24 @@ async function releaseClaim(accountId: string, patch: Record<string, unknown> = 
     .eq("id", accountId);
 }
 
+export const STALE_CLAIM_MINUTES = 15;
+
+/**
+ * Compare-and-swap claim so a manual check can never run concurrently with the
+ * scheduler (or with a second manual click) for the same account.
+ */
+export async function claimAccount(accountId: string): Promise<boolean> {
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MINUTES * 60_000).toISOString();
+  const { data } = await supabaseAdmin
+    .from("monitor_accounts")
+    .update({ processing_started_at: new Date().toISOString() })
+    .eq("id", accountId)
+    .or(`processing_started_at.is.null,processing_started_at.lt.${staleBefore}`)
+    .select("id")
+    .maybeSingle();
+  return Boolean(data);
+}
+
 export async function createActionsForEvent(
   account: MonitorAccount,
   eventId: string,
@@ -91,7 +109,10 @@ export async function createActionsForEvent(
     if (template?.dry_run) {
       await db
         .from("monitor_actions")
-        .update({ status: "not_configured", error_message: "Dry-run template — no order dispatched" })
+        .update({
+          status: "not_configured",
+          error_message: "Dry-run template — no order dispatched",
+        })
         .eq("id", action.id);
       continue;
     }
@@ -194,7 +215,10 @@ export async function processAccount(
   const transition = isPrivateToPublic(previous, status.isPrivate);
   const transitionKey = buildTransitionKey(previous);
 
-  const interval = resolveIntervalMinutes(account.interval_minutes, settings.default_interval_minutes);
+  const interval = resolveIntervalMinutes(
+    account.interval_minutes,
+    settings.default_interval_minutes,
+  );
   await releaseClaim(account.id, {
     is_private: status.isPrivate,
     status_initialized: true,
@@ -233,8 +257,21 @@ export async function processAccount(
 
 export async function processAccountSafely(
   account: MonitorAccount,
-  opts: { manual?: boolean } = {},
+  opts: { manual?: boolean; alreadyClaimed?: boolean } = {},
 ): Promise<ProcessResult> {
+  if (!opts.alreadyClaimed) {
+    const claimed = await claimAccount(account.id);
+    if (!claimed) {
+      return {
+        ok: false,
+        result: "error",
+        eventCreated: false,
+        cooldownSuppressed: false,
+        actionsCreated: 0,
+        error: "A check for this account is already running",
+      };
+    }
+  }
   try {
     return await processAccount(account, opts);
   } catch (err) {
@@ -276,7 +313,10 @@ export type SchedulerSummary = {
   status: string;
 };
 
-export async function runScheduler(batchLimit = 10): Promise<SchedulerSummary> {
+export async function runScheduler(
+  batchLimit = 10,
+  opts: { userId?: string } = {},
+): Promise<SchedulerSummary> {
   const db = supabaseAdmin;
   const { data: run } = await db
     .from("monitor_scheduler_runs")
@@ -291,14 +331,33 @@ export async function runScheduler(batchLimit = 10): Promise<SchedulerSummary> {
   let status = "completed";
 
   try {
-    const { data: claimed, error } = await db.rpc("claim_due_monitor_accounts", {
-      _limit: batchLimit,
-      _stale_after_minutes: 15,
-    });
-    if (error) throw new Error(error.message);
+    let due: MonitorAccount[] = [];
 
-    for (const account of (claimed ?? []) as MonitorAccount[]) {
-      const result = await processAccountSafely(account);
+    if (opts.userId) {
+      // Operator-scoped run: never touch another tenant's accounts or quota.
+      const { data: candidates, error } = await db
+        .from("monitor_accounts")
+        .select("*")
+        .eq("user_id", opts.userId)
+        .eq("enabled", true)
+        .lte("next_check_at", new Date().toISOString())
+        .order("next_check_at", { ascending: true })
+        .limit(batchLimit);
+      if (error) throw new Error(error.message);
+      for (const account of candidates ?? []) {
+        if (await claimAccount(account.id)) due.push(account);
+      }
+    } else {
+      const { data: claimed, error } = await db.rpc("claim_due_monitor_accounts", {
+        _limit: batchLimit,
+        _stale_after_minutes: STALE_CLAIM_MINUTES,
+      });
+      if (error) throw new Error(error.message);
+      due = (claimed ?? []) as MonitorAccount[];
+    }
+
+    for (const account of due) {
+      const result = await processAccountSafely(account, { alreadyClaimed: true });
       checked += 1;
       if (result.eventCreated) events += 1;
       actions += result.actionsCreated;

@@ -13,11 +13,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const DEFAULT_BASE_URL = "https://justanotherpanel.com/api/v2";
 const TIMEOUT_MS = 30_000;
 
-export type ExternalActionStatus =
-  | "not_configured"
-  | "completed"
-  | "failed"
-  | "unknown_outcome";
+export type ExternalActionStatus = "not_configured" | "completed" | "failed" | "unknown_outcome";
 
 export type ExternalActionResult = {
   ok: boolean;
@@ -118,7 +114,12 @@ export async function dispatchExternalAction(actionId: string): Promise<External
         response_excerpt: responseExcerpt === undefined ? null : excerpt(responseExcerpt),
       })
       .eq("id", actionId);
-    return { ok: status === "completed", status, message, providerReference: providerReference ?? null };
+    return {
+      ok: status === "completed",
+      status,
+      message,
+      providerReference: providerReference ?? null,
+    };
   }
 
   const apiKey = process.env.JAP_API_KEY;
