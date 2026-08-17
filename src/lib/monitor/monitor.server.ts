@@ -9,7 +9,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
 import { fetchProfileStatus, MissingApiKeyError } from "./instagram.server";
-import { dispatchExternalAction } from "./external-action-adapter.server";
+
 import { renderTarget } from "./usernames";
 import {
   buildTransitionKey,
