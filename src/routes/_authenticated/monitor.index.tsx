@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { parseUsernameInput } from "@/lib/monitor/usernames";
 import { IntervalDialog } from "@/components/monitor/interval-dialog";
 import { STANDARD_MIN_INTERVAL_MINUTES } from "@/lib/monitor/quota";
