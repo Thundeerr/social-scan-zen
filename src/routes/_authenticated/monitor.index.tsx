@@ -360,7 +360,7 @@ function MonitorPage() {
           <p className="text-sm text-muted-foreground">Loading watch list…</p>
         ) : accounts.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Standby — no profiles under watch yet. Import a list below to arm the monitor.
+            Standby — no profiles under watch yet. Use “Add account” to arm the monitor.
           </p>
         ) : (
           <div className="overflow-x-auto">
