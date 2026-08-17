@@ -371,8 +371,8 @@ function MonitorPage() {
                   <th className="py-2 pr-3 font-medium">Status</th>
                   <th className="py-2 pr-3 font-medium">Interval</th>
                   <th className="py-2 pr-3 font-medium">Last check</th>
-                  <th className="py-2 pr-3 font-medium">Next check</th>
-                  <th className="py-2 pr-3 font-medium">Last failure</th>
+                  {advancedOpen && <th className="py-2 pr-3 font-medium">Next check</th>}
+                  {advancedOpen && <th className="py-2 pr-3 font-medium">Last failure</th>}
                   <th className="py-2 pr-3 font-medium">Enabled</th>
                   <th className="py-2 pr-3 font-medium text-right">Actions</th>
                 </tr>
