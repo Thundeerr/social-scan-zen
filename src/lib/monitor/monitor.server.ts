@@ -225,7 +225,9 @@ export async function processAccount(
   const interval = resolveIntervalMinutes(
     account.interval_minutes,
     settings.default_interval_minutes,
+    { highFrequencyOptIn: account.high_frequency_opt_in },
   );
+
   await releaseClaim(account.id, {
     is_private: status.isPrivate,
     status_initialized: true,
