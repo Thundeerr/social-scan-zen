@@ -448,14 +448,16 @@ function MonitorPage() {
                         >
                           <RefreshCw className="h-3.5 w-3.5" /> Check
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => eventMutation.mutate(a.id)}
-                          disabled={eventMutation.isPending}
-                        >
-                          <Zap className="h-3.5 w-3.5" /> Event
-                        </Button>
+                        {advancedOpen && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => eventMutation.mutate(a.id)}
+                            disabled={eventMutation.isPending}
+                          >
+                            <Zap className="h-3.5 w-3.5" /> Event
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" asChild>
                           <Link to="/monitor/$accountId" params={{ accountId: a.id }}>
                             <ChevronRight className="h-4 w-4" />
