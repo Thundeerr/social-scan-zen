@@ -299,26 +299,38 @@ function AccountDetail() {
         <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
           <div className="mb-2 flex items-center justify-between">
             <span className="font-medium">Order preview</span>
-            <span className="text-xs text-muted-foreground">{previewQuery.data.ok ? "ready" : "blocked"}</span>
+            <span className="text-xs text-muted-foreground">
+              {previewQuery.data.targetOk && previewQuery.data.quantityOk && previewQuery.data.spendOk
+                ? "ready"
+                : "blocked"}
+            </span>
           </div>
-          {!previewQuery.data.ok ? (
-            <p className="text-xs text-destructive">{previewQuery.data.error}</p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div>
-                <div className="text-[11px] text-muted-foreground">Target</div>
-                <div className="font-mono text-xs">{previewQuery.data.target}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-muted-foreground">Quantity</div>
-                <div className="font-mono text-xs">{previewQuery.data.quantity}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-muted-foreground">Budget headroom</div>
-                <div className="font-mono text-xs">{previewQuery.data.budgetHeadroom}</div>
-              </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div>
+              <div className="text-[11px] text-muted-foreground">Target</div>
+              <div className="font-mono text-xs">{previewQuery.data.target ?? "—"}</div>
+              {previewQuery.data.targetReason && (
+                <div className="text-[11px] text-destructive">{previewQuery.data.targetReason}</div>
+              )}
             </div>
-          )}
+            <div>
+              <div className="text-[11px] text-muted-foreground">Quantity</div>
+              <div className="font-mono text-xs">{previewQuery.data.quantity ?? "—"}</div>
+              {previewQuery.data.quantityReason && (
+                <div className="text-[11px] text-destructive">{previewQuery.data.quantityReason}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground">Budget</div>
+              <div className="font-mono text-xs">
+                {previewQuery.data.ordersToday}/{previewQuery.data.dailyCap} today ·{" "}
+                {previewQuery.data.ordersThisMonth}/{previewQuery.data.monthlyCap} month
+              </div>
+              {previewQuery.data.spendReason && (
+                <div className="text-[11px] text-destructive">{previewQuery.data.spendReason}</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
