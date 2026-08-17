@@ -43,17 +43,23 @@ export function isCooldownActive(
   return elapsed < cooldownMinutes * 60_000;
 }
 
-export function clampInterval(minutes: number): number {
-  if (!Number.isFinite(minutes)) return MIN_INTERVAL_MINUTES;
-  return Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(minutes)));
+/**
+ * Clamp to the allowed window. `floor` defaults to the standard 180-minute
+ * minimum; high-frequency accounts pass the lower opt-in floor explicitly.
+ */
+export function clampInterval(minutes: number, floor: number = MIN_INTERVAL_MINUTES): number {
+  if (!Number.isFinite(minutes)) return floor;
+  return Math.min(MAX_INTERVAL_MINUTES, Math.max(floor, Math.round(minutes)));
 }
 
 export function resolveIntervalMinutes(
   accountInterval: number | null | undefined,
   defaultInterval: number,
+  opts: { highFrequencyOptIn?: boolean } = {},
 ): number {
-  return clampInterval(accountInterval ?? defaultInterval);
+  return clampInterval(accountInterval ?? defaultInterval, minIntervalFor(Boolean(opts.highFrequencyOptIn)));
 }
+
 
 export function nextCheckAt(
   intervalMinutes: number,
