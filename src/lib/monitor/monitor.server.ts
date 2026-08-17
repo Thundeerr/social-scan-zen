@@ -189,7 +189,12 @@ export async function processAccount(
       error_message: status.error,
     });
     // Never overwrite a known status with an error.
-    await releaseClaim(account.id, { last_error: status.error, next_check_at: retryAt(now) });
+    await releaseClaim(account.id, {
+      last_error: status.error,
+      last_failed_check_at: now.toISOString(),
+      next_check_at: retryAt(now),
+    });
+
     return {
       ok: false,
       result: "error",
