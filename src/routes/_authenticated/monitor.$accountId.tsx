@@ -10,7 +10,13 @@ import { StatusPill } from "@/components/monitor/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { checkAccountNowFn, retryActionFn, triggerManualEventFn } from "@/lib/monitor.functions";
+import {
+  checkAccountNowFn,
+  listProviderServicesFn,
+  retryActionFn,
+  triggerManualEventFn,
+} from "@/lib/monitor.functions";
+
 
 export const Route = createFileRoute("/_authenticated/monitor/$accountId")({
   head: () => ({
@@ -141,6 +147,14 @@ function AccountDetail() {
   };
 
   const [form, setForm] = useState(EMPTY_TEMPLATE);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const listServices = useServerFn(listProviderServicesFn);
+  const servicesQuery = useQuery({
+    queryKey: ["provider-services"],
+    queryFn: () => listServices({ data: { search: serviceSearch } }),
+    enabled: false,
+  });
+
 
   const createTemplate = useMutation({
     mutationFn: async () => {
