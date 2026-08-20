@@ -9,35 +9,36 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedTelegramRouteImport } from './routes/_authenticated/telegram'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
-import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
-import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
-import { Route as AuthenticatedDiscoveryRouteImport } from './routes/_authenticated/discovery'
-import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/burn'
-import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
-import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
+import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
+import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/burn'
+import { Route as AuthenticatedDiscoveryRouteImport } from './routes/_authenticated/discovery'
+import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
+import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
+import { Route as AuthenticatedPublisherRouteImport } from './routes/_authenticated/publisher'
+import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedTelegramRouteImport } from './routes/_authenticated/telegram'
+import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
 import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
 import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
-import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
-import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
-import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
-import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
-import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron/dispatch'
 import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
+import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron/dispatch'
+import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
+import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
+import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -45,44 +46,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedTelegramRoute = AuthenticatedTelegramRouteImport.update({
-  id: '/telegram',
-  path: '/telegram',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
-  id: '/scanner',
-  path: '/scanner',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
-  id: '/locations',
-  path: '/locations',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedDownloadsRoute = AuthenticatedDownloadsRouteImport.update({
-  id: '/downloads',
-  path: '/downloads',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedDiscoveryRoute = AuthenticatedDiscoveryRouteImport.update({
-  id: '/discovery',
-  path: '/discovery',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedBurnRoute = AuthenticatedBurnRouteImport.update({
-  id: '/burn',
-  path: '/burn',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
-  id: '/assets',
-  path: '/assets',
+const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedActivityRoute = AuthenticatedActivityRouteImport.update({
@@ -90,11 +56,57 @@ const AuthenticatedActivityRoute = AuthenticatedActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
-  id: '/accounts',
-  path: '/accounts',
+const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBurnRoute = AuthenticatedBurnRouteImport.update({
+  id: '/burn',
+  path: '/burn',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDiscoveryRoute = AuthenticatedDiscoveryRouteImport.update({
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDownloadsRoute = AuthenticatedDownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
+  id: '/locations',
+  path: '/locations',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPublisherRoute = AuthenticatedPublisherRouteImport.update({
+  id: '/publisher',
+  path: '/publisher',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
+  id: '/scanner',
+  path: '/scanner',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTelegramRoute = AuthenticatedTelegramRouteImport.update({
+  id: '/telegram',
+  path: '/telegram',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDiscoveryAnalyticsRoute =
+  AuthenticatedDiscoveryAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AuthenticatedDiscoveryRoute,
+  } as any)
 const AuthenticatedMonitorIndexRoute =
   AuthenticatedMonitorIndexRouteImport.update({
     id: '/monitor/',
@@ -107,16 +119,20 @@ const AuthenticatedMonitorAccountIdRoute =
     path: '/monitor/$accountId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDiscoveryAnalyticsRoute =
-  AuthenticatedDiscoveryAnalyticsRouteImport.update({
-    id: '/analytics',
-    path: '/analytics',
-    getParentRoute: () => AuthenticatedDiscoveryRoute,
-  } as any)
-const ApiPublicTelegramWebhookRoute =
-  ApiPublicTelegramWebhookRouteImport.update({
-    id: '/api/public/telegram/webhook',
-    path: '/api/public/telegram/webhook',
+const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
+  id: '/api/public/cron/check',
+  path: '/api/public/cron/check',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronDispatchRoute = ApiPublicCronDispatchRouteImport.update({
+  id: '/api/public/cron/dispatch',
+  path: '/api/public/cron/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksDiscoveryTickRoute =
+  ApiPublicHooksDiscoveryTickRouteImport.update({
+    id: '/api/public/hooks/discovery-tick',
+    path: '/api/public/hooks/discovery-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksScannerTickRoute =
@@ -125,22 +141,12 @@ const ApiPublicHooksScannerTickRoute =
     path: '/api/public/hooks/scanner-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksDiscoveryTickRoute =
-  ApiPublicHooksDiscoveryTickRouteImport.update({
-    id: '/api/public/hooks/discovery-tick',
-    path: '/api/public/hooks/discovery-tick',
+const ApiPublicTelegramWebhookRoute =
+  ApiPublicTelegramWebhookRouteImport.update({
+    id: '/api/public/telegram/webhook',
+    path: '/api/public/telegram/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicCronDispatchRoute = ApiPublicCronDispatchRouteImport.update({
-  id: '/api/public/cron/dispatch',
-  path: '/api/public/cron/dispatch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
-  id: '/api/public/cron/check',
-  path: '/api/public/cron/check',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/locations': typeof AuthenticatedLocationsRoute
+  '/publisher': typeof AuthenticatedPublisherRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/locations': typeof AuthenticatedLocationsRoute
+  '/publisher': typeof AuthenticatedPublisherRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/_authenticated/downloads': typeof AuthenticatedDownloadsRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
+  '/_authenticated/publisher': typeof AuthenticatedPublisherRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/discovery'
     | '/downloads'
     | '/locations'
+    | '/publisher'
     | '/scanner'
     | '/settings'
     | '/telegram'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/discovery'
     | '/downloads'
     | '/locations'
+    | '/publisher'
     | '/scanner'
     | '/settings'
     | '/telegram'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/_authenticated/discovery'
     | '/_authenticated/downloads'
     | '/_authenticated/locations'
+    | '/_authenticated/publisher'
     | '/_authenticated/scanner'
     | '/_authenticated/settings'
     | '/_authenticated/telegram'
@@ -292,18 +304,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -313,60 +325,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/telegram': {
-      id: '/_authenticated/telegram'
-      path: '/telegram'
-      fullPath: '/telegram'
-      preLoaderRoute: typeof AuthenticatedTelegramRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/scanner': {
-      id: '/_authenticated/scanner'
-      path: '/scanner'
-      fullPath: '/scanner'
-      preLoaderRoute: typeof AuthenticatedScannerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/locations': {
-      id: '/_authenticated/locations'
-      path: '/locations'
-      fullPath: '/locations'
-      preLoaderRoute: typeof AuthenticatedLocationsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/downloads': {
-      id: '/_authenticated/downloads'
-      path: '/downloads'
-      fullPath: '/downloads'
-      preLoaderRoute: typeof AuthenticatedDownloadsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/discovery': {
-      id: '/_authenticated/discovery'
-      path: '/discovery'
-      fullPath: '/discovery'
-      preLoaderRoute: typeof AuthenticatedDiscoveryRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/burn': {
-      id: '/_authenticated/burn'
-      path: '/burn'
-      fullPath: '/burn'
-      preLoaderRoute: typeof AuthenticatedBurnRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/assets': {
-      id: '/_authenticated/assets'
-      path: '/assets'
-      fullPath: '/assets'
-      preLoaderRoute: typeof AuthenticatedAssetsRouteImport
+    '/_authenticated/accounts': {
+      id: '/_authenticated/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/activity': {
@@ -376,12 +339,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedActivityRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/accounts': {
-      id: '/_authenticated/accounts'
-      path: '/accounts'
-      fullPath: '/accounts'
-      preLoaderRoute: typeof AuthenticatedAccountsRouteImport
+    '/_authenticated/assets': {
+      id: '/_authenticated/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AuthenticatedAssetsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/burn': {
+      id: '/_authenticated/burn'
+      path: '/burn'
+      fullPath: '/burn'
+      preLoaderRoute: typeof AuthenticatedBurnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/discovery': {
+      id: '/_authenticated/discovery'
+      path: '/discovery'
+      fullPath: '/discovery'
+      preLoaderRoute: typeof AuthenticatedDiscoveryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/downloads': {
+      id: '/_authenticated/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof AuthenticatedDownloadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/locations': {
+      id: '/_authenticated/locations'
+      path: '/locations'
+      fullPath: '/locations'
+      preLoaderRoute: typeof AuthenticatedLocationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/publisher': {
+      id: '/_authenticated/publisher'
+      path: '/publisher'
+      fullPath: '/publisher'
+      preLoaderRoute: typeof AuthenticatedPublisherRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/scanner': {
+      id: '/_authenticated/scanner'
+      path: '/scanner'
+      fullPath: '/scanner'
+      preLoaderRoute: typeof AuthenticatedScannerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/telegram': {
+      id: '/_authenticated/telegram'
+      path: '/telegram'
+      fullPath: '/telegram'
+      preLoaderRoute: typeof AuthenticatedTelegramRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/discovery/analytics': {
+      id: '/_authenticated/discovery/analytics'
+      path: '/analytics'
+      fullPath: '/discovery/analytics'
+      preLoaderRoute: typeof AuthenticatedDiscoveryAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedDiscoveryRoute
     }
     '/_authenticated/monitor/': {
       id: '/_authenticated/monitor/'
@@ -397,32 +423,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMonitorAccountIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/discovery/analytics': {
-      id: '/_authenticated/discovery/analytics'
-      path: '/analytics'
-      fullPath: '/discovery/analytics'
-      preLoaderRoute: typeof AuthenticatedDiscoveryAnalyticsRouteImport
-      parentRoute: typeof AuthenticatedDiscoveryRoute
-    }
-    '/api/public/telegram/webhook': {
-      id: '/api/public/telegram/webhook'
-      path: '/api/public/telegram/webhook'
-      fullPath: '/api/public/telegram/webhook'
-      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/scanner-tick': {
-      id: '/api/public/hooks/scanner-tick'
-      path: '/api/public/hooks/scanner-tick'
-      fullPath: '/api/public/hooks/scanner-tick'
-      preLoaderRoute: typeof ApiPublicHooksScannerTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/discovery-tick': {
-      id: '/api/public/hooks/discovery-tick'
-      path: '/api/public/hooks/discovery-tick'
-      fullPath: '/api/public/hooks/discovery-tick'
-      preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
+    '/api/public/cron/check': {
+      id: '/api/public/cron/check'
+      path: '/api/public/cron/check'
+      fullPath: '/api/public/cron/check'
+      preLoaderRoute: typeof ApiPublicCronCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/cron/dispatch': {
@@ -432,11 +437,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/cron/check': {
-      id: '/api/public/cron/check'
-      path: '/api/public/cron/check'
-      fullPath: '/api/public/cron/check'
-      preLoaderRoute: typeof ApiPublicCronCheckRouteImport
+    '/api/public/hooks/discovery-tick': {
+      id: '/api/public/hooks/discovery-tick'
+      path: '/api/public/hooks/discovery-tick'
+      fullPath: '/api/public/hooks/discovery-tick'
+      preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/scanner-tick': {
+      id: '/api/public/hooks/scanner-tick'
+      path: '/api/public/hooks/scanner-tick'
+      fullPath: '/api/public/hooks/scanner-tick'
+      preLoaderRoute: typeof ApiPublicHooksScannerTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/telegram/webhook': {
+      id: '/api/public/telegram/webhook'
+      path: '/api/public/telegram/webhook'
+      fullPath: '/api/public/telegram/webhook'
+      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -464,6 +483,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDiscoveryRoute: typeof AuthenticatedDiscoveryRouteWithChildren
   AuthenticatedDownloadsRoute: typeof AuthenticatedDownloadsRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
+  AuthenticatedPublisherRoute: typeof AuthenticatedPublisherRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTelegramRoute: typeof AuthenticatedTelegramRoute
@@ -480,6 +500,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDiscoveryRoute: AuthenticatedDiscoveryRouteWithChildren,
   AuthenticatedDownloadsRoute: AuthenticatedDownloadsRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
+  AuthenticatedPublisherRoute: AuthenticatedPublisherRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTelegramRoute: AuthenticatedTelegramRoute,

@@ -14,6 +14,7 @@ import {
   Flame,
   Gauge,
   Eye,
+  Clapperboard,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,9 +52,13 @@ const groups: NavGroup[] = [
     id: "transition",
     label: "Account Status Watch",
     defaultOpen: true,
-    items: [
-      { to: "/monitor", label: "Monitor", icon: Eye, hint: null },
-    ],
+    items: [{ to: "/monitor", label: "Monitor", icon: Eye, hint: null }],
+  },
+  {
+    id: "publisher",
+    label: "FollowerStar Content",
+    defaultOpen: true,
+    items: [{ to: "/publisher", label: "Content Publisher", icon: Clapperboard, hint: null }],
   },
   {
     id: "ops",
@@ -181,7 +186,6 @@ export function AppSidebar() {
           );
         })}
       </nav>
-
 
       <div className="p-3 border-t border-sidebar-border">
         <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
