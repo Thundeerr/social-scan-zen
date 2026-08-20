@@ -13,6 +13,7 @@ import {
   Send,
   Menu,
   Flame,
+  Clapperboard,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const items = [
   { to: "/discovery", label: "Discovery", icon: Sparkles },
   { to: "/downloads", label: "Archive", icon: Download },
   { to: "/scanner", label: "Scanner", icon: Radar },
+  { to: "/publisher", label: "Content Publisher", icon: Clapperboard },
   { to: "/burn", label: "Token Burn Rate", icon: Flame },
   { to: "/activity", label: "Activity", icon: Activity },
   { to: "/telegram", label: "Telegram", icon: Send },
@@ -78,7 +80,9 @@ export function MobileNav() {
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                 )}
               >
-                <Icon className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
+                <Icon
+                  className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")}
+                />
                 <span className="flex-1">{label}</span>
               </Link>
             );

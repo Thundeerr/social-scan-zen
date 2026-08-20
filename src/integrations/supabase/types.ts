@@ -228,6 +228,154 @@ export type Database = {
           },
         ]
       }
+      content_events: {
+        Row: {
+          content_post_id: string
+          created_at: string
+          detail: Json
+          event_type: string
+          id: string
+        }
+        Insert: {
+          content_post_id: string
+          created_at?: string
+          detail?: Json
+          event_type: string
+          id?: string
+        }
+        Update: {
+          content_post_id?: string
+          created_at?: string
+          detail?: Json
+          event_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_events_content_post_id_fkey"
+            columns: ["content_post_id"]
+            isOneToOne: false
+            referencedRelation: "content_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_posts: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          caption: string
+          cover_storage_path: string | null
+          created_at: string
+          first_comment: string
+          hook: string
+          id: string
+          media_sha256: string | null
+          post_key: string
+          reel_storage_path: string | null
+          review_note: string | null
+          scheduled_for: string | null
+          status: string
+          story_storage_path: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          caption?: string
+          cover_storage_path?: string | null
+          created_at?: string
+          first_comment?: string
+          hook?: string
+          id?: string
+          media_sha256?: string | null
+          post_key: string
+          reel_storage_path?: string | null
+          review_note?: string | null
+          scheduled_for?: string | null
+          status?: string
+          story_storage_path?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          caption?: string
+          cover_storage_path?: string | null
+          created_at?: string
+          first_comment?: string
+          hook?: string
+          id?: string
+          media_sha256?: string | null
+          post_key?: string
+          reel_storage_path?: string | null
+          review_note?: string | null
+          scheduled_for?: string | null
+          status?: string
+          story_storage_path?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      content_publications: {
+        Row: {
+          attempts: number
+          channel: string
+          content_post_id: string
+          created_at: string
+          id: string
+          last_error: string | null
+          permalink: string | null
+          platform_container_id: string | null
+          platform_media_id: string | null
+          published_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          content_post_id: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          permalink?: string | null
+          platform_container_id?: string | null
+          platform_media_id?: string | null
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          content_post_id?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          permalink?: string | null
+          platform_container_id?: string | null
+          platform_media_id?: string | null
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_publications_content_post_id_fkey"
+            columns: ["content_post_id"]
+            isOneToOne: false
+            referencedRelation: "content_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discovery_blacklist: {
         Row: {
           created_at: string
@@ -1426,6 +1574,14 @@ export type Database = {
       provider_budget_usage: {
         Args: { _end: string; _start: string }
         Returns: Json
+      }
+      review_content_post: {
+        Args: {
+          _content_post_id: string
+          _decision: string
+          _note?: string | null
+        }
+        Returns: undefined
       }
     }
     Enums: {
