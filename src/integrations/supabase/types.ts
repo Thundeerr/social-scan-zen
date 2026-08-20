@@ -281,7 +281,11 @@ export type Database = {
           reel_storage_path: string | null
           review_note: string | null
           scheduled_for: string | null
+          share_to_feed: boolean
           status: string
+          story_link_label: string
+          story_link_url: string
+          story_publish_mode: string
           story_storage_path: string | null
           title: string
           updated_at: string
@@ -308,7 +312,11 @@ export type Database = {
           reel_storage_path?: string | null
           review_note?: string | null
           scheduled_for?: string | null
+          share_to_feed?: boolean
           status?: string
+          story_link_label?: string
+          story_link_url?: string
+          story_publish_mode?: string
           story_storage_path?: string | null
           title: string
           updated_at?: string
@@ -335,7 +343,11 @@ export type Database = {
           reel_storage_path?: string | null
           review_note?: string | null
           scheduled_for?: string | null
+          share_to_feed?: boolean
           status?: string
+          story_link_label?: string
+          story_link_url?: string
+          story_publish_mode?: string
           story_storage_path?: string | null
           title?: string
           updated_at?: string
@@ -356,6 +368,7 @@ export type Database = {
           platform_container_id: string | null
           platform_media_id: string | null
           published_at: string | null
+          depends_on_channel: string | null
           status: string
           updated_at: string
         }
@@ -370,6 +383,7 @@ export type Database = {
           platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
+          depends_on_channel?: string | null
           status?: string
           updated_at?: string
         }
@@ -384,6 +398,7 @@ export type Database = {
           platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
+          depends_on_channel?: string | null
           status?: string
           updated_at?: string
         }

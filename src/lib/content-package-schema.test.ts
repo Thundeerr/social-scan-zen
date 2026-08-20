@@ -7,6 +7,7 @@ const validManifest = {
   title: "Tool name",
   hook: "A clear hook",
   caption: "A complete caption for the Instagram post.",
+  story_link_url: "https://followerstar.com/tools/live-follower-tracker?ref=content",
   files: { cover: "cover.jpg", reel: "reel.mp4", story: "story.mp4" },
 };
 
@@ -16,6 +17,8 @@ describe("contentManifestSchema", () => {
     expect(result.first_comment).toBe("");
     expect(result.alt_text).toBe("");
     expect(result.content_pillar).toBe("Product showcase");
+    expect(result.share_to_feed).toBe(true);
+    expect(result.story_link_label).toBe("Try it now");
   });
 
   it("rejects path traversal in post keys", () => {
@@ -32,5 +35,23 @@ describe("contentManifestSchema", () => {
 
   it("rejects unsupported manifest versions", () => {
     expect(() => contentManifestSchema.parse({ ...validManifest, version: 2 })).toThrow();
+  });
+
+  it("rejects insecure Story links", () => {
+    expect(() =>
+      contentManifestSchema.parse({
+        ...validManifest,
+        story_link_url: "http://followerstar.com/tools/live-follower-tracker",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects Story links outside FollowerStar", () => {
+    expect(() =>
+      contentManifestSchema.parse({
+        ...validManifest,
+        story_link_url: "https://example.com/not-ours",
+      }),
+    ).toThrow();
   });
 });

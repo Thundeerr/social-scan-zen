@@ -156,8 +156,8 @@ function ContentPublisherPage() {
           </div>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Content Publisher</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Review the batch twice a month. InstaScanner prepares Reel, Feed, Story and first
-            comment for the schedule.
+            Review the batch twice a month. InstaScanner prepares one Reel for Reels + Feed, the
+            first comment and a Story link handoff.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.15em] text-amber-300">
@@ -242,10 +242,15 @@ function ContentPublisherPage() {
                     {post.caption}
                   </p>
 
-                  <div className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                    <Channel label="Reel" ready={!!post.reel_storage_path} />
-                    <Channel label="Feed" ready={!!post.cover_storage_path} />
-                    <Channel label="Story" ready={!!post.story_storage_path} />
+                  <div className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-3">
+                    <Channel
+                      label={post.share_to_feed ? "Reel + Feed" : "Reel only"}
+                      ready={!!post.reel_storage_path}
+                    />
+                    <Channel
+                      label="Story link handoff"
+                      ready={!!post.story_storage_path && !!post.story_link_url}
+                    />
                     <Channel label="Comment" ready={!!post.first_comment} />
                   </div>
 
@@ -282,6 +287,7 @@ function ContentPublisherPage() {
                         !post.cover_storage_path ||
                         !post.reel_storage_path ||
                         !post.story_storage_path ||
+                        !post.story_link_url ||
                         !post.caption
                       }
                     >

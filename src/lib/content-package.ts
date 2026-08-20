@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAllowedFollowerStarStoryUrl, withInstagramStoryTracking } from "./story-link";
 
 export const contentManifestSchema = z.object({
   version: z.literal(1),
@@ -17,6 +18,23 @@ export const contentManifestSchema = z.object({
   first_comment: z.string().trim().max(2200).default(""),
   alt_text: z.string().trim().max(1000).default(""),
   content_pillar: z.string().trim().max(80).default("Product showcase"),
+  share_to_feed: z.boolean().default(true),
+  story_link_url: z
+    .string()
+    .trim()
+    .max(2048)
+    .url()
+    .refine(
+      isAllowedFollowerStarStoryUrl,
+      "Story link must use HTTPS on followerstar.com or a FollowerStar subdomain",
+    ),
+  story_link_label: z
+    .string()
+    .trim()
+    .min(2)
+    .max(50)
+    .regex(/^[^\r\n]+$/, "Story link label must fit on one line")
+    .default("Try it now"),
   files: z.object({
     cover: z.string().trim().min(1),
     reel: z.string().trim().min(1),
@@ -350,6 +368,13 @@ function validatePreparedPackage(
     });
   }
 
+  issues.push({
+    severity: "pass",
+    code: "story_link",
+    label: "Story link handoff",
+    detail: `${manifest.story_link_label} · FollowerStar HTTPS link`,
+  });
+
   return issues;
 }
 
@@ -430,7 +455,10 @@ export async function prepareContentPackage(
   );
 
   return {
-    manifest: parsed.data,
+    manifest: {
+      ...parsed.data,
+      story_link_url: withInstagramStoryTracking(parsed.data.story_link_url, parsed.data.post_key),
+    },
     files,
     media,
     issues: validatePreparedPackage(parsed.data, media),

@@ -1,5 +1,18 @@
 import { useState } from "react";
-import { Captions, CheckCircle2, Grid3X3, Play, ShieldCheck, Volume2 } from "lucide-react";
+import {
+  Captions,
+  CheckCircle2,
+  Copy,
+  Download,
+  ExternalLink,
+  Grid3X3,
+  Instagram,
+  Link2,
+  Play,
+  ShieldCheck,
+  Volume2,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +35,9 @@ export type ReviewablePost = ContentPost & {
 
 export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
   const [open, setOpen] = useState(false);
-  const ready = Boolean(post.coverUrl && post.reelUrl && post.storyUrl && post.caption);
+  const ready = Boolean(
+    post.coverUrl && post.reelUrl && post.storyUrl && post.caption && post.story_link_url,
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -64,7 +79,12 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
                 <VerticalVideo url={post.reelUrl} label="Reel preview" safeZone />
               </TabsContent>
               <TabsContent value="story" className="mt-4">
-                <VerticalVideo url={post.storyUrl} label="Story preview" safeZone />
+                <VerticalVideo
+                  url={post.storyUrl}
+                  label="Story preview"
+                  safeZone
+                  linkStickerLabel={post.story_link_label}
+                />
               </TabsContent>
               <TabsContent value="grid" className="mt-4">
                 <ProfileCropPreview url={post.coverUrl} />
@@ -92,6 +112,74 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
               muted={!post.alt_text}
             />
 
+            <section className="rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                  <Link2 className="h-4 w-4" /> Story link handoff
+                </div>
+                <Badge variant="outline" className="border-amber-500/30 text-amber-300">
+                  Mobile confirmation
+                </Badge>
+              </div>
+              <div className="mt-3 text-sm font-medium">{post.story_link_label}</div>
+              <a
+                href={post.story_link_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 flex items-start gap-1 break-all text-xs leading-5 text-primary underline-offset-4 hover:underline"
+              >
+                {post.story_link_url}
+                <ExternalLink className="mt-0.5 h-3 w-3 shrink-0" />
+              </a>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                The Story stays in handoff mode until the link sticker is added and confirmed in the
+                Instagram app. Tracking parameters are added automatically.
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(post.story_link_url);
+                      toast.success("Story link copied");
+                    } catch {
+                      toast.error("Could not copy the Story link");
+                    }
+                  }}
+                >
+                  <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy link
+                </Button>
+                {post.storyUrl ? (
+                  <Button asChild variant="outline" size="sm">
+                    <a
+                      href={post.storyUrl}
+                      download={`${post.post_key}-story.mp4`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Download className="mr-1.5 h-3.5 w-3.5" /> Get Story
+                    </a>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled>
+                    <Download className="mr-1.5 h-3.5 w-3.5" /> Get Story
+                  </Button>
+                )}
+                <Button asChild size="sm">
+                  <a href="instagram://story-camera">
+                    <Instagram className="mr-1.5 h-3.5 w-3.5" /> Instagram
+                  </a>
+                </Button>
+              </div>
+              <ol className="mt-3 list-inside list-decimal space-y-1 text-[10px] leading-4 text-muted-foreground">
+                <li>Copy the tracked link.</li>
+                <li>Save or share the prepared Story video.</li>
+                <li>Open Instagram, add the link sticker and publish.</li>
+              </ol>
+            </section>
+
             <div className="rounded-lg border border-primary/20 bg-primary/[0.05] p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-primary">
                 <ShieldCheck className="h-4 w-4" /> Safe review mode
@@ -112,10 +200,12 @@ function VerticalVideo({
   url,
   label,
   safeZone,
+  linkStickerLabel,
 }: {
   url: string | null;
   label: string;
   safeZone?: boolean;
+  linkStickerLabel?: string;
 }) {
   return (
     <div className="relative mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-[24px] border border-white/15 bg-black shadow-2xl">
@@ -138,6 +228,11 @@ function VerticalVideo({
           <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-1 text-[8px] uppercase tracking-[0.14em] text-white/70 backdrop-blur">
             Text safe zone
           </span>
+        </div>
+      )}
+      {linkStickerLabel && (
+        <div className="pointer-events-none absolute inset-x-[18%] bottom-[23%] flex items-center justify-center rounded-xl border border-white/25 bg-white/90 px-3 py-2 text-center text-[11px] font-semibold text-black shadow-lg">
+          <Link2 className="mr-1.5 h-3.5 w-3.5" /> {linkStickerLabel}
         </div>
       )}
       <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 text-[9px] text-white/70 backdrop-blur">

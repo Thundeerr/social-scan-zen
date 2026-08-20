@@ -221,6 +221,10 @@ export function ContentBatchImport({ onImported }: Props) {
             first_comment: item.manifest.first_comment,
             alt_text: item.manifest.alt_text,
             content_pillar: item.manifest.content_pillar,
+            share_to_feed: item.manifest.share_to_feed,
+            story_link_url: item.manifest.story_link_url,
+            story_link_label: item.manifest.story_link_label,
+            story_publish_mode: "manual_link_sticker",
             manifest_version: item.manifest.version,
             batch_key: sharedBatchId,
             cover_storage_path: paths.cover,
@@ -320,7 +324,8 @@ export function ContentBatchImport({ onImported }: Props) {
             </div>
             <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
               Select one post folder or a parent folder containing many post folders. Every
-              manifest, 1080×1920 Reel, Story and cover is checked before private upload.
+              manifest, 1080×1920 Reel, Story, cover and Story link are checked before private
+              upload.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-3 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
