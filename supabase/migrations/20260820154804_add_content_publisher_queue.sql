@@ -105,10 +105,13 @@ CREATE TRIGGER content_publications_updated_at
   BEFORE UPDATE ON public.content_publications
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Keep editorial decisions, their audit event and channel rows atomic. The
--- browser can execute this narrow operation but cannot write audit/publication
--- rows directly.
-CREATE OR REPLACE FUNCTION public.review_content_post(
+-- Keep the privileged implementation outside the exposed public schema. The
+-- browser only sees the narrow SECURITY INVOKER wrapper created below.
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC, anon;
+GRANT USAGE ON SCHEMA private TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.review_content_post(
   _content_post_id uuid,
   _decision text,
   _note text DEFAULT NULL
@@ -170,6 +173,22 @@ BEGIN
     WHERE content_post_id = _content_post_id AND status = 'pending';
   END IF;
 END;
+$$;
+
+REVOKE ALL ON FUNCTION private.review_content_post(uuid, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private.review_content_post(uuid, text, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.review_content_post(
+  _content_post_id uuid,
+  _decision text,
+  _note text DEFAULT NULL
+)
+RETURNS void
+LANGUAGE sql
+SECURITY INVOKER
+SET search_path = public, private, pg_temp
+AS $$
+  SELECT private.review_content_post(_content_post_id, _decision, _note);
 $$;
 
 REVOKE ALL ON FUNCTION public.review_content_post(uuid, text, text) FROM PUBLIC, anon;
