@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "post_key": "T004-tool-001",
+  "title": "Tool name",
+  "hook": "A short, clear first-frame promise.",
+  "caption": "Complete Instagram caption including the CTA.",
+  "first_comment": "Optional first comment with a natural follow-up CTA.",
+  "alt_text": "Accessible description of the video and its key on-screen message.",
+  "content_pillar": "Product showcase",
+  "files": {
+    "cover": "cover.jpg",
+    "reel": "reel.mp4",
+    "story": "story.mp4"
+  }
+}
