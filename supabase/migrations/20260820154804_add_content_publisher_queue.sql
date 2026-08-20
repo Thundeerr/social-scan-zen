@@ -1,6 +1,6 @@
 -- FollowerStar-owned content queue. This is separate from publish_jobs, which
 -- represents reposting an asset detected by the scanner.
-CREATE TABLE public.content_posts (
+CREATE TABLE IF NOT EXISTS public.content_posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   post_key text NOT NULL,
@@ -23,14 +23,14 @@ CREATE TABLE public.content_posts (
   UNIQUE (user_id, post_key)
 );
 
-CREATE INDEX content_posts_queue_idx
+CREATE INDEX IF NOT EXISTS content_posts_queue_idx
   ON public.content_posts (user_id, status, scheduled_for);
 
-CREATE UNIQUE INDEX content_posts_media_sha256_unique
+CREATE UNIQUE INDEX IF NOT EXISTS content_posts_media_sha256_unique
   ON public.content_posts (user_id, media_sha256)
   WHERE media_sha256 IS NOT NULL;
 
-CREATE TABLE public.content_publications (
+CREATE TABLE IF NOT EXISTS public.content_publications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   content_post_id uuid NOT NULL REFERENCES public.content_posts(id) ON DELETE CASCADE,
   channel text NOT NULL CHECK (channel IN ('reel','feed','story','first_comment')),
@@ -47,10 +47,10 @@ CREATE TABLE public.content_publications (
   UNIQUE (content_post_id, channel)
 );
 
-CREATE INDEX content_publications_status_idx
+CREATE INDEX IF NOT EXISTS content_publications_status_idx
   ON public.content_publications (status, created_at);
 
-CREATE TABLE public.content_events (
+CREATE TABLE IF NOT EXISTS public.content_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   content_post_id uuid NOT NULL REFERENCES public.content_posts(id) ON DELETE CASCADE,
   event_type text NOT NULL,
@@ -58,10 +58,11 @@ CREATE TABLE public.content_events (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX content_events_post_idx
+CREATE INDEX IF NOT EXISTS content_events_post_idx
   ON public.content_events (content_post_id, created_at DESC);
 
 REVOKE ALL ON public.content_posts, public.content_publications, public.content_events FROM anon;
+REVOKE ALL ON public.content_publications, public.content_events FROM authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.content_posts TO authenticated;
 GRANT SELECT ON public.content_publications, public.content_events TO authenticated;
 GRANT ALL ON public.content_posts, public.content_publications, public.content_events TO service_role;
@@ -70,11 +71,13 @@ ALTER TABLE public.content_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.content_publications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.content_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "operators manage own content posts" ON public.content_posts;
 CREATE POLICY "operators manage own content posts"
   ON public.content_posts FOR ALL TO authenticated
   USING ((SELECT auth.uid()) = user_id AND public.is_operator((SELECT auth.uid())))
   WITH CHECK ((SELECT auth.uid()) = user_id AND public.is_operator((SELECT auth.uid())));
 
+DROP POLICY IF EXISTS "operators manage own content publications" ON public.content_publications;
 CREATE POLICY "operators manage own content publications"
   ON public.content_publications FOR SELECT TO authenticated
   USING (
@@ -86,6 +89,7 @@ CREATE POLICY "operators manage own content publications"
     )
   );
 
+DROP POLICY IF EXISTS "operators read own content events" ON public.content_events;
 CREATE POLICY "operators read own content events"
   ON public.content_events FOR SELECT TO authenticated
   USING (
@@ -97,10 +101,12 @@ CREATE POLICY "operators read own content events"
     )
   );
 
+DROP TRIGGER IF EXISTS content_posts_updated_at ON public.content_posts;
 CREATE TRIGGER content_posts_updated_at
   BEFORE UPDATE ON public.content_posts
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS content_publications_updated_at ON public.content_publications;
 CREATE TRIGGER content_publications_updated_at
   BEFORE UPDATE ON public.content_publications
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
