@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { planContentBatchImport } from "@/lib/content-batch-plan";
 import {
   packageHasErrors,
   prepareContentBatch,
@@ -27,6 +28,48 @@ import {
 import { uploadContentFile } from "@/lib/resumable-content-upload";
 
 type Props = { onImported: () => void };
+type ExistingPost = {
+  id: string;
+  post_key: string;
+  media_sha256: string | null;
+  media_manifest: unknown;
+  batch_key: string | null;
+};
+
+function chunks<T>(items: T[], size = 40) {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
+function storedPackageHash(row: ExistingPost) {
+  if (!row.media_manifest || typeof row.media_manifest !== "object") return null;
+  const value = (row.media_manifest as Record<string, unknown>).package_sha256;
+  return typeof value === "string" ? value : null;
+}
+
+async function findExistingPosts(keys: string[], hashes: string[]) {
+  const rows = new Map<string, ExistingPost>();
+  for (const keyChunk of chunks(keys)) {
+    const { data, error } = await supabase
+      .from("content_posts")
+      .select("id, post_key, media_sha256, media_manifest, batch_key")
+      .in("post_key", keyChunk);
+    if (error) throw error;
+    for (const row of data ?? []) rows.set(row.id, row as ExistingPost);
+  }
+  for (const hashChunk of chunks(hashes)) {
+    const { data, error } = await supabase
+      .from("content_posts")
+      .select("id, post_key, media_sha256, media_manifest, batch_key")
+      .in("media_sha256", hashChunk);
+    if (error) throw error;
+    for (const row of data ?? []) rows.set(row.id, row as ExistingPost);
+  }
+  return [...rows.values()];
+}
 
 export function ContentBatchImport({ onImported }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -34,8 +77,11 @@ export function ContentBatchImport({ onImported }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [isReading, setIsReading] = useState(false);
+  const [readProgress, setReadProgress] = useState({ completed: 0, total: 0 });
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const uploadGuardRef = useRef(false);
   const selected = batch[selectedIndex] ?? null;
 
   useEffect(() => {
@@ -48,13 +94,27 @@ export function ContentBatchImport({ onImported }: Props) {
     return () => URL.revokeObjectURL(next);
   }, [selected]);
 
+  useEffect(() => {
+    if (!isUploading) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [isUploading]);
+
   const selectBatch = async (files: File[]) => {
     if (!files.length) return;
     setIsReading(true);
     setBatch([]);
     setSelectedIndex(0);
+    setReadProgress({ completed: 0, total: 0 });
+    setProgress(0);
     try {
-      const next = await prepareContentBatch(files);
+      const next = await prepareContentBatch(files, (completed, total) =>
+        setReadProgress({ completed, total }),
+      );
       setBatch(next);
       const invalid = next.filter(packageHasErrors).length;
       if (invalid > 0)
@@ -68,60 +128,90 @@ export function ContentBatchImport({ onImported }: Props) {
     }
   };
 
-  const uploadBatch = async () => {
-    if (!batch.length || batch.some(packageHasErrors)) return;
+  const uploadBatchLocked = async () => {
+    if (!batch.length || batch.some(packageHasErrors) || uploadGuardRef.current) return;
+    uploadGuardRef.current = true;
     setIsUploading(true);
     setProgress(1);
+    const controller = new AbortController();
+    abortRef.current = controller;
     let imported = 0;
+    let skipped = 0;
     try {
+      if (!navigator.onLine) throw new Error("You are offline. Reconnect before uploading.");
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Your operator session has expired.");
 
       const keys = batch.map((item) => item.manifest.post_key);
-      const hashes = batch.map((item) => item.packageSha256);
-      const [{ data: existingKeys, error: keyError }, { data: existingHashes, error: hashError }] =
-        await Promise.all([
-          supabase.from("content_posts").select("post_key").in("post_key", keys),
-          supabase
-            .from("content_posts")
-            .select("post_key, media_sha256")
-            .in("media_sha256", hashes),
-        ]);
-      if (keyError) throw keyError;
-      if (hashError) throw hashError;
-      if (existingKeys?.length)
-        throw new Error(`Post key already exists: ${existingKeys[0].post_key}`);
-      if (existingHashes?.length)
-        throw new Error(`Media already imported as ${existingHashes[0].post_key}.`);
+      const hashes = batch.flatMap((item) => [item.mediaSha256, item.packageSha256]);
+      const existing = await findExistingPosts(keys, hashes);
+      const plan = planContentBatchImport(
+        batch.map((item) => ({
+          postKey: item.manifest.post_key,
+          mediaSha256: item.mediaSha256,
+          packageSha256: item.packageSha256,
+        })),
+        existing.map((row) => ({
+          id: row.id,
+          postKey: row.post_key,
+          mediaSha256: row.media_sha256,
+          packageSha256: storedPackageHash(row),
+          batchKey: row.batch_key,
+        })),
+      );
+      const pendingKeys = new Set(plan.pendingPostKeys);
+      const pending = batch.filter((item) => pendingKeys.has(item.manifest.post_key));
+      skipped = plan.skippedPostKeys.length;
 
-      const sharedBatchId = crypto.randomUUID();
+      if (pending.length === 0) {
+        toast.success(`${skipped} post${skipped === 1 ? " is" : "s are"} already imported`);
+        setBatch([]);
+        onImported();
+        return;
+      }
+
+      const sharedBatchId = plan.reusableBatchKey ?? crypto.randomUUID();
       const roles: PackageFileRole[] = ["cover", "reel", "story"];
-      const totalFiles = batch.length * roles.length;
+      const totalFiles = pending.length * roles.length;
       let completedFiles = 0;
 
-      for (const item of batch) {
-        const paths = {} as Record<PackageFileRole, string>;
-        const uploadedPaths: string[] = [];
-        try {
-          for (const role of roles) {
+      for (const item of pending) {
+        if (controller.signal.aborted) throw new DOMException("Upload cancelled", "AbortError");
+        const root = `${auth.user.id}/content/${item.manifest.post_key}/${item.packageSha256}`;
+        const paths = Object.fromEntries(
+          roles.map((role) => {
             const file = item.files[role];
             const hash = item.media[role].sha256.slice(0, 16);
-            const root = `${auth.user.id}/content/${sharedBatchId}/${item.manifest.post_key}`;
-            const path = `${root}/${role}-${hash}.${storageExtension(file)}`;
+            return [role, `${root}/${role}-${hash}.${storageExtension(file)}`];
+          }),
+        ) as Record<PackageFileRole, string>;
+        const uploadedPaths: string[] = [];
+        try {
+          const { error: orphanError } = await supabase.storage
+            .from("ig-publish")
+            .remove(Object.values(paths));
+          if (orphanError) throw new Error(`Could not clean an earlier partial upload.`);
+
+          for (const role of roles) {
+            const file = item.files[role];
             await uploadContentFile({
               file,
-              objectPath: path,
+              objectPath: paths[role],
+              contentType: item.media[role].contentType,
+              signal: controller.signal,
               onProgress: (fraction) =>
                 setProgress(Math.round(((completedFiles + fraction) / totalFiles) * 90)),
             });
-            paths[role] = path;
-            uploadedPaths.push(path);
+            uploadedPaths.push(paths[role]);
             completedFiles += 1;
           }
 
-          const mediaManifest = Object.fromEntries(
-            roles.map((role) => [role, { ...item.media[role], storage_path: paths[role] }]),
-          );
+          const mediaManifest = {
+            package_sha256: item.packageSha256,
+            ...Object.fromEntries(
+              roles.map((role) => [role, { ...item.media[role], storage_path: paths[role] }]),
+            ),
+          };
           const { error: insertError } = await supabase.from("content_posts").insert({
             user_id: auth.user.id,
             post_key: item.manifest.post_key,
@@ -136,7 +226,7 @@ export function ContentBatchImport({ onImported }: Props) {
             cover_storage_path: paths.cover,
             reel_storage_path: paths.reel,
             story_storage_path: paths.story,
-            media_sha256: item.packageSha256,
+            media_sha256: item.mediaSha256,
             media_manifest: mediaManifest,
             quality_report: item.issues,
             imported_at: new Date().toISOString(),
@@ -145,24 +235,54 @@ export function ContentBatchImport({ onImported }: Props) {
           if (insertError) throw insertError;
           imported += 1;
         } catch (error) {
-          if (uploadedPaths.length > 0)
-            await supabase.storage.from("ig-publish").remove(uploadedPaths);
+          if (uploadedPaths.length > 0) {
+            const { error: cleanupError } = await supabase.storage
+              .from("ig-publish")
+              .remove(uploadedPaths);
+            if (cleanupError) {
+              toast.warning("Some partial files need automatic cleanup on the next retry.");
+            }
+          }
           throw error;
         }
       }
 
       setProgress(100);
-      toast.success(`${imported} post${imported === 1 ? " is" : "s are"} ready for mobile review`);
+      toast.success(
+        `${imported} post${imported === 1 ? " is" : "s are"} ready${skipped ? ` · ${skipped} already existed` : ""}`,
+      );
       setBatch([]);
       setSelectedIndex(0);
       onImported();
     } catch (error) {
       if (imported > 0) onImported();
       const message = error instanceof Error ? error.message : "Upload failed";
-      toast.error(imported > 0 ? `${message} · ${imported} already imported safely` : message);
+      const safeCount = imported + skipped;
+      toast.error(safeCount > 0 ? `${message} · ${safeCount} already safe` : message);
     } finally {
+      abortRef.current = null;
+      uploadGuardRef.current = false;
       setIsUploading(false);
     }
+  };
+
+  const uploadBatch = async () => {
+    if (!navigator.locks) {
+      toast.error("Safe uploads require desktop Chrome or Edge.");
+      return;
+    }
+
+    await navigator.locks.request(
+      "instascanner-content-import",
+      { ifAvailable: true },
+      async (lock) => {
+        if (!lock) {
+          toast.warning("Another InstaScanner tab is already importing content.");
+          return;
+        }
+        await uploadBatchLocked();
+      },
+    );
   };
 
   const errors = selected?.issues.filter((issue) => issue.severity === "error") ?? [];
@@ -194,7 +314,9 @@ export function ContentBatchImport({ onImported }: Props) {
               </div>
             )}
             <div className="mt-4 text-sm font-semibold">
-              {isReading ? "Checking batch…" : "Import content batch"}
+              {isReading
+                ? `Checking batch${readProgress.total ? ` ${readProgress.completed}/${readProgress.total}` : ""}…`
+                : "Import content batch"}
             </div>
             <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
               Select one post folder or a parent folder containing many post folders. Every
@@ -328,6 +450,11 @@ export function ContentBatchImport({ onImported }: Props) {
                   )}
                   Upload {batch.length} post{batch.length === 1 ? "" : "s"} privately
                 </Button>
+                {isUploading && (
+                  <Button variant="destructive" onClick={() => abortRef.current?.abort()}>
+                    Cancel safely
+                  </Button>
+                )}
               </div>
             </div>
           </div>

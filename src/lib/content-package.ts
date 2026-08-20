@@ -50,8 +50,16 @@ export type PreparedContentPackage = {
   files: Record<PackageFileRole, File>;
   media: Record<PackageFileRole, MediaMetadata>;
   issues: PackageIssue[];
+  mediaSha256: string;
   packageSha256: string;
 };
+
+export const MAX_BATCH_POSTS = 100;
+const MAX_BATCH_BYTES = 5 * 1024 * 1024 * 1024;
+const MAX_MANIFEST_BYTES = 256 * 1024;
+const MAX_COVER_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+const METADATA_TIMEOUT_MS = 20_000;
 
 function baseName(value: string) {
   return value.replaceAll("\\", "/").split("/").pop()?.toLowerCase() ?? "";
@@ -73,6 +81,19 @@ function extension(value: string) {
   return dot >= 0 ? name.slice(dot + 1) : "bin";
 }
 
+function inferredContentType(file: File) {
+  if (file.type) return file.type.toLowerCase();
+  const byExtension: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+  };
+  return byExtension[extension(file.name)] ?? "application/octet-stream";
+}
+
 export function storageExtension(file: File) {
   const byType: Record<string, string> = {
     "image/jpeg": "jpg",
@@ -81,7 +102,7 @@ export function storageExtension(file: File) {
     "video/mp4": "mp4",
     "video/quicktime": "mov",
   };
-  return byType[file.type] ?? extension(file.name);
+  return byType[inferredContentType(file)] ?? extension(file.name);
 }
 
 async function sha256(buffer: ArrayBuffer) {
@@ -94,8 +115,18 @@ async function inspectImage(file: File) {
   try {
     return await new Promise<{ width: number; height: number }>((resolve, reject) => {
       const image = new Image();
-      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-      image.onerror = () => reject(new Error(`${file.name} could not be read as an image`));
+      const timer = window.setTimeout(
+        () => reject(new Error(`${file.name} took too long to read as an image`)),
+        METADATA_TIMEOUT_MS,
+      );
+      image.onload = () => {
+        window.clearTimeout(timer);
+        resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      };
+      image.onerror = () => {
+        window.clearTimeout(timer);
+        reject(new Error(`${file.name} could not be read as an image`));
+      };
       image.src = url;
     });
   } finally {
@@ -110,13 +141,23 @@ async function inspectVideo(file: File) {
       (resolve, reject) => {
         const video = document.createElement("video");
         video.preload = "metadata";
-        video.onloadedmetadata = () =>
+        const timer = window.setTimeout(() => {
+          video.removeAttribute("src");
+          video.load();
+          reject(new Error(`${file.name} took too long to read as a video`));
+        }, METADATA_TIMEOUT_MS);
+        video.onloadedmetadata = () => {
+          window.clearTimeout(timer);
           resolve({
             width: video.videoWidth,
             height: video.videoHeight,
             durationSeconds: Number.isFinite(video.duration) ? video.duration : 0,
           });
-        video.onerror = () => reject(new Error(`${file.name} could not be read as a video`));
+        };
+        video.onerror = () => {
+          window.clearTimeout(timer);
+          reject(new Error(`${file.name} could not be read as a video`));
+        };
         video.src = url;
       },
     );
@@ -132,7 +173,7 @@ async function inspectMedia(role: PackageFileRole, file: File): Promise<MediaMet
     return {
       role,
       filename: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType: inferredContentType(file),
       bytes: file.size,
       ...dimensions,
       durationSeconds: null,
@@ -144,7 +185,7 @@ async function inspectMedia(role: PackageFileRole, file: File): Promise<MediaMet
   return {
     role,
     filename: file.name,
-    contentType: file.type || "application/octet-stream",
+    contentType: inferredContentType(file),
     bytes: file.size,
     ...metadata,
     sha256: await sha256(buffer),
@@ -163,12 +204,12 @@ function validatePreparedPackage(
   const vertical = 9 / 16;
   const coverRatio = 420 / 654;
 
-  if (!media.cover.contentType.startsWith("image/")) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(media.cover.contentType)) {
     issues.push({
       severity: "error",
       code: "cover_type",
       label: "Cover format",
-      detail: "Cover must be an image.",
+      detail: "Cover must be JPG, PNG or WebP.",
     });
   } else if (media.cover.width < 420 || media.cover.height < 654) {
     issues.push({
@@ -198,12 +239,12 @@ function validatePreparedPackage(
   for (const role of ["reel", "story"] as const) {
     const item = media[role];
     const label = role === "reel" ? "Reel" : "Story";
-    if (!item.contentType.startsWith("video/")) {
+    if (item.contentType !== "video/mp4") {
       issues.push({
         severity: "error",
         code: `${role}_type`,
         label: `${label} format`,
-        detail: `${label} must be a video.`,
+        detail: `${label} must be an MP4 for reliable Instagram publishing.`,
       });
     }
     if (!ratioClose(item.width, item.height, vertical)) {
@@ -238,6 +279,18 @@ function validatePreparedPackage(
     }
   }
 
+  for (const role of ["reel", "story"] as const) {
+    const duration = media[role].durationSeconds ?? 0;
+    if (duration <= 0) {
+      issues.push({
+        severity: "error",
+        code: `${role}_duration_valid`,
+        label: `${role === "reel" ? "Reel" : "Story"} duration`,
+        detail: "Video duration could not be verified.",
+      });
+    }
+  }
+
   if ((media.reel.durationSeconds ?? 0) > 180) {
     issues.push({
       severity: "error",
@@ -252,12 +305,21 @@ function validatePreparedPackage(
       label: "Reel duration",
       detail: `${media.reel.durationSeconds?.toFixed(1)}s — longer than the 15–20s FollowerStar template target.`,
     });
-  } else {
+  } else if ((media.reel.durationSeconds ?? 0) > 0) {
     issues.push({
       severity: "pass",
       code: "reel_duration",
       label: "Reel duration",
       detail: `${media.reel.durationSeconds?.toFixed(1)}s`,
+    });
+  }
+
+  if ((media.story.durationSeconds ?? 0) > 60) {
+    issues.push({
+      severity: "error",
+      code: "story_duration",
+      label: "Story duration",
+      detail: "Story video must be 60 seconds or shorter.",
     });
   }
 
@@ -300,10 +362,13 @@ export async function prepareContentPackage(
   if (manifestCandidates.length !== 1) {
     throw new Error("Select one post folder containing exactly one manifest.json file.");
   }
+  if (manifestCandidates[0].size > MAX_MANIFEST_BYTES) {
+    throw new Error("manifest.json exceeds the 256 KB safety limit.");
+  }
 
   let rawManifest: unknown;
   try {
-    rawManifest = JSON.parse(await manifestCandidates[0].text());
+    rawManifest = JSON.parse((await manifestCandidates[0].text()).replace(/^\uFEFF/, ""));
   } catch {
     throw new Error("manifest.json is not valid JSON.");
   }
@@ -333,20 +398,33 @@ export async function prepareContentPackage(
     story: resolveFile(parsed.data.files.story, "story"),
   };
 
-  const inspected = await Promise.all(
-    (Object.entries(files) as [PackageFileRole, File][]).map(([role, file]) =>
-      inspectMedia(role, file),
-    ),
-  );
+  for (const [role, file] of Object.entries(files) as [PackageFileRole, File][]) {
+    if (file.size <= 0) throw new Error(`${file.name} is empty.`);
+    const limit = role === "cover" ? MAX_COVER_BYTES : MAX_VIDEO_BYTES;
+    if (file.size > limit) {
+      const limitMb = Math.round(limit / 1024 / 1024);
+      throw new Error(`${file.name} exceeds the ${limitMb} MB ${role} safety limit.`);
+    }
+  }
+
+  const inspected: MediaMetadata[] = [];
+  for (const [role, file] of Object.entries(files) as [PackageFileRole, File][]) {
+    inspected.push(await inspectMedia(role, file));
+  }
   const media = Object.fromEntries(inspected.map((item) => [item.role, item])) as Record<
     PackageFileRole,
     MediaMetadata
   >;
+  const mediaSha256 = await sha256(
+    new TextEncoder().encode(
+      JSON.stringify(inspected.map((item) => [item.role, item.sha256]).sort()),
+    ).buffer,
+  );
   const packageSha256 = await sha256(
     new TextEncoder().encode(
       JSON.stringify({
         manifest: parsed.data,
-        hashes: inspected.map((item) => item.sha256).sort(),
+        mediaSha256,
       }),
     ).buffer,
   );
@@ -356,37 +434,54 @@ export async function prepareContentPackage(
     files,
     media,
     issues: validatePreparedPackage(parsed.data, media),
+    mediaSha256,
     packageSha256,
   };
 }
 
 export async function prepareContentBatch(
   selectedFiles: File[],
+  onProgress?: (completed: number, total: number) => void,
 ): Promise<PreparedContentPackage[]> {
   const manifests = selectedFiles.filter((file) => baseName(file.name) === "manifest.json");
   if (manifests.length === 0) {
     throw new Error("No manifest.json found. Select a post folder or a batch folder.");
   }
 
-  const packages = await Promise.all(
-    manifests.map((manifest) => {
-      const directory = directoryName(selectedPath(manifest));
-      const files = selectedFiles.filter((file) => directoryName(selectedPath(file)) === directory);
-      return prepareContentPackage(files);
-    }),
-  );
+  if (manifests.length > MAX_BATCH_POSTS) {
+    throw new Error(`A batch can contain at most ${MAX_BATCH_POSTS} posts.`);
+  }
+  if (manifests.length > 1 && manifests.some((file) => !directoryName(selectedPath(file)))) {
+    throw new Error(
+      "This browser did not preserve the batch folders. Import from desktop Chrome or Edge.",
+    );
+  }
+  const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+  if (totalBytes > MAX_BATCH_BYTES) {
+    throw new Error("This batch exceeds 5 GB. Split it into smaller batch folders.");
+  }
+
+  const packages: PreparedContentPackage[] = [];
+  for (const manifest of manifests) {
+    const directory = directoryName(selectedPath(manifest));
+    const files = selectedFiles.filter((file) => directoryName(selectedPath(file)) === directory);
+    packages.push(await prepareContentPackage(files));
+    onProgress?.(packages.length, manifests.length);
+  }
 
   const duplicateKey = packages.find(
     (item, index) =>
-      packages.findIndex((candidate) => candidate.manifest.post_key === item.manifest.post_key) !==
-      index,
+      packages.findIndex(
+        (candidate) =>
+          candidate.manifest.post_key.toLowerCase() === item.manifest.post_key.toLowerCase(),
+      ) !== index,
   );
   if (duplicateKey)
     throw new Error(`Duplicate post_key in batch: ${duplicateKey.manifest.post_key}`);
 
   const duplicateMedia = packages.find(
     (item, index) =>
-      packages.findIndex((candidate) => candidate.packageSha256 === item.packageSha256) !== index,
+      packages.findIndex((candidate) => candidate.mediaSha256 === item.mediaSha256) !== index,
   );
   if (duplicateMedia) {
     throw new Error(`Duplicate media package in batch: ${duplicateMedia.manifest.post_key}`);

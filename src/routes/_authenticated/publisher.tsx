@@ -26,6 +26,16 @@ import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
+const SIGNED_URL_SECONDS = 60 * 60;
+const SIGNED_URL_REFRESH_MS = 45 * 60 * 1000;
+
+function chunks<T>(items: T[], size = 50) {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
 
 export const Route = createFileRoute("/_authenticated/publisher")({
   head: () => ({
@@ -44,36 +54,40 @@ async function loadPosts() {
   const { data, error } = await supabase
     .from("content_posts")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
   if (error) throw error;
 
-  return Promise.all(
-    data.map(async (post): Promise<ReviewablePost> => {
-      const signedEntries = await Promise.all(
-        (["cover", "reel", "story"] as const).map(async (role) => {
-          const path =
-            role === "cover"
-              ? post.cover_storage_path
-              : role === "reel"
-                ? post.reel_storage_path
-                : post.story_storage_path;
-          if (!path) return [role, null] as const;
-          const { data: signed } = await supabase.storage
-            .from("ig-publish")
-            .createSignedUrl(path, 60 * 60);
-          return [role, signed?.signedUrl ?? null] as const;
-        }),
-      );
-      const signed = Object.fromEntries(signedEntries) as Record<
-        "cover" | "reel" | "story",
-        string | null
-      >;
-      return {
-        ...post,
-        coverUrl: signed.cover,
-        reelUrl: signed.reel,
-        storyUrl: signed.story,
-      };
+  const paths = [
+    ...new Set(
+      data.flatMap((post) =>
+        [post.cover_storage_path, post.reel_storage_path, post.story_storage_path].filter(
+          (path): path is string => Boolean(path),
+        ),
+      ),
+    ),
+  ];
+  const signedByPath = new Map<string, string>();
+  for (const pathChunk of chunks(paths)) {
+    const { data: signed, error: signedError } = await supabase.storage
+      .from("ig-publish")
+      .createSignedUrls(pathChunk, SIGNED_URL_SECONDS);
+    if (signedError) throw signedError;
+    for (const item of signed ?? []) {
+      if (item.signedUrl) signedByPath.set(item.path, item.signedUrl);
+    }
+  }
+
+  return data.map(
+    (post): ReviewablePost => ({
+      ...post,
+      coverUrl: post.cover_storage_path
+        ? (signedByPath.get(post.cover_storage_path) ?? null)
+        : null,
+      reelUrl: post.reel_storage_path ? (signedByPath.get(post.reel_storage_path) ?? null) : null,
+      storyUrl: post.story_storage_path
+        ? (signedByPath.get(post.story_storage_path) ?? null)
+        : null,
     }),
   );
 }
@@ -90,6 +104,7 @@ function ContentPublisherPage() {
     queryKey: ["content-posts"],
     queryFn: loadPosts,
     retry: false,
+    refetchInterval: SIGNED_URL_REFRESH_MS,
   });
 
   const decisionMutation = useMutation({
