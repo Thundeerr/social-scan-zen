@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Database } from "@/integrations/supabase/types";
+import { PublisherDryRunPanel } from "./publisher-dry-run";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 
@@ -111,6 +112,8 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
               value={post.alt_text || "Not included"}
               muted={!post.alt_text}
             />
+
+            <PublisherDryRunPanel post={post} />
 
             <section className="rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">

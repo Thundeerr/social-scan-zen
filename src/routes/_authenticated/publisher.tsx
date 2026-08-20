@@ -4,11 +4,14 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleDashed,
+  AlertTriangle,
   FileCheck2,
+  Hand,
   LockKeyhole,
   MessageSquareText,
   Send,
   ShieldCheck,
+  SkipForward,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +26,7 @@ import {
 } from "@/components/publisher/content-review-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { buildPublisherDryRun, type PublisherDryRun } from "@/lib/publisher-preflight";
 import { useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
@@ -219,86 +223,80 @@ function ContentPublisherPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {posts.map((post) => (
-            <Card key={post.id} className="overflow-hidden border-border/70 bg-card/70">
-              <div className="grid md:grid-cols-[220px_1fr]">
-                <div className="aspect-[3/4] bg-muted/30">
-                  <img
-                    src={post.coverUrl ?? "/media/T003-cover-grid.jpg"}
-                    alt="Content cover"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Badge variant="outline">{post.status.toUpperCase()}</Badge>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {post.post_key}
-                    </span>
-                  </div>
-                  <h2 className="mt-5 text-xl font-semibold tracking-tight">{post.title}</h2>
-                  <p className="mt-1 text-sm font-medium text-primary">{post.hook}</p>
-                  <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {post.caption}
-                  </p>
-
-                  <div className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-3">
-                    <Channel
-                      label={post.share_to_feed ? "Reel + Feed" : "Reel only"}
-                      ready={!!post.reel_storage_path}
+          {posts.map((post) => {
+            const dryRun = buildPublisherDryRun(post);
+            return (
+              <Card key={post.id} className="overflow-hidden border-border/70 bg-card/70">
+                <div className="grid md:grid-cols-[220px_1fr]">
+                  <div className="aspect-[3/4] bg-muted/30">
+                    <img
+                      src={post.coverUrl ?? "/media/T003-cover-grid.jpg"}
+                      alt="Content cover"
+                      className="h-full w-full object-cover"
                     />
-                    <Channel
-                      label="Story link handoff"
-                      ready={!!post.story_storage_path && !!post.story_link_url}
-                    />
-                    <Channel label="Comment" ready={!!post.first_comment} />
                   </div>
-
-                  {noteOpenFor === post.id && (
-                    <div className="mt-5 space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-medium">
-                        <MessageSquareText className="h-3.5 w-3.5" /> Change request
-                      </div>
-                      <Textarea
-                        value={reviewNote}
-                        onChange={(event) => setReviewNote(event.target.value)}
-                        placeholder="What should be improved?"
-                      />
+                  <div className="p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <StatusBadge result={dryRun} />
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {post.post_key}
+                      </span>
                     </div>
-                  )}
+                    <h2 className="mt-5 text-xl font-semibold tracking-tight">{post.title}</h2>
+                    <p className="mt-1 text-sm font-medium text-primary">{post.hook}</p>
+                    <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
+                      {post.caption}
+                    </p>
 
-                  <div className="mt-5 flex flex-wrap justify-end gap-2">
-                    <ContentReviewDialog post={post} />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (noteOpenFor === post.id)
-                          decisionMutation.mutate({ post, decision: "changes_requested" });
-                        else setNoteOpenFor(post.id);
-                      }}
-                    >
-                      {noteOpenFor === post.id ? "Save request" : "Request changes"}
-                    </Button>
-                    <Button
-                      onClick={() => decisionMutation.mutate({ post, decision: "approved" })}
-                      disabled={
-                        post.status === "approved" ||
-                        decisionMutation.isPending ||
-                        !post.cover_storage_path ||
-                        !post.reel_storage_path ||
-                        !post.story_storage_path ||
-                        !post.story_link_url ||
-                        !post.caption
-                      }
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />{" "}
-                      {post.status === "approved" ? "Approved" : "Approve for schedule"}
-                    </Button>
+                    <div className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-3">
+                      <Channel
+                        label={post.share_to_feed ? "Reel + Feed" : "Reel only"}
+                        state={dryRun.steps[0].state}
+                      />
+                      <Channel label="Story link handoff" state={dryRun.steps[2].state} />
+                      <Channel label="First comment" state={dryRun.steps[1].state} />
+                    </div>
+
+                    {noteOpenFor === post.id && (
+                      <div className="mt-5 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium">
+                          <MessageSquareText className="h-3.5 w-3.5" /> Change request
+                        </div>
+                        <Textarea
+                          value={reviewNote}
+                          onChange={(event) => setReviewNote(event.target.value)}
+                          placeholder="What should be improved?"
+                        />
+                      </div>
+                    )}
+
+                    <div className="mt-5 flex flex-wrap justify-end gap-2">
+                      <ContentReviewDialog post={post} />
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (noteOpenFor === post.id)
+                            decisionMutation.mutate({ post, decision: "changes_requested" });
+                          else setNoteOpenFor(post.id);
+                        }}
+                      >
+                        {noteOpenFor === post.id ? "Save request" : "Request changes"}
+                      </Button>
+                      <Button
+                        onClick={() => decisionMutation.mutate({ post, decision: "approved" })}
+                        disabled={
+                          post.status === "approved" || decisionMutation.isPending || !dryRun.ready
+                        }
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />{" "}
+                        {post.status === "approved" ? "Approved" : "Approve for schedule"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -331,12 +329,39 @@ function QueueMetric({
   );
 }
 
-function Channel({ label, ready }: { label: string; ready: boolean }) {
+function StatusBadge({ result }: { result: PublisherDryRun }) {
+  const tone = {
+    success: "border-emerald-500/30 text-emerald-300",
+    warning: "border-amber-500/30 text-amber-300",
+    danger: "border-red-500/30 text-red-300",
+    neutral: "border-primary/30 text-primary",
+  }[result.statusTone];
+  return (
+    <Badge variant="outline" className={tone}>
+      {result.statusLabel}
+      {result.blockers.length > 0 ? ` · ${result.blockers.length}` : ""}
+    </Badge>
+  );
+}
+
+function Channel({
+  label,
+  state,
+}: {
+  label: string;
+  state: "ready" | "blocked" | "skipped" | "manual";
+}) {
   return (
     <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/40 px-3 py-2 text-xs">
       <span>{label}</span>
-      {ready ? (
+      {state === "ready" ? (
         <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+      ) : state === "manual" ? (
+        <Hand className="h-3.5 w-3.5 text-primary" />
+      ) : state === "skipped" ? (
+        <SkipForward className="h-3.5 w-3.5 text-muted-foreground" />
+      ) : state === "blocked" ? (
+        <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
       ) : (
         <CircleDashed className="h-3.5 w-3.5 text-muted-foreground" />
       )}
