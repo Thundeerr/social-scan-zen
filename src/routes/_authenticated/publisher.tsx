@@ -4,7 +4,6 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleDashed,
-  Clapperboard,
   FileCheck2,
   LockKeyhole,
   MessageSquareText,
@@ -17,6 +16,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { ContentBatchImport } from "@/components/publisher/content-batch-import";
+import {
+  ContentReviewDialog,
+  type ReviewablePost,
+} from "@/components/publisher/content-review-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { useState } from "react";
@@ -42,7 +46,36 @@ async function loadPosts() {
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data;
+
+  return Promise.all(
+    data.map(async (post): Promise<ReviewablePost> => {
+      const signedEntries = await Promise.all(
+        (["cover", "reel", "story"] as const).map(async (role) => {
+          const path =
+            role === "cover"
+              ? post.cover_storage_path
+              : role === "reel"
+                ? post.reel_storage_path
+                : post.story_storage_path;
+          if (!path) return [role, null] as const;
+          const { data: signed } = await supabase.storage
+            .from("ig-publish")
+            .createSignedUrl(path, 60 * 60);
+          return [role, signed?.signedUrl ?? null] as const;
+        }),
+      );
+      const signed = Object.fromEntries(signedEntries) as Record<
+        "cover" | "reel" | "story",
+        string | null
+      >;
+      return {
+        ...post,
+        coverUrl: signed.cover,
+        reelUrl: signed.reel,
+        storyUrl: signed.story,
+      };
+    }),
+  );
 }
 
 function ContentPublisherPage() {
@@ -57,29 +90,6 @@ function ContentPublisherPage() {
     queryKey: ["content-posts"],
     queryFn: loadPosts,
     retry: false,
-  });
-
-  const seedMutation = useMutation({
-    mutationFn: async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) throw new Error("No active operator session");
-      const { error: insertError } = await supabase.from("content_posts").insert({
-        user_id: auth.user.id,
-        post_key: "T003-live-001",
-        title: "Live Follower Tracker",
-        hook: "Watch it grow.",
-        caption:
-          "Watching a follower count once tells you almost nothing. Watching it move live shows you exactly when momentum starts.",
-        first_comment: "Try the Live Follower Tracker on FollowerStar.",
-        status: "review",
-      });
-      if (insertError) throw insertError;
-    },
-    onSuccess: () => {
-      toast.success("T003 is ready for review");
-      qc.invalidateQueries({ queryKey: ["content-posts"] });
-    },
-    onError: () => toast.error("Apply the prepared database migration first."),
   });
 
   const decisionMutation = useMutation({
@@ -147,17 +157,21 @@ function ContentPublisherPage() {
         <QueueMetric label="Published" value={counts.published} icon={Send} />
       </div>
 
+      <ContentBatchImport
+        onImported={() => qc.invalidateQueries({ queryKey: ["content-posts"] })}
+      />
+
       {error && (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
             <div>
-              <p className="text-sm font-medium">Publisher database upgrade is prepared</p>
+              <p className="text-sm font-medium">Publisher could not load the review queue</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                The new tables are still local and have not changed the live InstaScanner database.
+                Your content is unchanged. Check the connection and reload the page.
               </p>
             </div>
             <Badge variant="outline" className="border-amber-500/30 text-amber-300">
-              Safe preview
+              Nothing published
             </Badge>
           </CardContent>
         </Card>
@@ -175,21 +189,16 @@ function ContentPublisherPage() {
             </div>
             <div className="flex flex-col justify-center p-6 md:p-8">
               <Badge variant="outline" className="mb-4 w-fit border-primary/30 text-primary">
-                LOCAL PACKAGE READY
+                READY FOR YOUR FIRST BATCH
               </Badge>
-              <h2 className="text-2xl font-semibold tracking-tight">Live Follower Tracker</h2>
-              <p className="mt-2 text-sm font-medium text-primary">Watch it grow.</p>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-                T003-live-001 already contains the viral cover, Reel, Story plan, caption and first
-                comment. Connect it to the shared queue after the database upgrade is approved.
+              <h2 className="text-2xl font-semibold tracking-tight">No packages to review yet</h2>
+              <p className="mt-2 text-sm font-medium text-primary">
+                Import once. Review everything.
               </p>
-              <Button
-                className="mt-6 w-fit"
-                onClick={() => seedMutation.mutate()}
-                disabled={seedMutation.isPending || !!error}
-              >
-                <Clapperboard className="mr-2 h-4 w-4" /> Add first package
-              </Button>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
+                Use the private batch importer above. InstaScanner checks every manifest, cover,
+                Reel and Story before anything reaches this review queue.
+              </p>
             </div>
           </div>
         </Card>
@@ -200,7 +209,7 @@ function ContentPublisherPage() {
               <div className="grid md:grid-cols-[220px_1fr]">
                 <div className="aspect-[3/4] bg-muted/30">
                   <img
-                    src="/media/T003-cover-grid.jpg"
+                    src={post.coverUrl ?? "/media/T003-cover-grid.jpg"}
                     alt="Content cover"
                     className="h-full w-full object-cover"
                   />
@@ -239,6 +248,7 @@ function ContentPublisherPage() {
                   )}
 
                   <div className="mt-5 flex flex-wrap justify-end gap-2">
+                    <ContentReviewDialog post={post} />
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -251,7 +261,14 @@ function ContentPublisherPage() {
                     </Button>
                     <Button
                       onClick={() => decisionMutation.mutate({ post, decision: "approved" })}
-                      disabled={post.status === "approved" || decisionMutation.isPending}
+                      disabled={
+                        post.status === "approved" ||
+                        decisionMutation.isPending ||
+                        !post.cover_storage_path ||
+                        !post.reel_storage_path ||
+                        !post.story_storage_path ||
+                        !post.caption
+                      }
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />{" "}
                       {post.status === "approved" ? "Approved" : "Approve for schedule"}

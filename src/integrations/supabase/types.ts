@@ -262,14 +262,20 @@ export type Database = {
       }
       content_posts: {
         Row: {
+          alt_text: string
           approved_at: string | null
           approved_by: string | null
+          batch_key: string | null
           caption: string
+          content_pillar: string
           cover_storage_path: string | null
           created_at: string
           first_comment: string
           hook: string
           id: string
+          imported_at: string | null
+          manifest_version: number
+          media_manifest: Json
           media_sha256: string | null
           post_key: string
           reel_storage_path: string | null
@@ -280,16 +286,23 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          quality_report: Json
         }
         Insert: {
+          alt_text?: string
           approved_at?: string | null
           approved_by?: string | null
+          batch_key?: string | null
           caption?: string
+          content_pillar?: string
           cover_storage_path?: string | null
           created_at?: string
           first_comment?: string
           hook?: string
           id?: string
+          imported_at?: string | null
+          manifest_version?: number
+          media_manifest?: Json
           media_sha256?: string | null
           post_key: string
           reel_storage_path?: string | null
@@ -300,16 +313,23 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          quality_report?: Json
         }
         Update: {
+          alt_text?: string
           approved_at?: string | null
           approved_by?: string | null
+          batch_key?: string | null
           caption?: string
+          content_pillar?: string
           cover_storage_path?: string | null
           created_at?: string
           first_comment?: string
           hook?: string
           id?: string
+          imported_at?: string | null
+          manifest_version?: number
+          media_manifest?: Json
           media_sha256?: string | null
           post_key?: string
           reel_storage_path?: string | null
@@ -320,6 +340,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          quality_report?: Json
         }
         Relationships: []
       }
