@@ -1,4 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// Edge-runtime types come from the Deno runtime itself; the jsr type import is
+// intentionally omitted because it transitively requires npm:openai.
 import { createClient } from "npm:@supabase/supabase-js@2.110.0";
 import { buildReelContainerFields } from "../_shared/instagram-reel.ts";
 
