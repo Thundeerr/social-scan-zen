@@ -31,13 +31,18 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { buildPublisherDryRun, type PublisherDryRun } from "@/lib/publisher-preflight";
-import { useState } from "react";
+import { connectionHealth } from "@/lib/instagram-oauth";
+import {
+  disconnectInstagramFn,
+  startInstagramOAuthFn,
+} from "@/lib/instagram-oauth.functions";
+import { useEffect, useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 type ContentPublication = Database["public"]["Tables"]["content_publications"]["Row"];
 type InstagramConnection = Pick<
   Database["public"]["Tables"]["ig_connections"]["Row"],
-  "ig_username" | "token_expires_at" | "status" | "last_error"
+  "ig_username" | "token_expires_at" | "status" | "last_error" | "login_type"
 >;
 const SIGNED_URL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_MS = 45 * 60 * 1000;
@@ -129,7 +134,7 @@ async function loadPosts() {
 async function loadInstagramConnection(): Promise<InstagramConnection | null> {
   const { data, error } = await supabase
     .from("ig_connections")
-    .select("ig_username,token_expires_at,status,last_error")
+    .select("ig_username,token_expires_at,status,last_error,login_type")
     .maybeSingle();
   if (error) throw error;
   return data;
@@ -137,6 +142,25 @@ async function loadInstagramConnection(): Promise<InstagramConnection | null> {
 
 function ContentPublisherPage() {
   const qc = useQueryClient();
+
+  // OAuth return: surface the outcome, then scrub the params from the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("ig");
+    const oauthError = params.get("ig_error");
+    if (!connected && !oauthError) return;
+    if (connected === "connected") {
+      const username = params.get("ig_user");
+      toast.success(
+        username ? `@${username} · connected. Publishing stays paused.` : "Instagram connected",
+      );
+      qc.invalidateQueries({ queryKey: ["publisher-instagram-connection"] });
+    } else if (oauthError) {
+      toast.error(oauthError);
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [qc]);
+
   const [reviewNote, setReviewNote] = useState("");
   const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);
   const [scheduleOpenFor, setScheduleOpenFor] = useState<string | null>(null);
@@ -564,18 +588,47 @@ function InstagramConnectionCard({
   unavailable: boolean;
   loading: boolean;
 }) {
+  const qc = useQueryClient();
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+
+  const connectMutation = useMutation({
+    mutationFn: async () => startInstagramOAuthFn(),
+    onSuccess: ({ authorizeUrl }) => {
+      window.location.assign(authorizeUrl);
+    },
+    onError: (mutationError) =>
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Could not start authorization",
+      ),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => disconnectInstagramFn(),
+    onSuccess: () => {
+      setConfirmDisconnect(false);
+      toast.success("Instagram disconnected. Publishing stays paused.");
+      qc.invalidateQueries({ queryKey: ["publisher-instagram-connection"] });
+    },
+    onError: (mutationError) =>
+      toast.error(mutationError instanceof Error ? mutationError.message : "Disconnect failed"),
+  });
+
   if (loading) return null;
 
+  const health = connectionHealth({
+    status: connection?.status,
+    tokenExpiresAt: connection?.token_expires_at,
+  });
+  const isActive = health.healthy;
+  const needsAttention = health.needsAttention;
   const expiresAt = connection ? new Date(connection.token_expires_at) : null;
-  const remainingMs = expiresAt ? expiresAt.getTime() - Date.now() : 0;
-  const isActive = connection?.status === "active" && remainingMs > 6 * 60 * 60 * 1000;
-  const needsAttention = !isActive || remainingMs < 14 * 24 * 60 * 60 * 1000;
   const expiryLabel = expiresAt
     ? new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(expiresAt)
     : null;
+  const busy = connectMutation.isPending || disconnectMutation.isPending;
 
   return (
     <Card
@@ -602,26 +655,73 @@ function InstagramConnectionCard({
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {connection && expiryLabel
-                ? `Credential valid until ${expiryLabel}. Scheduling is blocked if it would expire before publishing.`
-                : "Connect Instagram before scheduling. Nothing can publish while this check is unhealthy."}
+                ? `${connection.login_type === "facebook_login" ? "Facebook Login" : "Instagram Business Login"} · credential valid until ${expiryLabel}. Scheduling is blocked if it would expire before publishing.`
+                : "Connect Instagram before scheduling. Connecting only authorizes the account — it never publishes anything, and publishing stays paused."}
             </p>
             {connection?.last_error ? (
               <p className="mt-1 text-xs text-amber-200">
                 Last connection error: {connection.last_error}
               </p>
             ) : null}
+            {confirmDisconnect ? (
+              <p className="mt-2 text-xs text-amber-200">
+                Disconnect @{connection?.ig_username}? Content history and media stay untouched;
+                publishing is paused first. Confirm to continue.
+              </p>
+            ) : null}
           </div>
         </div>
-        <Badge
-          variant="outline"
-          className={
-            needsAttention
-              ? "border-amber-500/30 text-amber-300"
-              : "border-emerald-500/30 text-emerald-300"
-          }
-        >
-          {needsAttention ? "CHECK BEFORE BATCH" : "READY FOR SCHEDULES"}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            variant="outline"
+            className={
+              needsAttention
+                ? "border-amber-500/30 text-amber-300"
+                : "border-emerald-500/30 text-emerald-300"
+            }
+          >
+            {needsAttention ? "CHECK BEFORE BATCH" : "READY FOR SCHEDULES"}
+          </Badge>
+          <Button size="sm" disabled={busy} onClick={() => connectMutation.mutate()}>
+            {connectMutation.isPending ? (
+              <LoaderCircle className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Instagram className="mr-2 h-3.5 w-3.5" />
+            )}
+            {connection ? "Reconnect Instagram" : "Connect Instagram"}
+          </Button>
+          {connection ? (
+            confirmDisconnect ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => disconnectMutation.mutate()}
+                >
+                  Confirm disconnect
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setConfirmDisconnect(false)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setConfirmDisconnect(true)}
+              >
+                Disconnect
+              </Button>
+            )
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );
