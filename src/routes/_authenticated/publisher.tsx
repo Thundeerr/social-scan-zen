@@ -142,6 +142,25 @@ async function loadInstagramConnection(): Promise<InstagramConnection | null> {
 
 function ContentPublisherPage() {
   const qc = useQueryClient();
+
+  // OAuth return: surface the outcome, then scrub the params from the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("ig");
+    const oauthError = params.get("ig_error");
+    if (!connected && !oauthError) return;
+    if (connected === "connected") {
+      const username = params.get("ig_user");
+      toast.success(
+        username ? `@${username} · connected. Publishing stays paused.` : "Instagram connected",
+      );
+      qc.invalidateQueries({ queryKey: ["publisher-instagram-connection"] });
+    } else if (oauthError) {
+      toast.error(oauthError);
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [qc]);
+
   const [reviewNote, setReviewNote] = useState("");
   const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);
   const [scheduleOpenFor, setScheduleOpenFor] = useState<string | null>(null);
