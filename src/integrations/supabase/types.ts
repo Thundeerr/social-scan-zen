@@ -356,6 +356,7 @@ export type Database = {
           platform_container_id: string | null
           platform_media_id: string | null
           published_at: string | null
+          depends_on_channel: string | null
           status: string
           updated_at: string
         }
@@ -370,6 +371,7 @@ export type Database = {
           platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
+          depends_on_channel?: string | null
           status?: string
           updated_at?: string
         }
@@ -384,6 +386,7 @@ export type Database = {
           platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
+          depends_on_channel?: string | null
           status?: string
           updated_at?: string
         }
@@ -684,6 +687,7 @@ export type Database = {
       }
       ig_connections: {
         Row: {
+          api_base_url: string
           created_at: string
           id: string
           ig_user_id: string
@@ -697,6 +701,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          api_base_url?: string
           created_at?: string
           id?: string
           ig_user_id: string
@@ -710,6 +715,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          api_base_url?: string
           created_at?: string
           id?: string
           ig_user_id?: string
@@ -1553,6 +1559,10 @@ export type Database = {
     }
     Functions: {
       can_access_asset: { Args: { _asset_id: string }; Returns: boolean }
+      confirm_content_handoff: {
+        Args: { _channel: string; _content_post_id: string }
+        Returns: undefined
+      }
       claim_due_monitor_accounts: {
         Args: { _limit?: number; _stale_after_minutes?: number }
         Returns: {
@@ -1598,6 +1608,10 @@ export type Database = {
       }
       review_content_post: {
         Args: { _content_post_id: string; _decision: string; _note?: string }
+        Returns: undefined
+      }
+      schedule_content_post: {
+        Args: { _content_post_id: string; _scheduled_for: string }
         Returns: undefined
       }
     }

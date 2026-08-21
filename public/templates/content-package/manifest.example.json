@@ -7,6 +7,12 @@
   "first_comment": "Optional first comment with a natural follow-up CTA.",
   "alt_text": "Accessible description of the video and its key on-screen message.",
   "content_pillar": "Product showcase",
+  "highlight_enabled": true,
+  "highlight_name": "Free Tools",
+  "share_to_feed": true,
+  "story_publish_mode": "manual_link_sticker",
+  "story_link_url": "https://followerstar.com/tools/example",
+  "story_link_label": "Try it free",
   "files": {
     "cover": "cover.jpg",
     "reel": "reel.mp4",
