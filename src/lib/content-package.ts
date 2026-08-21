@@ -573,4 +573,3 @@ export async function prepareContentBatch(
 export function packageHasErrors(prepared: PreparedContentPackage) {
   return prepared.issues.some((issue) => issue.severity === "error");
 }
-

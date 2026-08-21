@@ -335,4 +335,3 @@ function CopySection({
     </section>
   );
 }
-

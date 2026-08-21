@@ -462,4 +462,3 @@ SELECT cron.schedule(
     );
   $cron$
 );
-

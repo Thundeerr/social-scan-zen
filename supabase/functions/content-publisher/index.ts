@@ -489,4 +489,3 @@ Deno.serve(async (request: Request) => {
     return response({ ok: false, post_id: claimedId, error: message, cleaned }, 500);
   }
 });
-

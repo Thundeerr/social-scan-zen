@@ -470,4 +470,3 @@ export function ContentBatchImport({ onImported }: Props) {
     </Card>
   );
 }
-
