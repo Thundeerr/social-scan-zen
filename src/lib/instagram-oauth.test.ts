@@ -9,7 +9,7 @@ import {
   parseCallbackParams,
   redactSecrets,
 } from "./instagram-oauth";
-import { consumeOAuthState } from "./instagram-oauth.server";
+import { consumeOAuthState, normalizeGrantedPermissions } from "./instagram-oauth.server";
 
 describe("authorize url", () => {
   it("requests exactly the supported permissions", () => {
@@ -74,6 +74,29 @@ describe("scopes", () => {
       "instagram_business_content_publish",
     );
     expect(missingScopes([...IG_SCOPES])).toEqual([]);
+  });
+});
+
+describe("token permissions", () => {
+  it("accepts the array returned by Instagram Login", () => {
+    expect(
+      normalizeGrantedPermissions([
+        "instagram_business_basic",
+        "instagram_business_content_publish",
+      ]),
+    ).toEqual(["instagram_business_basic", "instagram_business_content_publish"]);
+  });
+
+  it("keeps compatibility with comma-separated responses", () => {
+    expect(
+      normalizeGrantedPermissions(
+        "instagram_business_basic, instagram_business_manage_comments",
+      ),
+    ).toEqual(["instagram_business_basic", "instagram_business_manage_comments"]);
+  });
+
+  it("treats an unexpected shape as no reported permissions", () => {
+    expect(normalizeGrantedPermissions({ invalid: true })).toEqual([]);
   });
 });
 

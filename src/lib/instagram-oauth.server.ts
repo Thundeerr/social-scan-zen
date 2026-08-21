@@ -71,7 +71,24 @@ export async function consumeOAuthState(
   return { userId: data.user_id, redirectUri: data.redirect_uri };
 }
 
-type TokenResponse = { access_token: string; user_id?: string | number; permissions?: string };
+type TokenResponse = {
+  access_token: string;
+  user_id?: string | number;
+  permissions?: unknown;
+};
+
+export function normalizeGrantedPermissions(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
+
+  return raw
+    .filter((scope): scope is string => typeof scope === "string")
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+}
 
 async function readJson(response: Response, label: string) {
   const text = await response.text();
@@ -111,10 +128,7 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   return {
     accessToken: payload.access_token,
     igUserId: payload.user_id != null ? String(payload.user_id) : null,
-    permissions: (payload.permissions ?? "")
-      .split(",")
-      .map((scope) => scope.trim())
-      .filter(Boolean),
+    permissions: normalizeGrantedPermissions(payload.permissions),
   };
 }
 
