@@ -254,12 +254,12 @@ function validatePreparedPackage(
   const vertical = 9 / 16;
   const coverRatio = 420 / 654;
 
-  if (!["image/jpeg", "image/png", "image/webp"].includes(media.cover.contentType)) {
+  if (media.cover.contentType !== "image/jpeg") {
     issues.push({
       severity: "error",
       code: "cover_type",
       label: "Cover format",
-      detail: "Cover must be JPG, PNG or WebP.",
+      detail: "Cover must be JPG so Instagram can use it as the Reel cover.",
     });
   } else if (media.cover.width < 420 || media.cover.height < 654) {
     issues.push({
