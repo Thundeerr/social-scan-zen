@@ -33,6 +33,10 @@ import type { Database } from "@/integrations/supabase/types";
 import { buildPublisherDryRun, type PublisherDryRun } from "@/lib/publisher-preflight";
 import { connectionHealth } from "@/lib/instagram-oauth";
 import { disconnectInstagramFn, startInstagramOAuthFn } from "@/lib/instagram-oauth.functions";
+import {
+  PublishingSwitchCard,
+  usePublishingPaused,
+} from "@/components/publisher/publishing-switch";
 import { useEffect, useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
@@ -191,6 +195,9 @@ function ContentPublisherPage() {
     refetchInterval: SIGNED_URL_REFRESH_MS,
   });
 
+  const { data: publishingPaused } = usePublishingPaused();
+  const isPaused = publishingPaused !== false;
+
   const decisionMutation = useMutation({
     mutationFn: async ({
       post,
@@ -226,6 +233,9 @@ function ContentPublisherPage() {
 
   const scheduleMutation = useMutation({
     mutationFn: async ({ post, scheduledFor }: { post: ContentPost; scheduledFor: string }) => {
+      if (isPaused) {
+        throw new Error("Publishing is paused. Resume cloud publishing before scheduling.");
+      }
       const { error: scheduleError } = await supabase.rpc("schedule_content_post", {
         _content_post_id: post.id,
         _scheduled_for: scheduledFor,
@@ -239,10 +249,15 @@ function ContentPublisherPage() {
       setScheduleValue("");
       qc.invalidateQueries({ queryKey: ["content-posts"] });
     },
-    onError: (mutationError) =>
+    onError: (mutationError) => {
+      const raw =
+        mutationError instanceof Error ? mutationError.message : "Schedule could not be saved";
       toast.error(
-        mutationError instanceof Error ? mutationError.message : "Schedule could not be saved",
-      ),
+        /publishing is paused/i.test(raw)
+          ? "Publishing is paused. Resume cloud publishing before scheduling."
+          : raw,
+      );
+    },
   });
 
   const handoffMutation = useMutation({
@@ -297,6 +312,8 @@ function ContentPublisherPage() {
           <CloudCog className="h-3.5 w-3.5" /> Cloud publisher
         </div>
       </div>
+
+      <PublishingSwitchCard />
 
       <InstagramConnectionCard
         connection={instagramConnection ?? null}
@@ -466,6 +483,14 @@ function ContentPublisherPage() {
                     {scheduleOpenFor === post.id && (
                       <div className="mt-5 rounded-lg border border-primary/25 bg-primary/[0.05] p-4">
                         <div className="text-xs font-medium">Choose publishing time</div>
+                        {isPaused ? (
+                          <p className="mt-1 text-[11px] leading-4 text-amber-200">
+                            Publishing is paused. Resume cloud publishing before scheduling.{" "}
+                            <a href="#publishing-switch" className="underline underline-offset-2">
+                              Go to Resume publishing
+                            </a>
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
                           Your browser and laptop can be offline when this time arrives.
                         </p>
@@ -485,7 +510,7 @@ function ContentPublisherPage() {
                                 scheduledFor: new Date().toISOString(),
                               })
                             }
-                            disabled={scheduleMutation.isPending}
+                            disabled={isPaused || scheduleMutation.isPending}
                           >
                             Publish now
                           </Button>
@@ -501,7 +526,7 @@ function ContentPublisherPage() {
                                 scheduledFor: scheduledFor.toISOString(),
                               });
                             }}
-                            disabled={!scheduleValue || scheduleMutation.isPending}
+                            disabled={isPaused || !scheduleValue || scheduleMutation.isPending}
                           >
                             {scheduleMutation.isPending ? (
                               <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
