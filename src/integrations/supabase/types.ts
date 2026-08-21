@@ -271,13 +271,22 @@ export type Database = {
           cover_storage_path: string | null
           created_at: string
           first_comment: string
+          highlight_enabled: boolean
+          highlight_name: string
           hook: string
           id: string
           imported_at: string | null
+          last_publish_error: string | null
           manifest_version: number
+          media_cleaned_at: string | null
+          media_cleanup_after: string | null
           media_manifest: Json
           media_sha256: string | null
           post_key: string
+          publish_attempts: number
+          publish_lease_until: string | null
+          publish_started_at: string | null
+          published_at: string | null
           quality_report: Json
           reel_storage_path: string | null
           review_note: string | null
@@ -302,13 +311,22 @@ export type Database = {
           cover_storage_path?: string | null
           created_at?: string
           first_comment?: string
+          highlight_enabled?: boolean
+          highlight_name?: string
           hook?: string
           id?: string
           imported_at?: string | null
+          last_publish_error?: string | null
           manifest_version?: number
+          media_cleaned_at?: string | null
+          media_cleanup_after?: string | null
           media_manifest?: Json
           media_sha256?: string | null
           post_key: string
+          publish_attempts?: number
+          publish_lease_until?: string | null
+          publish_started_at?: string | null
+          published_at?: string | null
           quality_report?: Json
           reel_storage_path?: string | null
           review_note?: string | null
@@ -333,13 +351,22 @@ export type Database = {
           cover_storage_path?: string | null
           created_at?: string
           first_comment?: string
+          highlight_enabled?: boolean
+          highlight_name?: string
           hook?: string
           id?: string
           imported_at?: string | null
+          last_publish_error?: string | null
           manifest_version?: number
+          media_cleaned_at?: string | null
+          media_cleanup_after?: string | null
           media_manifest?: Json
           media_sha256?: string | null
           post_key?: string
+          publish_attempts?: number
+          publish_lease_until?: string | null
+          publish_started_at?: string | null
+          published_at?: string | null
           quality_report?: Json
           reel_storage_path?: string | null
           review_note?: string | null
@@ -699,6 +726,7 @@ export type Database = {
       }
       ig_connections: {
         Row: {
+          api_base_url: string
           created_at: string
           id: string
           ig_user_id: string
@@ -712,6 +740,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          api_base_url?: string
           created_at?: string
           id?: string
           ig_user_id: string
@@ -725,6 +754,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          api_base_url?: string
           created_at?: string
           id?: string
           ig_user_id?: string
@@ -1568,6 +1598,10 @@ export type Database = {
     }
     Functions: {
       can_access_asset: { Args: { _asset_id: string }; Returns: boolean }
+      claim_due_content_post: {
+        Args: { _content_post_id?: string; _user_id?: string }
+        Returns: string
+      }
       claim_due_monitor_accounts: {
         Args: { _limit?: number; _stale_after_minutes?: number }
         Returns: {
@@ -1596,6 +1630,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      confirm_content_handoff: {
+        Args: { _channel: string; _content_post_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1611,9 +1649,21 @@ export type Database = {
         Args: { _end: string; _start: string }
         Returns: Json
       }
+      release_content_publish_lease: {
+        Args: { _content_post_id: string }
+        Returns: undefined
+      }
       review_content_post: {
         Args: { _content_post_id: string; _decision: string; _note?: string }
         Returns: undefined
+      }
+      schedule_content_post: {
+        Args: { _content_post_id: string; _scheduled_for: string }
+        Returns: undefined
+      }
+      verify_publisher_cron_secret: {
+        Args: { _candidate: string }
+        Returns: boolean
       }
     }
     Enums: {
