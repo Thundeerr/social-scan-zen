@@ -153,7 +153,9 @@ function ContentPublisherPage() {
       );
       qc.invalidateQueries({ queryKey: ["publisher-instagram-connection"] });
     } else if (oauthError) {
-      toast.error(oauthError);
+      toast.error(
+        `${oauthError} Meta callback must be exactly https://instascanner.app/api/public/instagram/callback`,
+      );
     }
     window.history.replaceState({}, "", window.location.pathname);
   }, [qc]);
