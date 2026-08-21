@@ -209,9 +209,11 @@ BEGIN
     SELECT 1 FROM public.ig_connections
     WHERE user_id = _actor
       AND status = 'active'
-      AND token_expires_at > now() + interval '1 hour'
+      -- Do not accept a future schedule which is already known to outlive
+      -- its credential. Keep a six-hour buffer for Meta processing/retries.
+      AND token_expires_at > GREATEST(_scheduled_for, now()) + interval '6 hours'
   ) THEN
-    RAISE EXCEPTION 'A healthy Instagram connection is required';
+    RAISE EXCEPTION 'Instagram must stay connected until at least six hours after publishing';
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.profiles
@@ -458,7 +460,9 @@ SELECT cron.schedule(
         )
       ),
       body := '{"source":"pg_cron"}'::jsonb,
-      timeout_milliseconds := 10000
+      -- A single Meta request may take 20 seconds and a worker tick can make
+      -- more than one. Do not let pg_net abort a healthy run prematurely.
+      timeout_milliseconds := 60000
     );
   $cron$
 );

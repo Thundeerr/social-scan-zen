@@ -35,6 +35,10 @@ import { useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 type ContentPublication = Database["public"]["Tables"]["content_publications"]["Row"];
+type InstagramConnection = Pick<
+  Database["public"]["Tables"]["ig_connections"]["Row"],
+  "ig_username" | "token_expires_at" | "status" | "last_error"
+>;
 const SIGNED_URL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_MS = 45 * 60 * 1000;
 
@@ -122,6 +126,15 @@ async function loadPosts() {
   );
 }
 
+async function loadInstagramConnection(): Promise<InstagramConnection | null> {
+  const { data, error } = await supabase
+    .from("ig_connections")
+    .select("ig_username,token_expires_at,status,last_error")
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 function ContentPublisherPage() {
   const qc = useQueryClient();
   const [reviewNote, setReviewNote] = useState("");
@@ -145,6 +158,16 @@ function ContentPublisherPage() {
       });
       return needsLiveProgress ? 15_000 : SIGNED_URL_REFRESH_MS;
     },
+  });
+  const {
+    data: instagramConnection,
+    error: instagramConnectionError,
+    isLoading: instagramConnectionLoading,
+  } = useQuery({
+    queryKey: ["publisher-instagram-connection"],
+    queryFn: loadInstagramConnection,
+    retry: false,
+    refetchInterval: SIGNED_URL_REFRESH_MS,
   });
 
   const decisionMutation = useMutation({
@@ -245,14 +268,20 @@ function ContentPublisherPage() {
           </div>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Content Publisher</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Review the batch twice a month. InstaScanner prepares one Reel for Reels + Feed, the
-            first comment and a Story link handoff.
+            Review the batch twice a month. InstaScanner prepares one Reel for the Reels tab, the
+            first comment and a Story or link-sticker handoff.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.15em] text-emerald-300">
           <CloudCog className="h-3.5 w-3.5" /> Cloud publisher
         </div>
       </div>
+
+      <InstagramConnectionCard
+        connection={instagramConnection ?? null}
+        unavailable={Boolean(instagramConnectionError)}
+        loading={instagramConnectionLoading}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <QueueMetric label="To review" value={counts.review} icon={FileCheck2} tone="primary" />
@@ -523,6 +552,78 @@ function ContentPublisherPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function InstagramConnectionCard({
+  connection,
+  unavailable,
+  loading,
+}: {
+  connection: InstagramConnection | null;
+  unavailable: boolean;
+  loading: boolean;
+}) {
+  if (loading) return null;
+
+  const expiresAt = connection ? new Date(connection.token_expires_at) : null;
+  const remainingMs = expiresAt ? expiresAt.getTime() - Date.now() : 0;
+  const isActive = connection?.status === "active" && remainingMs > 6 * 60 * 60 * 1000;
+  const needsAttention = !isActive || remainingMs < 14 * 24 * 60 * 60 * 1000;
+  const expiryLabel = expiresAt
+    ? new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(expiresAt)
+    : null;
+
+  return (
+    <Card
+      className={
+        needsAttention
+          ? "border-amber-500/30 bg-amber-500/[0.05]"
+          : "border-emerald-500/25 bg-emerald-500/[0.04]"
+      }
+    >
+      <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+        <div className="flex min-w-0 items-start gap-3">
+          {needsAttention ? (
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          ) : (
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+          )}
+          <div>
+            <p className="text-sm font-medium">
+              {unavailable
+                ? "Instagram connection status is unavailable"
+                : connection
+                  ? `@${connection.ig_username} · ${isActive ? "connected" : "action required"}`
+                  : "Instagram is not connected"}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {connection && expiryLabel
+                ? `Credential valid until ${expiryLabel}. Scheduling is blocked if it would expire before publishing.`
+                : "Connect Instagram before scheduling. Nothing can publish while this check is unhealthy."}
+            </p>
+            {connection?.last_error ? (
+              <p className="mt-1 text-xs text-amber-200">
+                Last connection error: {connection.last_error}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <Badge
+          variant="outline"
+          className={
+            needsAttention
+              ? "border-amber-500/30 text-amber-300"
+              : "border-emerald-500/30 text-emerald-300"
+          }
+        >
+          {needsAttention ? "CHECK BEFORE BATCH" : "READY FOR SCHEDULES"}
+        </Badge>
+      </CardContent>
+    </Card>
   );
 }
 
