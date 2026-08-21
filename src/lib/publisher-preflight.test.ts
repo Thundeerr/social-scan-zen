@@ -6,6 +6,8 @@ const completePost: PublisherPreflightPost = {
   caption: "Track Instagram follower growth live with FollowerStar.",
   cover_storage_path: "user/post/cover.jpg",
   first_comment: "Try the free tracker through the link in our bio.",
+  highlight_enabled: true,
+  highlight_name: "Free Tools",
   media_manifest: {
     reel: { width: 1080, height: 1920, durationSeconds: 20, bytes: 10_000_000 },
     story: { width: 1080, height: 1920, durationSeconds: 20, bytes: 9_000_000 },
@@ -32,6 +34,7 @@ describe("buildPublisherDryRun", () => {
       ["reel", "ready", null],
       ["first_comment", "ready", "reel"],
       ["story_handoff", "manual", null],
+      ["highlight_handoff", "manual", "story_handoff"],
     ]);
   });
 
@@ -39,6 +42,22 @@ describe("buildPublisherDryRun", () => {
     const result = buildPublisherDryRun({ ...completePost, first_comment: "" });
     expect(result.ready).toBe(true);
     expect(result.steps[1].state).toBe("skipped");
+  });
+
+  it("builds an automatic Story step without requiring a link", () => {
+    const result = buildPublisherDryRun({
+      ...completePost,
+      share_to_feed: false,
+      story_link_url: "",
+      story_publish_mode: "automatic_no_link",
+    });
+    expect(result.ready).toBe(true);
+    expect(result.steps.map((step) => [step.channel, step.state])).toEqual([
+      ["reel", "ready"],
+      ["first_comment", "ready"],
+      ["story", "ready"],
+      ["highlight_handoff", "manual"],
+    ]);
   });
 
   it("blocks missing assets and invalid Story links", () => {
@@ -81,3 +100,4 @@ describe("buildPublisherDryRun", () => {
     vi.useRealTimers();
   });
 });
+

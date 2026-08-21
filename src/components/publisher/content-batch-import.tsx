@@ -221,10 +221,12 @@ export function ContentBatchImport({ onImported }: Props) {
             first_comment: item.manifest.first_comment,
             alt_text: item.manifest.alt_text,
             content_pillar: item.manifest.content_pillar,
+            highlight_enabled: item.manifest.highlight_enabled,
+            highlight_name: item.manifest.highlight_name,
             share_to_feed: item.manifest.share_to_feed,
             story_link_url: item.manifest.story_link_url,
             story_link_label: item.manifest.story_link_label,
-            story_publish_mode: "manual_link_sticker",
+            story_publish_mode: item.manifest.story_publish_mode,
             manifest_version: item.manifest.version,
             batch_key: sharedBatchId,
             cover_storage_path: paths.cover,
@@ -468,3 +470,4 @@ export function ContentBatchImport({ onImported }: Props) {
     </Card>
   );
 }
+

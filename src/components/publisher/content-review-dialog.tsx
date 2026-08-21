@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Captions,
+  BookMarked,
   CheckCircle2,
   Copy,
   Download,
@@ -27,9 +28,11 @@ import type { Database } from "@/integrations/supabase/types";
 import { PublisherDryRunPanel } from "./publisher-dry-run";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
+type ContentPublication = Database["public"]["Tables"]["content_publications"]["Row"];
 
 export type ReviewablePost = ContentPost & {
   coverUrl: string | null;
+  publications: ContentPublication[];
   reelUrl: string | null;
   storyUrl: string | null;
 };
@@ -37,7 +40,11 @@ export type ReviewablePost = ContentPost & {
 export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
   const [open, setOpen] = useState(false);
   const ready = Boolean(
-    post.coverUrl && post.reelUrl && post.storyUrl && post.caption && post.story_link_url,
+    post.coverUrl &&
+    post.reelUrl &&
+    post.storyUrl &&
+    post.caption &&
+    (post.story_publish_mode === "automatic_no_link" || post.story_link_url),
   );
 
   return (
@@ -84,7 +91,11 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
                   url={post.storyUrl}
                   label="Story preview"
                   safeZone
-                  linkStickerLabel={post.story_link_label}
+                  linkStickerLabel={
+                    post.story_publish_mode === "manual_link_sticker"
+                      ? post.story_link_label
+                      : undefined
+                  }
                 />
               </TabsContent>
               <TabsContent value="grid" className="mt-4">
@@ -115,81 +126,117 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
 
             <PublisherDryRunPanel post={post} />
 
-            <section className="rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-xs font-medium text-primary">
-                  <Link2 className="h-4 w-4" /> Story link handoff
+            {post.story_publish_mode === "manual_link_sticker" ? (
+              <section className="rounded-lg border border-primary/25 bg-primary/[0.06] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                    <Link2 className="h-4 w-4" /> Story link handoff
+                  </div>
+                  <Badge variant="outline" className="border-amber-500/30 text-amber-300">
+                    Mobile confirmation
+                  </Badge>
                 </div>
-                <Badge variant="outline" className="border-amber-500/30 text-amber-300">
-                  Mobile confirmation
-                </Badge>
-              </div>
-              <div className="mt-3 text-sm font-medium">{post.story_link_label}</div>
-              <a
-                href={post.story_link_url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 flex items-start gap-1 break-all text-xs leading-5 text-primary underline-offset-4 hover:underline"
-              >
-                {post.story_link_url}
-                <ExternalLink className="mt-0.5 h-3 w-3 shrink-0" />
-              </a>
-              <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                The Story stays in handoff mode until the link sticker is added and confirmed in the
-                Instagram app. Tracking parameters are added automatically.
-              </p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(post.story_link_url);
-                      toast.success("Story link copied");
-                    } catch {
-                      toast.error("Could not copy the Story link");
-                    }
-                  }}
+                <div className="mt-3 text-sm font-medium">{post.story_link_label}</div>
+                <a
+                  href={post.story_link_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 flex items-start gap-1 break-all text-xs leading-5 text-primary underline-offset-4 hover:underline"
                 >
-                  <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy link
-                </Button>
-                {post.storyUrl ? (
-                  <Button asChild variant="outline" size="sm">
-                    <a
-                      href={post.storyUrl}
-                      download={`${post.post_key}-story.mp4`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
+                  {post.story_link_url}
+                  <ExternalLink className="mt-0.5 h-3 w-3 shrink-0" />
+                </a>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  The Story stays in handoff mode until the link sticker is added and confirmed in
+                  the Instagram app. Tracking parameters are added automatically.
+                </p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(post.story_link_url);
+                        toast.success("Story link copied");
+                      } catch {
+                        toast.error("Could not copy the Story link");
+                      }
+                    }}
+                  >
+                    <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy link
+                  </Button>
+                  {post.storyUrl ? (
+                    <Button asChild variant="outline" size="sm">
+                      <a
+                        href={post.storyUrl}
+                        download={`${post.post_key}-story.mp4`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Download className="mr-1.5 h-3.5 w-3.5" /> Get Story
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" disabled>
                       <Download className="mr-1.5 h-3.5 w-3.5" /> Get Story
+                    </Button>
+                  )}
+                  <Button asChild size="sm">
+                    <a href="instagram://story-camera">
+                      <Instagram className="mr-1.5 h-3.5 w-3.5" /> Instagram
                     </a>
                   </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled>
-                    <Download className="mr-1.5 h-3.5 w-3.5" /> Get Story
-                  </Button>
-                )}
-                <Button asChild size="sm">
-                  <a href="instagram://story-camera">
-                    <Instagram className="mr-1.5 h-3.5 w-3.5" /> Instagram
-                  </a>
-                </Button>
-              </div>
-              <ol className="mt-3 list-inside list-decimal space-y-1 text-[10px] leading-4 text-muted-foreground">
-                <li>Copy the tracked link.</li>
-                <li>Save or share the prepared Story video.</li>
-                <li>Open Instagram, add the link sticker and publish.</li>
-              </ol>
-            </section>
+                </div>
+                <ol className="mt-3 list-inside list-decimal space-y-1 text-[10px] leading-4 text-muted-foreground">
+                  <li>Copy the tracked link.</li>
+                  <li>Save or share the prepared Story video.</li>
+                  <li>Open Instagram, add the link sticker and publish.</li>
+                </ol>
+              </section>
+            ) : (
+              <section className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-emerald-300">
+                    <Instagram className="h-4 w-4" /> Automatic Story
+                  </div>
+                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-300">
+                    Cloud delivery
+                  </Badge>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  InstaScanner publishes this Story after the Reel and first comment. Instagram's
+                  publishing API cannot add a link sticker, so this mode intentionally posts without
+                  one.
+                </p>
+              </section>
+            )}
+
+            {post.highlight_enabled && (
+              <section className="rounded-lg border border-violet-500/25 bg-violet-500/[0.06] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-violet-300">
+                    <BookMarked className="h-4 w-4" /> Highlight destination
+                  </div>
+                  <Badge variant="outline" className="border-violet-500/30 text-violet-300">
+                    One app tap remains
+                  </Badge>
+                </div>
+                <div className="mt-3 text-sm font-semibold">{post.highlight_name}</div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  After the Story is live, InstaScanner keeps this destination visible until you add
+                  it to the matching Instagram Highlight and confirm the handoff.
+                </p>
+              </section>
+            )}
 
             <div className="rounded-lg border border-primary/20 bg-primary/[0.05] p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-primary">
                 <ShieldCheck className="h-4 w-4" /> Safe review mode
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                This preview can approve the package later, but it cannot publish anything.
-                Scheduling and real Instagram publishing remain separately locked.
+                Reviewing cannot publish anything. Approval and scheduling are separate actions;
+                only the cloud worker can contact Instagram when the scheduled time arrives.
               </p>
             </div>
           </div>
@@ -288,3 +335,4 @@ function CopySection({
     </section>
   );
 }
+

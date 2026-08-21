@@ -1,46 +1,68 @@
 import { z } from "zod";
 import { isAllowedFollowerStarStoryUrl, withInstagramStoryTracking } from "./story-link";
 
-export const contentManifestSchema = z.object({
-  version: z.literal(1),
-  post_key: z
-    .string()
-    .trim()
-    .min(3)
-    .max(80)
-    .regex(
-      /^[A-Za-z0-9][A-Za-z0-9._-]+$/,
-      "Use only letters, numbers, dots, dashes and underscores",
-    ),
-  title: z.string().trim().min(2).max(120),
-  hook: z.string().trim().min(2).max(180),
-  caption: z.string().trim().min(10).max(2200),
-  first_comment: z.string().trim().max(2200).default(""),
-  alt_text: z.string().trim().max(1000).default(""),
-  content_pillar: z.string().trim().max(80).default("Product showcase"),
-  share_to_feed: z.boolean().default(true),
-  story_link_url: z
-    .string()
-    .trim()
-    .max(2048)
-    .url()
-    .refine(
-      isAllowedFollowerStarStoryUrl,
-      "Story link must use HTTPS on followerstar.com or a FollowerStar subdomain",
-    ),
-  story_link_label: z
-    .string()
-    .trim()
-    .min(2)
-    .max(50)
-    .regex(/^[^\r\n]+$/, "Story link label must fit on one line")
-    .default("Try it now"),
-  files: z.object({
-    cover: z.string().trim().min(1),
-    reel: z.string().trim().min(1),
-    story: z.string().trim().min(1),
-  }),
-});
+export const contentManifestSchema = z
+  .object({
+    version: z.literal(1),
+    post_key: z
+      .string()
+      .trim()
+      .min(3)
+      .max(80)
+      .regex(
+        /^[A-Za-z0-9][A-Za-z0-9._-]+$/,
+        "Use only letters, numbers, dots, dashes and underscores",
+      ),
+    title: z.string().trim().min(2).max(120),
+    hook: z.string().trim().min(2).max(180),
+    caption: z.string().trim().min(10).max(2200),
+    first_comment: z.string().trim().max(2200).default(""),
+    alt_text: z.string().trim().max(1000).default(""),
+    content_pillar: z.string().trim().max(80).default("Product showcase"),
+    highlight_enabled: z.boolean().default(true),
+    highlight_name: z
+      .string()
+      .trim()
+      .max(30)
+      .regex(/^[^\r\n]*$/)
+      .default(""),
+    share_to_feed: z.boolean().default(true),
+    story_publish_mode: z
+      .enum(["manual_link_sticker", "automatic_no_link"])
+      .default("manual_link_sticker"),
+    story_link_url: z.string().trim().max(2048).default(""),
+    story_link_label: z
+      .string()
+      .trim()
+      .min(2)
+      .max(50)
+      .regex(/^[^\r\n]+$/, "Story link label must fit on one line")
+      .default("Try it now"),
+    files: z.object({
+      cover: z.string().trim().min(1),
+      reel: z.string().trim().min(1),
+      story: z.string().trim().min(1),
+    }),
+  })
+  .superRefine((manifest, context) => {
+    if (
+      manifest.story_publish_mode === "manual_link_sticker" &&
+      !isAllowedFollowerStarStoryUrl(manifest.story_link_url)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["story_link_url"],
+        message: "Manual Story mode requires HTTPS on followerstar.com or a FollowerStar subdomain",
+      });
+    }
+    if (manifest.story_publish_mode === "automatic_no_link" && manifest.story_link_url) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["story_link_url"],
+        message: "Automatic Story mode cannot add a link sticker; leave story_link_url empty",
+      });
+    }
+  });
 
 export type ContentManifest = z.infer<typeof contentManifestSchema>;
 export type PackageFileRole = "cover" | "reel" | "story";
@@ -78,6 +100,16 @@ const MAX_MANIFEST_BYTES = 256 * 1024;
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 const METADATA_TIMEOUT_MS = 20_000;
+
+export function suggestedHighlightName(contentPillar: string) {
+  const value = contentPillar.toLowerCase();
+  if (/result|case|proof|testimonial/.test(value)) return "Results";
+  if (/guide|blog|education|learn/.test(value)) return "Guides";
+  if (/tip|growth|strategy/.test(value)) return "Growth Tips";
+  if (/update|news|launch/.test(value)) return "Updates";
+  if (/faq|question|support/.test(value)) return "FAQ";
+  return "Free Tools";
+}
 
 function baseName(value: string) {
   return value.replaceAll("\\", "/").split("/").pop()?.toLowerCase() ?? "";
@@ -368,11 +400,26 @@ function validatePreparedPackage(
     });
   }
 
+  if (manifest.highlight_enabled) {
+    issues.push({
+      severity: "pass",
+      code: "highlight_handoff",
+      label: "Highlight target",
+      detail: manifest.highlight_name || suggestedHighlightName(manifest.content_pillar),
+    });
+  }
+
   issues.push({
     severity: "pass",
-    code: "story_link",
-    label: "Story link handoff",
-    detail: `${manifest.story_link_label} · FollowerStar HTTPS link`,
+    code: "story_delivery",
+    label:
+      manifest.story_publish_mode === "automatic_no_link"
+        ? "Automatic Story"
+        : "Story link handoff",
+    detail:
+      manifest.story_publish_mode === "automatic_no_link"
+        ? "Publishes automatically without a link sticker."
+        : `${manifest.story_link_label} · FollowerStar HTTPS link`,
   });
 
   return issues;
@@ -457,7 +504,12 @@ export async function prepareContentPackage(
   return {
     manifest: {
       ...parsed.data,
-      story_link_url: withInstagramStoryTracking(parsed.data.story_link_url, parsed.data.post_key),
+      highlight_name:
+        parsed.data.highlight_name || suggestedHighlightName(parsed.data.content_pillar),
+      story_link_url:
+        parsed.data.story_publish_mode === "manual_link_sticker"
+          ? withInstagramStoryTracking(parsed.data.story_link_url, parsed.data.post_key)
+          : "",
     },
     files,
     media,
@@ -521,3 +573,4 @@ export async function prepareContentBatch(
 export function packageHasErrors(prepared: PreparedContentPackage) {
   return prepared.issues.some((issue) => issue.severity === "error");
 }
+

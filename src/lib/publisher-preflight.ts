@@ -9,6 +9,8 @@ export type PublisherPreflightPost = Pick<
   | "caption"
   | "cover_storage_path"
   | "first_comment"
+  | "highlight_enabled"
+  | "highlight_name"
   | "media_manifest"
   | "post_key"
   | "quality_report"
@@ -30,10 +32,10 @@ export type PreflightCheck = {
 };
 
 export type PublishPlanStep = {
-  channel: "reel" | "first_comment" | "story_handoff";
+  channel: "reel" | "first_comment" | "story" | "story_handoff" | "highlight_handoff";
   label: string;
   detail: string;
-  dependsOn: "reel" | null;
+  dependsOn: "reel" | "story" | "story_handoff" | null;
   state: "ready" | "blocked" | "skipped" | "manual";
 };
 
@@ -188,13 +190,16 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
     },
     {
       code: "story_link",
-      label: "Story link",
+      label: post.story_publish_mode === "automatic_no_link" ? "Automatic Story" : "Story link",
       detail:
-        isAllowedFollowerStarStoryUrl(post.story_link_url) && post.story_link_label.trim()
-          ? `${post.story_link_label} · tracked FollowerStar HTTPS link.`
-          : "A valid FollowerStar HTTPS link and sticker label are required.",
+        post.story_publish_mode === "automatic_no_link"
+          ? "Publishes through the cloud worker without a link sticker."
+          : isAllowedFollowerStarStoryUrl(post.story_link_url) && post.story_link_label.trim()
+            ? `${post.story_link_label} · tracked FollowerStar HTTPS link.`
+            : "A valid FollowerStar HTTPS link and sticker label are required.",
       state:
-        isAllowedFollowerStarStoryUrl(post.story_link_url) && post.story_link_label.trim()
+        post.story_publish_mode === "automatic_no_link" ||
+        (isAllowedFollowerStarStoryUrl(post.story_link_url) && post.story_link_label.trim())
           ? "pass"
           : "blocker",
     },
@@ -204,8 +209,8 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
       detail:
         post.story_publish_mode === "manual_link_sticker"
           ? "Manual link-sticker confirmation is enforced."
-          : "Story link posts must use the manual link-sticker handoff.",
-      state: post.story_publish_mode === "manual_link_sticker" ? "pass" : "blocker",
+          : "Automatic cloud publishing is enabled without a link sticker.",
+      state: "pass",
     },
     {
       code: "quality_report",
@@ -214,6 +219,20 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
         ? `${qualityErrors.length} blocking import issue${qualityErrors.length === 1 ? "" : "s"} remain.`
         : "No blocking import issues.",
       state: qualityErrors.length ? "blocker" : "pass",
+    },
+    {
+      code: "highlight_target",
+      label: "Highlight target",
+      detail: post.highlight_enabled
+        ? post.highlight_name.trim()
+          ? `After Story publishing: ${post.highlight_name.trim()}.`
+          : "Choose the destination Highlight."
+        : "Highlight handoff disabled for this post.",
+      state: post.highlight_enabled
+        ? post.highlight_name.trim()
+          ? "manual"
+          : "blocker"
+        : "warning",
     },
     {
       code: "frame_rate",
@@ -240,7 +259,7 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
   const warnings = checks.filter((check) => check.state === "warning" || check.state === "manual");
   const ready = blockers.length === 0;
   const reelReady = ready && Boolean(post.reel_storage_path);
-  const storyReady = ready && post.story_publish_mode === "manual_link_sticker";
+  const storyReady = ready;
   const steps: PublishPlanStep[] = [
     {
       channel: "reel",
@@ -261,11 +280,28 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
       state: !post.first_comment.trim() ? "skipped" : reelReady ? "ready" : "blocked",
     },
     {
-      channel: "story_handoff",
-      label: "Story link handoff",
-      detail: "Download Story, copy link, add the link sticker and confirm on mobile.",
+      channel: post.story_publish_mode === "automatic_no_link" ? "story" : "story_handoff",
+      label:
+        post.story_publish_mode === "automatic_no_link" ? "Automatic Story" : "Story link handoff",
+      detail:
+        post.story_publish_mode === "automatic_no_link"
+          ? "Publishes after the Reel and first comment without a link sticker."
+          : "Download Story, copy link, add the link sticker and confirm on mobile.",
       dependsOn: null,
-      state: storyReady ? "manual" : "blocked",
+      state: storyReady
+        ? post.story_publish_mode === "automatic_no_link"
+          ? "ready"
+          : "manual"
+        : "blocked",
+    },
+    {
+      channel: "highlight_handoff",
+      label: post.highlight_enabled ? `Add to ${post.highlight_name}` : "Highlight",
+      detail: post.highlight_enabled
+        ? "Instagram does not expose Highlights in its official API; one confirmation remains in the app."
+        : "No Highlight requested.",
+      dependsOn: post.story_publish_mode === "automatic_no_link" ? "story" : "story_handoff",
+      state: !post.highlight_enabled ? "skipped" : storyReady ? "manual" : "blocked",
     },
   ];
   return {
@@ -277,3 +313,4 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
     steps,
   };
 }
+

@@ -18,6 +18,8 @@ describe("contentManifestSchema", () => {
     expect(result.alt_text).toBe("");
     expect(result.content_pillar).toBe("Product showcase");
     expect(result.share_to_feed).toBe(true);
+    expect(result.story_publish_mode).toBe("manual_link_sticker");
+    expect(result.highlight_enabled).toBe(true);
     expect(result.story_link_label).toBe("Try it now");
   });
 
@@ -54,4 +56,21 @@ describe("contentManifestSchema", () => {
       }),
     ).toThrow();
   });
+
+  it("accepts automatic Story delivery only without a link sticker", () => {
+    const result = contentManifestSchema.parse({
+      ...validManifest,
+      story_publish_mode: "automatic_no_link",
+      story_link_url: "",
+    });
+    expect(result.story_publish_mode).toBe("automatic_no_link");
+    expect(result.story_link_url).toBe("");
+    expect(() =>
+      contentManifestSchema.parse({
+        ...validManifest,
+        story_publish_mode: "automatic_no_link",
+      }),
+    ).toThrow();
+  });
 });
+
