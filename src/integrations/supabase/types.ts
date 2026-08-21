@@ -728,43 +728,79 @@ export type Database = {
         Row: {
           api_base_url: string
           created_at: string
+          granted_scopes: string[]
           id: string
           ig_user_id: string
           ig_username: string
           last_error: string | null
+          login_type: string
           page_access_token: string
-          page_id: string
+          page_id: string | null
           status: string
           token_expires_at: string
+          token_refreshed_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           api_base_url?: string
           created_at?: string
+          granted_scopes?: string[]
           id?: string
           ig_user_id: string
           ig_username: string
           last_error?: string | null
+          login_type?: string
           page_access_token: string
-          page_id: string
+          page_id?: string | null
           status?: string
           token_expires_at: string
+          token_refreshed_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           api_base_url?: string
           created_at?: string
+          granted_scopes?: string[]
           id?: string
           ig_user_id?: string
           ig_username?: string
           last_error?: string | null
+          login_type?: string
           page_access_token?: string
-          page_id?: string
+          page_id?: string | null
           status?: string
           token_expires_at?: string
+          token_refreshed_at?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ig_oauth_states: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          redirect_uri?: string
+          state?: string
           user_id?: string
         }
         Relationships: []
@@ -1649,6 +1685,7 @@ export type Database = {
         Args: { _end: string; _start: string }
         Returns: Json
       }
+      purge_ig_oauth_states: { Args: never; Returns: undefined }
       release_content_publish_lease: {
         Args: { _content_post_id: string }
         Returns: undefined
