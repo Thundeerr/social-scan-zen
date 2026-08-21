@@ -21,6 +21,8 @@ export type ActivityEventType =
   | "asset_archived"
   | "asset_prioritized"
   | "asset_undo"
+  | "publishing_paused"
+  | "publishing_resumed"
   | "error";
 
 export type ActivityRow = {
