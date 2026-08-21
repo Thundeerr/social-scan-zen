@@ -278,6 +278,7 @@ export type Database = {
           media_manifest: Json
           media_sha256: string | null
           post_key: string
+          quality_report: Json
           reel_storage_path: string | null
           review_note: string | null
           scheduled_for: string | null
@@ -286,7 +287,6 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
-          quality_report: Json
         }
         Insert: {
           alt_text?: string
@@ -305,6 +305,7 @@ export type Database = {
           media_manifest?: Json
           media_sha256?: string | null
           post_key: string
+          quality_report?: Json
           reel_storage_path?: string | null
           review_note?: string | null
           scheduled_for?: string | null
@@ -313,7 +314,6 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
-          quality_report?: Json
         }
         Update: {
           alt_text?: string
@@ -332,6 +332,7 @@ export type Database = {
           media_manifest?: Json
           media_sha256?: string | null
           post_key?: string
+          quality_report?: Json
           reel_storage_path?: string | null
           review_note?: string | null
           scheduled_for?: string | null
@@ -340,7 +341,6 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
-          quality_report?: Json
         }
         Relationships: []
       }
@@ -1597,11 +1597,7 @@ export type Database = {
         Returns: Json
       }
       review_content_post: {
-        Args: {
-          _content_post_id: string
-          _decision: string
-          _note?: string | null
-        }
+        Args: { _content_post_id: string; _decision: string; _note?: string }
         Returns: undefined
       }
     }
