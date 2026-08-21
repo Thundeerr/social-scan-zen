@@ -36,7 +36,7 @@ import {
   disconnectInstagramFn,
   startInstagramOAuthFn,
 } from "@/lib/instagram-oauth.functions";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 type ContentPublication = Database["public"]["Tables"]["content_publications"]["Row"];
@@ -590,17 +590,65 @@ function InstagramConnectionCard({
 }) {
   const qc = useQueryClient();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const oauthPopupRef = useRef<Window | null>(null);
+  const oauthPollRef = useRef<number | null>(null);
+
+  const stopOAuthPolling = () => {
+    if (oauthPollRef.current !== null) window.clearInterval(oauthPollRef.current);
+    oauthPollRef.current = null;
+  };
+
+  useEffect(() => {
+    return () => stopOAuthPolling();
+  }, []);
 
   const connectMutation = useMutation({
     mutationFn: async () => startInstagramOAuthFn(),
     onSuccess: ({ authorizeUrl }) => {
-      window.location.assign(authorizeUrl);
+      const popup = oauthPopupRef.current;
+      if (!popup || popup.closed) {
+        toast.error("Instagram sign-in was blocked. Allow popups and try again.");
+        return;
+      }
+      popup.location.assign(authorizeUrl);
+      stopOAuthPolling();
+      oauthPollRef.current = window.setInterval(async () => {
+        const result = await qc.fetchQuery({
+          queryKey: ["publisher-instagram-connection"],
+          queryFn: loadInstagramConnection,
+          staleTime: 0,
+        });
+        if (!result) return;
+        stopOAuthPolling();
+        if (!popup.closed) popup.close();
+        toast.success(`@${result.ig_username} · connected. Publishing stays paused.`);
+      }, 1500);
     },
-    onError: (mutationError) =>
+    onError: (mutationError) => {
+      oauthPopupRef.current?.close();
+      stopOAuthPolling();
       toast.error(
         mutationError instanceof Error ? mutationError.message : "Could not start authorization",
-      ),
+      );
+    },
   });
+
+  const beginInstagramConnect = () => {
+    stopOAuthPolling();
+    const popup = window.open(
+      "about:blank",
+      "instascanner-instagram-oauth",
+      "popup=yes,width=560,height=760,resizable=yes,scrollbars=yes",
+    );
+    if (!popup) {
+      toast.error("Allow popups for InstaScanner, then try again.");
+      return;
+    }
+    oauthPopupRef.current = popup;
+    popup.document.title = "Connecting Instagram…";
+    popup.document.body.textContent = "Opening secure Instagram sign-in…";
+    connectMutation.mutate();
+  };
 
   const disconnectMutation = useMutation({
     mutationFn: async () => disconnectInstagramFn(),
@@ -682,7 +730,7 @@ function InstagramConnectionCard({
           >
             {needsAttention ? "CHECK BEFORE BATCH" : "READY FOR SCHEDULES"}
           </Badge>
-          <Button size="sm" disabled={busy} onClick={() => connectMutation.mutate()}>
+          <Button size="sm" disabled={busy} onClick={beginInstagramConnect}>
             {connectMutation.isPending ? (
               <LoaderCircle className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (
