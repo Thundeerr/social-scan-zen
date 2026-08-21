@@ -4,28 +4,19 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buildAuthorizeUrl, callbackUrlForOrigin } from "./instagram-oauth";
+import { buildAuthorizeUrl, instagramOAuthCallbackUrl } from "./instagram-oauth";
 
 export const startInstagramOAuthFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { instagramAppCredentials, createOAuthState } = await import(
-      "./instagram-oauth.server"
-    );
+    const { instagramAppCredentials, createOAuthState } = await import("./instagram-oauth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { clientId } = instagramAppCredentials();
 
-    // Server functions run through an internal preview origin in the editor.
-    // OAuth providers must receive the stable, registered public callback.
-    const requestOrigin = new URL(getRequest().url).origin;
-    const configuredOrigin = process.env["INSTAGRAM_OAUTH_ORIGIN"];
-    const callbackOrigin = configuredOrigin ||
-      (requestOrigin.includes("localhost") || requestOrigin.includes("-preview--")
-        ? "https://www.instascanner.app"
-        : requestOrigin);
-    const redirectUri = callbackUrlForOrigin(callbackOrigin);
+    // Meta compares redirect URIs exactly. Never derive this from preview,
+    // localhost, or the www host (which redirects to the apex domain).
+    const redirectUri = instagramOAuthCallbackUrl();
     const state = await createOAuthState(supabaseAdmin, context.userId, redirectUri);
 
     return { authorizeUrl: buildAuthorizeUrl({ clientId, redirectUri, state }) };

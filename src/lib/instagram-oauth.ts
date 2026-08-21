@@ -22,11 +22,20 @@ export const IG_API_BASE_URL = `${IG_GRAPH_HOST}/v23.0`;
 
 /** Path of the server-side callback that must be registered in the Meta app. */
 export const IG_CALLBACK_PATH = "/api/public/instagram/callback";
+export const IG_OAUTH_ORIGIN = "https://instascanner.app";
 
 export const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 export function callbackUrlForOrigin(origin: string): string {
   return new URL(IG_CALLBACK_PATH, origin).toString();
+}
+
+/**
+ * Meta requires byte-for-byte redirect URI matching. Both the editor preview
+ * and www host must therefore resolve to the registered apex-domain callback.
+ */
+export function instagramOAuthCallbackUrl(): string {
+  return callbackUrlForOrigin(IG_OAUTH_ORIGIN);
 }
 
 export function buildAuthorizeUrl(params: {
@@ -81,9 +90,7 @@ export function connectionHealth(input: {
   now?: number;
 }): { healthy: boolean; needsAttention: boolean; remainingMs: number } {
   const now = input.now ?? Date.now();
-  const remainingMs = input.tokenExpiresAt
-    ? new Date(input.tokenExpiresAt).getTime() - now
-    : -1;
+  const remainingMs = input.tokenExpiresAt ? new Date(input.tokenExpiresAt).getTime() - now : -1;
   const healthy = input.status === "active" && remainingMs > SAFE_PUBLISH_MARGIN_MS;
   return { healthy, needsAttention: !healthy || remainingMs < RECONNECT_WARNING_MS, remainingMs };
 }
