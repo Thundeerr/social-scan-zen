@@ -17,8 +17,15 @@ export const startInstagramOAuthFn = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { clientId } = instagramAppCredentials();
 
-    const origin = new URL(getRequest().url).origin;
-    const redirectUri = callbackUrlForOrigin(origin);
+    // Server functions run through an internal preview origin in the editor.
+    // OAuth providers must receive the stable, registered public callback.
+    const requestOrigin = new URL(getRequest().url).origin;
+    const configuredOrigin = process.env["INSTAGRAM_OAUTH_ORIGIN"];
+    const callbackOrigin = configuredOrigin ||
+      (requestOrigin.includes("localhost") || requestOrigin.includes("-preview--")
+        ? "https://www.instascanner.app"
+        : requestOrigin);
+    const redirectUri = callbackUrlForOrigin(callbackOrigin);
     const state = await createOAuthState(supabaseAdmin, context.userId, redirectUri);
 
     return { authorizeUrl: buildAuthorizeUrl({ clientId, redirectUri, state }) };
