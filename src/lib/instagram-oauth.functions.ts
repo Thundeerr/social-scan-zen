@@ -10,9 +10,7 @@ import { buildAuthorizeUrl, instagramOAuthCallbackUrl } from "./instagram-oauth"
 export const startInstagramOAuthFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { instagramAppCredentials, createOAuthState } = await import(
-      "./instagram-oauth.server"
-    );
+    const { instagramAppCredentials, createOAuthState } = await import("./instagram-oauth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { clientId } = instagramAppCredentials();
 

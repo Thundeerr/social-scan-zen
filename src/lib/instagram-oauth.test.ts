@@ -52,9 +52,7 @@ describe("callback parsing", () => {
   });
 
   it("redacts secrets that a provider error might echo", () => {
-    const result = parseCallbackParams(
-      new URLSearchParams("error_description=bad code=AQ99&x=1"),
-    );
+    const result = parseCallbackParams(new URLSearchParams("error_description=bad code=AQ99&x=1"));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).not.toContain("AQ99");
   });

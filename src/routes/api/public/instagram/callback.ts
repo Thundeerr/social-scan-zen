@@ -28,9 +28,7 @@ export const Route = createFileRoute("/api/public/instagram/callback")({
         }
 
         try {
-          const { completeInstagramConnection } = await import(
-            "@/lib/instagram-oauth.server"
-          );
+          const { completeInstagramConnection } = await import("@/lib/instagram-oauth.server");
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const result = await completeInstagramConnection(supabaseAdmin, {
             code: parsed.code,

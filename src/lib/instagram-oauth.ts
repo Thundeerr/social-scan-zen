@@ -90,9 +90,7 @@ export function connectionHealth(input: {
   now?: number;
 }): { healthy: boolean; needsAttention: boolean; remainingMs: number } {
   const now = input.now ?? Date.now();
-  const remainingMs = input.tokenExpiresAt
-    ? new Date(input.tokenExpiresAt).getTime() - now
-    : -1;
+  const remainingMs = input.tokenExpiresAt ? new Date(input.tokenExpiresAt).getTime() - now : -1;
   const healthy = input.status === "active" && remainingMs > SAFE_PUBLISH_MARGIN_MS;
   return { healthy, needsAttention: !healthy || remainingMs < RECONNECT_WARNING_MS, remainingMs };
 }

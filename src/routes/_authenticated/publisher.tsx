@@ -32,10 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { buildPublisherDryRun, type PublisherDryRun } from "@/lib/publisher-preflight";
 import { connectionHealth } from "@/lib/instagram-oauth";
-import {
-  disconnectInstagramFn,
-  startInstagramOAuthFn,
-} from "@/lib/instagram-oauth.functions";
+import { disconnectInstagramFn, startInstagramOAuthFn } from "@/lib/instagram-oauth.functions";
 import { useEffect, useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
