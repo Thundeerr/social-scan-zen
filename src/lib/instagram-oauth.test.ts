@@ -4,6 +4,7 @@ import {
   buildAuthorizeUrl,
   callbackUrlForOrigin,
   connectionHealth,
+  instagramOAuthCallbackUrl,
   missingScopes,
   parseCallbackParams,
   redactSecrets,
@@ -22,9 +23,15 @@ describe("authorize url", () => {
     expect(url.toString()).not.toContain("client_secret");
   });
 
-  it("derives the registered callback url from the origin", () => {
+  it("can derive a callback url from a trusted origin", () => {
     expect(callbackUrlForOrigin("https://www.instascanner.app")).toBe(
       "https://www.instascanner.app/api/public/instagram/callback",
+    );
+  });
+
+  it("always uses the registered apex-domain callback for OAuth", () => {
+    expect(instagramOAuthCallbackUrl()).toBe(
+      "https://instascanner.app/api/public/instagram/callback",
     );
   });
 });

@@ -9,10 +9,10 @@
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { parseCallbackParams } from "@/lib/instagram-oauth";
+import { IG_OAUTH_ORIGIN, parseCallbackParams } from "@/lib/instagram-oauth";
 
-function backToPublisher(origin: string, params: Record<string, string>) {
-  const url = new URL("/publisher", origin);
+function backToPublisher(params: Record<string, string>) {
+  const url = new URL("/publisher", IG_OAUTH_ORIGIN);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return new Response(null, { status: 302, headers: { location: url.toString() } });
 }
@@ -22,10 +22,9 @@ export const Route = createFileRoute("/api/public/instagram/callback")({
     handlers: {
       GET: async ({ request }) => {
         const url = new URL(request.url);
-        const origin = url.origin;
         const parsed = parseCallbackParams(url.searchParams);
         if (!parsed.ok) {
-          return backToPublisher(origin, { ig_error: parsed.error });
+          return backToPublisher({ ig_error: parsed.error });
         }
 
         try {
@@ -37,10 +36,10 @@ export const Route = createFileRoute("/api/public/instagram/callback")({
             code: parsed.code,
             state: parsed.state,
           });
-          if (!result.ok) return backToPublisher(origin, { ig_error: result.error });
-          return backToPublisher(origin, { ig: "connected", ig_user: result.username });
+          if (!result.ok) return backToPublisher({ ig_error: result.error });
+          return backToPublisher({ ig: "connected", ig_user: result.username });
         } catch {
-          return backToPublisher(origin, {
+          return backToPublisher({
             ig_error: "Instagram connection failed. Please try again.",
           });
         }

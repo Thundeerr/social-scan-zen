@@ -22,11 +22,20 @@ export const IG_API_BASE_URL = `${IG_GRAPH_HOST}/v23.0`;
 
 /** Path of the server-side callback that must be registered in the Meta app. */
 export const IG_CALLBACK_PATH = "/api/public/instagram/callback";
+export const IG_OAUTH_ORIGIN = "https://instascanner.app";
 
 export const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 export function callbackUrlForOrigin(origin: string): string {
   return new URL(IG_CALLBACK_PATH, origin).toString();
+}
+
+/**
+ * Meta requires byte-for-byte redirect URI matching. Both the editor preview
+ * and www host must therefore resolve to the registered apex-domain callback.
+ */
+export function instagramOAuthCallbackUrl(): string {
+  return callbackUrlForOrigin(IG_OAUTH_ORIGIN);
 }
 
 export function buildAuthorizeUrl(params: {

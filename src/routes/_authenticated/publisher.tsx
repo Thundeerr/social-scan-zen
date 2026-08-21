@@ -36,7 +36,7 @@ import {
   disconnectInstagramFn,
   startInstagramOAuthFn,
 } from "@/lib/instagram-oauth.functions";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 type ContentPublication = Database["public"]["Tables"]["content_publications"]["Row"];
@@ -590,43 +590,20 @@ function InstagramConnectionCard({
 }) {
   const qc = useQueryClient();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  const oauthPopupRef = useRef<Window | null>(null);
-  const oauthPollRef = useRef<number | null>(null);
-
-  const stopOAuthPolling = () => {
-    if (oauthPollRef.current !== null) window.clearInterval(oauthPollRef.current);
-    oauthPollRef.current = null;
-  };
-
-  useEffect(() => {
-    return () => stopOAuthPolling();
-  }, []);
+  const [instagramAuthorizeUrl, setInstagramAuthorizeUrl] = useState<string | null>(null);
 
   const connectMutation = useMutation({
     mutationFn: async () => startInstagramOAuthFn(),
     onSuccess: ({ authorizeUrl }) => {
-      const popup = oauthPopupRef.current;
-      if (!popup || popup.closed) {
-        toast.error("Instagram sign-in was blocked. Allow popups and try again.");
-        return;
-      }
-      popup.location.assign(authorizeUrl);
-      stopOAuthPolling();
-      oauthPollRef.current = window.setInterval(async () => {
-        const result = await qc.fetchQuery({
-          queryKey: ["publisher-instagram-connection"],
-          queryFn: loadInstagramConnection,
-          staleTime: 0,
-        });
-        if (!result) return;
-        stopOAuthPolling();
-        if (!popup.closed) popup.close();
-        toast.success(`@${result.ig_username} · connected. Publishing stays paused.`);
-      }, 1500);
+      setInstagramAuthorizeUrl(authorizeUrl);
+      const link = document.createElement("a");
+      link.href = authorizeUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+      toast.info("Instagram opened in a new browser tab. If it was blocked, use Open Instagram.");
     },
     onError: (mutationError) => {
-      oauthPopupRef.current?.close();
-      stopOAuthPolling();
       toast.error(
         mutationError instanceof Error ? mutationError.message : "Could not start authorization",
       );
@@ -634,19 +611,7 @@ function InstagramConnectionCard({
   });
 
   const beginInstagramConnect = () => {
-    stopOAuthPolling();
-    const popup = window.open(
-      "about:blank",
-      "instascanner-instagram-oauth",
-      "popup=yes,width=560,height=760,resizable=yes,scrollbars=yes",
-    );
-    if (!popup) {
-      toast.error("Allow popups for InstaScanner, then try again.");
-      return;
-    }
-    oauthPopupRef.current = popup;
-    popup.document.title = "Connecting Instagram…";
-    popup.document.body.textContent = "Opening secure Instagram sign-in…";
+    setInstagramAuthorizeUrl(null);
     connectMutation.mutate();
   };
 
@@ -738,6 +703,13 @@ function InstagramConnectionCard({
             )}
             {connection ? "Reconnect Instagram" : "Connect Instagram"}
           </Button>
+          {instagramAuthorizeUrl ? (
+            <Button size="sm" variant="outline" asChild>
+              <a href={instagramAuthorizeUrl} target="_blank" rel="noopener noreferrer">
+                Open Instagram
+              </a>
+            </Button>
+          ) : null}
           {connection ? (
             confirmDisconnect ? (
               <>
