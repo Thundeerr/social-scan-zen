@@ -134,7 +134,7 @@ async function loadPosts() {
 async function loadInstagramConnection(): Promise<InstagramConnection | null> {
   const { data, error } = await supabase
     .from("ig_connections")
-    .select("ig_username,token_expires_at,status,last_error")
+    .select("ig_username,token_expires_at,status,last_error,login_type")
     .maybeSingle();
   if (error) throw error;
   return data;
