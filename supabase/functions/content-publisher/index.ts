@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.110.0";
+import { buildReelContainerFields } from "../_shared/instagram-reel.ts";
 
 const GRAPH_TIMEOUT_MS = 20_000;
 const SIGNED_URL_SECONDS = 12 * 60 * 60;
@@ -103,7 +104,11 @@ async function authorize(
   return { kind: "operator", userId: auth.user.id };
 }
 
-async function signedVideoUrl(admin: ReturnType<typeof createClient>, storagePath: string) {
+async function signedMediaUrl(
+  admin: ReturnType<typeof createClient>,
+  storagePath: string,
+  mediaKind: "video" | "cover",
+) {
   const { data, error } = await admin.storage
     .from("ig-publish")
     .createSignedUrl(storagePath, SIGNED_URL_SECONDS);
@@ -114,8 +119,16 @@ async function signedVideoUrl(admin: ReturnType<typeof createClient>, storagePat
     headers: { Range: "bytes=0-0" },
   });
   const contentType = check.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!check.ok || !contentType.startsWith("video/mp4")) {
-    throw new Error("Temporary media URL did not return video/mp4");
+  const validContentType =
+    mediaKind === "video"
+      ? contentType.startsWith("video/mp4")
+      : contentType.startsWith("image/jpeg");
+  if (!check.ok || !validContentType) {
+    throw new Error(
+      mediaKind === "video"
+        ? "Temporary media URL did not return video/mp4"
+        : "Temporary cover URL did not return image/jpeg",
+    );
   }
   return data.signedUrl;
 }
@@ -152,6 +165,7 @@ async function processVideoPublication(input: {
   publication: Publication;
   channel: "reel" | "story";
   storagePath: string;
+  coverStoragePath?: string;
   caption: string;
   shareToFeed: boolean;
   igUserId: string;
@@ -166,15 +180,22 @@ async function processVideoPublication(input: {
     if (publication.attempts >= MAX_PUBLICATION_ATTEMPTS) {
       throw new Error(`${channel} reached the retry limit`);
     }
-    const videoUrl = await signedVideoUrl(admin, input.storagePath);
+    const videoUrl = await signedMediaUrl(admin, input.storagePath, "video");
     const body: Record<string, string | boolean | number> = {
       media_type: channel === "reel" ? "REELS" : "STORIES",
       video_url: videoUrl,
     };
     if (channel === "reel") {
-      body.caption = input.caption;
-      body.share_to_feed = input.shareToFeed;
-      body.thumb_offset = 0;
+      if (!input.coverStoragePath) throw new Error("Reel cover is missing");
+      const coverUrl = await signedMediaUrl(admin, input.coverStoragePath, "cover");
+      Object.assign(
+        body,
+        buildReelContainerFields({
+          caption: input.caption,
+          shareToFeed: input.shareToFeed,
+          coverUrl,
+        }),
+      );
     }
     const created = await graphRequest(apiBaseUrl, `${input.igUserId}/media`, token, "POST", body);
     if (typeof created.id !== "string")
@@ -277,7 +298,7 @@ async function processFirstComment(input: {
 async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
   const { data: due, error } = await admin
     .from("content_posts")
-    .select("id,reel_storage_path,story_storage_path")
+    .select("id,reel_storage_path,story_storage_path,cover_storage_path")
     .is("media_cleaned_at", null)
     .lte("media_cleanup_after", new Date().toISOString())
     .limit(5);
@@ -286,7 +307,9 @@ async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
   let cleaned = 0;
   for (const post of due ?? []) {
     const paths = [
-      ...new Set([post.reel_storage_path, post.story_storage_path].filter(Boolean)),
+      ...new Set(
+        [post.reel_storage_path, post.story_storage_path, post.cover_storage_path].filter(Boolean),
+      ),
     ] as string[];
     if (paths.length) {
       const { error: removeError } = await admin.storage.from("ig-publish").remove(paths);
@@ -347,6 +370,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
     publication: reel,
     channel: "reel",
     storagePath: post.reel_storage_path,
+    coverStoragePath: post.cover_storage_path,
     caption: post.caption,
     shareToFeed: post.share_to_feed,
   });
