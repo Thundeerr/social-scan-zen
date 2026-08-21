@@ -1,1 +1,6 @@
 project_id = "vkudzmoaqskmglfajzkz"
+
+# pg_cron authenticates this worker with x-cron-secret. The function still
+# performs its own operator/cron authorization before doing any work.
+[functions.content-publisher]
+verify_jwt = false
