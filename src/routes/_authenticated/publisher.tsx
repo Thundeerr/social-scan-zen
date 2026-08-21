@@ -178,14 +178,14 @@ function ContentPublisherPage() {
       post: ContentPost;
       decision: "approved" | "changes_requested";
     }) => {
-      const note = decision === "changes_requested" ? reviewNote.trim() : null;
+      const note = decision === "changes_requested" ? reviewNote.trim() : "";
       if (decision === "changes_requested" && !note)
         throw new Error("Add a short review note first.");
 
       const { error: reviewError } = await supabase.rpc("review_content_post", {
         _content_post_id: post.id,
         _decision: decision,
-        _note: note,
+        _note: note || undefined,
       });
       if (reviewError) throw reviewError;
     },
