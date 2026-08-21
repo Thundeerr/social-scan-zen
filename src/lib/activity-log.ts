@@ -51,6 +51,8 @@ const CATEGORY_ORDER: ActivityEventType[] = [
   "asset_archived",
   "asset_prioritized",
   "asset_undo",
+  "publishing_paused",
+  "publishing_resumed",
   "error",
 ];
 
