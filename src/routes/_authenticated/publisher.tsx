@@ -655,7 +655,7 @@ function InstagramConnectionCard({
             </p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {connection && expiryLabel
-                ? `Business Login credential valid until ${expiryLabel}. Scheduling is blocked if it would expire before publishing.`
+                ? `${connection.login_type === "facebook_login" ? "Facebook Login" : "Instagram Business Login"} · credential valid until ${expiryLabel}. Scheduling is blocked if it would expire before publishing.`
                 : "Connect Instagram before scheduling. Connecting only authorizes the account — it never publishes anything, and publishing stays paused."}
             </p>
             {connection?.last_error ? (
