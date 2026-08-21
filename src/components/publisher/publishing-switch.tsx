@@ -62,9 +62,7 @@ export function PublishingSwitchCard() {
       toast.success(nextPaused ? "Publishing paused" : "Cloud publishing active");
       void logActivity(
         nextPaused ? "publishing_paused" : "publishing_resumed",
-        nextPaused
-          ? "Operator paused cloud publishing"
-          : "Operator resumed cloud publishing",
+        nextPaused ? "Operator paused cloud publishing" : "Operator resumed cloud publishing",
       );
     },
     onError: (mutationError) =>
@@ -94,7 +92,9 @@ export function PublishingSwitchCard() {
     <Card
       id="publishing-switch"
       className={
-        paused ? "border-amber-500/30 bg-amber-500/[0.05]" : "border-emerald-500/25 bg-emerald-500/[0.04]"
+        paused
+          ? "border-amber-500/30 bg-amber-500/[0.05]"
+          : "border-emerald-500/25 bg-emerald-500/[0.04]"
       }
     >
       <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
@@ -126,7 +126,9 @@ export function PublishingSwitchCard() {
           <Badge
             variant="outline"
             className={
-              paused ? "border-amber-500/30 text-amber-300" : "border-emerald-500/30 text-emerald-300"
+              paused
+                ? "border-amber-500/30 text-amber-300"
+                : "border-emerald-500/30 text-emerald-300"
             }
           >
             {paused ? "PAUSED" : "ACTIVE"}
