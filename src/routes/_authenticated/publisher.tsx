@@ -31,13 +31,18 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { buildPublisherDryRun, type PublisherDryRun } from "@/lib/publisher-preflight";
-import { useState } from "react";
+import { connectionHealth } from "@/lib/instagram-oauth";
+import {
+  disconnectInstagramFn,
+  startInstagramOAuthFn,
+} from "@/lib/instagram-oauth.functions";
+import { useEffect, useState } from "react";
 
 type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 type ContentPublication = Database["public"]["Tables"]["content_publications"]["Row"];
 type InstagramConnection = Pick<
   Database["public"]["Tables"]["ig_connections"]["Row"],
-  "ig_username" | "token_expires_at" | "status" | "last_error"
+  "ig_username" | "token_expires_at" | "status" | "last_error" | "login_type"
 >;
 const SIGNED_URL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_MS = 45 * 60 * 1000;
