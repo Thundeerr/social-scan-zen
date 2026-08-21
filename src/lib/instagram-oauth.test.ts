@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  IG_API_BASE_URL,
   IG_SCOPES,
   buildAuthorizeUrl,
   callbackUrlForOrigin,
@@ -12,6 +13,10 @@ import {
 import { consumeOAuthState, normalizeGrantedPermissions } from "./instagram-oauth.server";
 
 describe("authorize url", () => {
+  it("uses the API base URL permitted by the connection constraint", () => {
+    expect(IG_API_BASE_URL).toBe("https://graph.instagram.com/v25.0");
+  });
+
   it("requests exactly the supported permissions", () => {
     const url = new URL(
       buildAuthorizeUrl({ clientId: "123", redirectUri: "https://app.test/cb", state: "s1" }),

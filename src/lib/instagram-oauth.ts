@@ -18,7 +18,7 @@ export const IG_SCOPES = [
 export const IG_AUTHORIZE_URL = "https://www.instagram.com/oauth/authorize";
 export const IG_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
 export const IG_GRAPH_HOST = "https://graph.instagram.com";
-export const IG_API_BASE_URL = `${IG_GRAPH_HOST}/v23.0`;
+export const IG_API_BASE_URL = `${IG_GRAPH_HOST}/v25.0`;
 
 /** Path of the server-side callback that must be registered in the Meta app. */
 export const IG_CALLBACK_PATH = "/api/public/instagram/callback";
