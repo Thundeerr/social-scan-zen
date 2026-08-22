@@ -33,6 +33,7 @@ type ContentPublication = Database["public"]["Tables"]["content_publications"]["
 export type ReviewablePost = ContentPost & {
   coverUrl: string | null;
   publications: ContentPublication[];
+  primaryUrls: string[];
   reelUrl: string | null;
   storyUrl: string | null;
 };
@@ -41,7 +42,7 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
   const [open, setOpen] = useState(false);
   const ready = Boolean(
     post.coverUrl &&
-    post.reelUrl &&
+    (post.content_type === "reel" ? post.reelUrl : post.primaryUrls.length) &&
     post.storyUrl &&
     post.caption &&
     (post.story_publish_mode === "automatic_no_link" || post.story_link_url),
@@ -79,24 +80,46 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
           <div className="border-b border-border/60 bg-black/20 p-4 lg:border-b-0 lg:border-r md:p-6">
             <Tabs defaultValue="reel">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="reel">Reel</TabsTrigger>
+                <TabsTrigger value="reel">
+                  {post.content_type === "carousel"
+                    ? "Carousel"
+                    : post.content_type === "image"
+                      ? "Image"
+                      : "Reel"}
+                </TabsTrigger>
                 <TabsTrigger value="story">Story</TabsTrigger>
                 <TabsTrigger value="grid">Profile crop</TabsTrigger>
               </TabsList>
               <TabsContent value="reel" className="mt-4">
-                <VerticalVideo url={post.reelUrl} label="Reel preview" safeZone />
+                {post.content_type === "reel" ? (
+                  <VerticalVideo url={post.reelUrl} label="Reel preview" safeZone />
+                ) : (
+                  <FeedMediaPreview urls={post.primaryUrls} />
+                )}
               </TabsContent>
               <TabsContent value="story" className="mt-4">
-                <VerticalVideo
-                  url={post.storyUrl}
-                  label="Story preview"
-                  safeZone
-                  linkStickerLabel={
-                    post.story_publish_mode === "manual_link_sticker"
-                      ? post.story_link_label
-                      : undefined
-                  }
-                />
+                {post.content_type === "reel" ? (
+                  <VerticalVideo
+                    url={post.storyUrl}
+                    label="Story preview"
+                    safeZone
+                    linkStickerLabel={
+                      post.story_publish_mode === "manual_link_sticker"
+                        ? post.story_link_label
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <VerticalImage
+                    url={post.storyUrl}
+                    label="Story preview"
+                    linkStickerLabel={
+                      post.story_publish_mode === "manual_link_sticker"
+                        ? post.story_link_label
+                        : undefined
+                    }
+                  />
+                )}
               </TabsContent>
               <TabsContent value="grid" className="mt-4">
                 <ProfileCropPreview url={post.coverUrl} />
@@ -170,7 +193,7 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
                     <Button asChild variant="outline" size="sm">
                       <a
                         href={post.storyUrl}
-                        download={`${post.post_key}-story.mp4`}
+                        download={`${post.post_key}-story.${post.content_type === "reel" ? "mp4" : "jpg"}`}
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -205,7 +228,7 @@ export function ContentReviewDialog({ post }: { post: ReviewablePost }) {
                   </Badge>
                 </div>
                 <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                  InstaScanner publishes this Story after the Reel and first comment. Instagram's
+                  InstaScanner publishes this Story after the primary post and first comment. Instagram's
                   publishing API cannot add a link sticker, so this mode intentionally posts without
                   one.
                 </p>
@@ -288,6 +311,60 @@ function VerticalVideo({
       <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 text-[9px] text-white/70 backdrop-blur">
         <Volume2 className="h-3 w-3" /> Sound check
       </div>
+    </div>
+  );
+}
+
+function VerticalImage({
+  url,
+  label,
+  linkStickerLabel,
+}: {
+  url: string | null;
+  label: string;
+  linkStickerLabel?: string;
+}) {
+  return (
+    <div className="relative mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden rounded-[24px] border border-white/15 bg-black shadow-2xl">
+      {url ? (
+        <img src={url} alt={label} className="h-full w-full object-cover" />
+      ) : (
+        <div className="grid h-full place-items-center text-xs text-white/50">No image uploaded</div>
+      )}
+      <div className="pointer-events-none absolute inset-x-[7%] bottom-[17%] top-[8%] rounded-xl border border-dashed border-white/45" />
+      {linkStickerLabel && (
+        <div className="pointer-events-none absolute inset-x-[18%] bottom-[23%] flex items-center justify-center rounded-xl border border-white/25 bg-white/90 px-3 py-2 text-center text-[11px] font-semibold text-black shadow-lg">
+          <Link2 className="mr-1.5 h-3.5 w-3.5" /> {linkStickerLabel}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeedMediaPreview({ urls }: { urls: string[] }) {
+  return (
+    <div className="mx-auto w-full max-w-[420px] space-y-3">
+      {urls.length ? (
+        <div className="grid gap-3">
+          {urls.map((url, index) => (
+            <div
+              key={url}
+              className="relative aspect-[4/5] overflow-hidden rounded-[20px] border border-white/15 bg-black shadow-xl"
+            >
+              <img src={url} alt={`Feed media ${index + 1}`} className="h-full w-full object-cover" />
+              {urls.length > 1 && (
+                <div className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white backdrop-blur">
+                  {index + 1}/{urls.length}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid aspect-[4/5] place-items-center rounded-[20px] border border-white/15 bg-black text-xs text-white/50">
+          No feed media uploaded
+        </div>
+      )}
     </div>
   );
 }

@@ -7,12 +7,15 @@ export type PublisherPreflightPost = Pick<
   ContentPost,
   | "alt_text"
   | "caption"
+  | "content_type"
   | "cover_storage_path"
   | "first_comment"
   | "highlight_enabled"
   | "highlight_name"
   | "media_manifest"
   | "post_key"
+  | "primary_media_alt_texts"
+  | "primary_media_storage_paths"
   | "quality_report"
   | "reel_storage_path"
   | "scheduled_for"
@@ -60,9 +63,47 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function mediaRecord(manifest: unknown, role: "reel" | "story") {
+function mediaRecord(manifest: unknown, role: string) {
   if (!isRecord(manifest) || !isRecord(manifest[role])) return null;
   return manifest[role] as MediaRecord;
+}
+
+function technicalImageCheck(
+  role: string,
+  label: string,
+  media: MediaRecord | null,
+  expected: { width: number; height: number },
+): PreflightCheck {
+  if (!media) {
+    return {
+      code: `${role}_metadata`,
+      label,
+      detail: "Technical metadata is missing. Re-import this package before approval.",
+      state: "blocker",
+    };
+  }
+  if (media.width !== expected.width || media.height !== expected.height) {
+    return {
+      code: `${role}_metadata`,
+      label,
+      detail: `Expected ${expected.width}×${expected.height}, found ${media.width ?? "?"}×${media.height ?? "?"}.`,
+      state: "blocker",
+    };
+  }
+  if (typeof media.bytes !== "number" || media.bytes <= 0 || media.bytes > 20 * 1024 * 1024) {
+    return {
+      code: `${role}_metadata`,
+      label,
+      detail: "The JPEG is empty, above 20 MB or its size could not be verified.",
+      state: "blocker",
+    };
+  }
+  return {
+    code: `${role}_metadata`,
+    label,
+    detail: `${expected.width}×${expected.height} · ${(media.bytes / 1024 / 1024).toFixed(1)} MB`,
+    state: "pass",
+  };
 }
 
 function importedQualityErrors(report: unknown) {
@@ -135,6 +176,42 @@ function displayStatus(post: PublisherPreflightPost, ready: boolean) {
 
 export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDryRun {
   const qualityErrors = importedQualityErrors(post.quality_report);
+  const isReel = post.content_type === "reel";
+  const primaryChecks: PreflightCheck[] = isReel
+    ? [
+        {
+          code: "reel_asset",
+          label: "Reel asset",
+          detail: post.reel_storage_path ? "Uploaded to private storage." : "Reel is missing.",
+          state: post.reel_storage_path ? "pass" : "blocker",
+        },
+        technicalVideoCheck("reel", mediaRecord(post.media_manifest, "reel")),
+      ]
+    : post.primary_media_storage_paths.map((_, index) => {
+        const role = post.content_type === "image" ? "image" : `slide_${index + 1}`;
+        return technicalImageCheck(
+          role,
+          post.content_type === "image" ? "Feed image" : `Carousel slide ${index + 1}`,
+          mediaRecord(post.media_manifest, role),
+          { width: 1080, height: 1350 },
+        );
+      });
+  if (!isReel && post.primary_media_storage_paths.length === 0) {
+    primaryChecks.push({
+      code: "primary_asset",
+      label: post.content_type === "carousel" ? "Carousel slides" : "Feed image",
+      detail: "Primary media is missing.",
+      state: "blocker",
+    });
+  }
+  if (post.content_type === "carousel" && (post.primary_media_storage_paths.length < 2 || post.primary_media_storage_paths.length > 10)) {
+    primaryChecks.push({
+      code: "carousel_count",
+      label: "Carousel order",
+      detail: "A carousel requires 2–10 ordered slides.",
+      state: "blocker",
+    });
+  }
   const checks: PreflightCheck[] = [
     {
       code: "cover",
@@ -144,20 +221,19 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
         : "Cover is missing.",
       state: post.cover_storage_path ? "pass" : "blocker",
     },
-    {
-      code: "reel_asset",
-      label: "Reel asset",
-      detail: post.reel_storage_path ? "Uploaded to private storage." : "Reel is missing.",
-      state: post.reel_storage_path ? "pass" : "blocker",
-    },
-    technicalVideoCheck("reel", mediaRecord(post.media_manifest, "reel")),
+    ...primaryChecks,
     {
       code: "story_asset",
       label: "Story asset",
       detail: post.story_storage_path ? "Uploaded to private storage." : "Story is missing.",
       state: post.story_storage_path ? "pass" : "blocker",
     },
-    technicalVideoCheck("story", mediaRecord(post.media_manifest, "story")),
+    isReel
+      ? technicalVideoCheck("story", mediaRecord(post.media_manifest, "story"))
+      : technicalImageCheck("story", "Story image", mediaRecord(post.media_manifest, "story"), {
+          width: 1080,
+          height: 1920,
+        }),
     {
       code: "caption",
       label: "Caption",
@@ -236,9 +312,11 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
     },
     {
       code: "frame_rate",
-      label: "Frame rate",
-      detail: "Confirm 30 FPS in the final exported file. Browsers cannot verify FPS reliably.",
-      state: "manual",
+      label: isReel ? "Frame rate" : "Feed crop",
+      detail: isReel
+        ? "Confirm 30 FPS in the final exported file. Browsers cannot verify FPS reliably."
+        : "1080×1350 media uses the 4:5 feed-safe format.",
+      state: isReel ? "manual" : "pass",
     },
   ];
 
@@ -258,15 +336,27 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
   const blockers = checks.filter((check) => check.state === "blocker");
   const warnings = checks.filter((check) => check.state === "warning" || check.state === "manual");
   const ready = blockers.length === 0;
-  const reelReady = ready && Boolean(post.reel_storage_path);
+  const reelReady =
+    ready &&
+    (isReel ? Boolean(post.reel_storage_path) : post.primary_media_storage_paths.length > 0);
   const storyReady = ready;
   const steps: PublishPlanStep[] = [
     {
       channel: "reel",
-      label: post.share_to_feed ? "Reel + Feed" : "Reel only",
-      detail: post.share_to_feed
-        ? "One Reel publication with Feed sharing enabled."
-        : "One Reel publication without Feed sharing.",
+      label: isReel
+        ? post.share_to_feed
+          ? "Reel + Feed"
+          : "Reel only"
+        : post.content_type === "carousel"
+          ? "Carousel post"
+          : "Image post",
+      detail: isReel
+        ? post.share_to_feed
+          ? "One Reel publication with Feed sharing enabled."
+          : "One Reel publication without Feed sharing."
+        : post.content_type === "carousel"
+          ? `One ordered ${post.primary_media_storage_paths.length}-slide Feed post.`
+          : "One 4:5 image Feed post.",
       dependsOn: null,
       state: reelReady ? "ready" : "blocked",
     },
@@ -274,7 +364,7 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
       channel: "first_comment",
       label: "First comment",
       detail: post.first_comment.trim()
-        ? "Runs only after the Reel is confirmed as published."
+        ? "Runs only after the primary post is confirmed as published."
         : "No first comment included.",
       dependsOn: "reel",
       state: !post.first_comment.trim() ? "skipped" : reelReady ? "ready" : "blocked",
@@ -285,7 +375,7 @@ export function buildPublisherDryRun(post: PublisherPreflightPost): PublisherDry
         post.story_publish_mode === "automatic_no_link" ? "Automatic Story" : "Story link handoff",
       detail:
         post.story_publish_mode === "automatic_no_link"
-          ? "Publishes after the Reel and first comment without a link sticker."
+          ? "Publishes after the primary post and first comment without a link sticker."
           : "Download Story, copy link, add the link sticker and confirm on mobile.",
       dependsOn: null,
       state: storyReady

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
+  CalendarCheck2,
   CheckCircle2,
   CircleDashed,
   AlertTriangle,
@@ -61,6 +62,14 @@ function localDateTimeValue(date: Date) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function formatPublishingTime(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Berlin",
+  }).format(new Date(value));
+}
+
 export const Route = createFileRoute("/_authenticated/publisher")({
   head: () => ({
     meta: [
@@ -100,9 +109,12 @@ async function loadPosts() {
   const paths = [
     ...new Set(
       data.flatMap((post) =>
-        [post.cover_storage_path, post.reel_storage_path, post.story_storage_path].filter(
-          (path): path is string => Boolean(path),
-        ),
+        [
+          post.cover_storage_path,
+          post.reel_storage_path,
+          post.story_storage_path,
+          ...post.primary_media_storage_paths,
+        ].filter((path): path is string => Boolean(path)),
       ),
     ),
   ];
@@ -117,19 +129,16 @@ async function loadPosts() {
     }
   }
 
-  return data.map(
-    (post): ReviewablePost => ({
-      ...post,
-      publications: publicationsByPost.get(post.id) ?? [],
-      coverUrl: post.cover_storage_path
-        ? (signedByPath.get(post.cover_storage_path) ?? null)
-        : null,
-      reelUrl: post.reel_storage_path ? (signedByPath.get(post.reel_storage_path) ?? null) : null,
-      storyUrl: post.story_storage_path
-        ? (signedByPath.get(post.story_storage_path) ?? null)
-        : null,
-    }),
-  );
+  return data.map((post): ReviewablePost => ({
+    ...post,
+    publications: publicationsByPost.get(post.id) ?? [],
+    coverUrl: post.cover_storage_path ? (signedByPath.get(post.cover_storage_path) ?? null) : null,
+    reelUrl: post.reel_storage_path ? (signedByPath.get(post.reel_storage_path) ?? null) : null,
+    primaryUrls: post.primary_media_storage_paths
+      .map((path) => signedByPath.get(path) ?? null)
+      .filter((url): url is string => Boolean(url)),
+    storyUrl: post.story_storage_path ? (signedByPath.get(post.story_storage_path) ?? null) : null,
+  }));
 }
 
 async function loadInstagramConnection(): Promise<InstagramConnection | null> {
@@ -260,6 +269,31 @@ function ContentPublisherPage() {
     },
   });
 
+  const approveBatchMutation = useMutation({
+    mutationFn: async (batchKey: string) => {
+      if (isPaused) {
+        throw new Error(
+          "Publishing is paused. Resume cloud publishing before approving the batch.",
+        );
+      }
+      const { data, error: approveError } = await supabase.rpc("approve_content_batch", {
+        _batch_key: batchKey,
+      });
+      if (approveError) throw approveError;
+      return data;
+    },
+    onSuccess: (approvedCount) => {
+      toast.success(`${approvedCount} posts approved and scheduled`);
+      qc.invalidateQueries({ queryKey: ["content-posts"] });
+    },
+    onError: (mutationError) =>
+      toast.error(
+        mutationError instanceof Error
+          ? mutationError.message
+          : "Batch approval could not be saved",
+      ),
+  });
+
   const handoffMutation = useMutation({
     mutationFn: async ({
       post,
@@ -294,6 +328,15 @@ function ContentPublisherPage() {
     scheduled: posts.filter((post) => post.status === "scheduled").length,
     published: posts.filter((post) => post.status === "published").length,
   };
+  const latestReviewBatchKey = posts.find(
+    (post) => post.status === "review" && post.batch_key,
+  )?.batch_key;
+  const latestReviewBatch = latestReviewBatchKey
+    ? posts.filter((post) => post.status === "review" && post.batch_key === latestReviewBatchKey)
+    : [];
+  const latestBatchReady = latestReviewBatch.every(
+    (post) => post.planned_for && buildPublisherDryRun(post).ready,
+  );
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -304,8 +347,8 @@ function ContentPublisherPage() {
           </div>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Content Publisher</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Review the batch twice a month. InstaScanner prepares one Reel for the Reels tab, the
-            first comment and a Story or link-sticker handoff.
+            Review the batch twice a month. InstaScanner prepares Reels, image posts and Carousels,
+            including first comments and Stories or link-sticker handoffs.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.15em] text-emerald-300">
@@ -331,6 +374,39 @@ function ContentPublisherPage() {
       <ContentBatchImport
         onImported={() => qc.invalidateQueries({ queryKey: ["content-posts"] })}
       />
+
+      {latestReviewBatchKey && latestReviewBatch.length > 0 ? (
+        <Card className="border-primary/30 bg-primary/[0.05]">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <CalendarCheck2 className="h-4 w-4 text-primary" /> Month batch ready
+              </div>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                All {latestReviewBatch.length} built-in publishing times are applied automatically.
+                One approval schedules the complete batch; your laptop may be offline afterwards.
+              </p>
+              {isPaused ? (
+                <p className="mt-1 text-xs text-amber-200">
+                  Resume cloud publishing above before approving the batch.
+                </p>
+              ) : null}
+            </div>
+            <Button
+              size="lg"
+              onClick={() => approveBatchMutation.mutate(latestReviewBatchKey)}
+              disabled={isPaused || !latestBatchReady || approveBatchMutation.isPending}
+            >
+              {approveBatchMutation.isPending ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              )}
+              Approve all · {latestReviewBatch.length}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {error && (
         <Card className="border-amber-500/30 bg-amber-500/5">
@@ -367,8 +443,8 @@ function ContentPublisherPage() {
                 Import once. Review everything.
               </p>
               <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-                Use the private batch importer above. InstaScanner checks every manifest, cover,
-                Reel and Story before anything reaches this review queue.
+                Use the private batch importer above. InstaScanner checks every manifest, Reel,
+                Carousel slide, image and Story before anything reaches this review queue.
               </p>
             </div>
           </div>
@@ -416,6 +492,12 @@ function ContentPublisherPage() {
                     <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
                       {post.caption}
                     </p>
+                    {post.planned_for ? (
+                      <div className="mt-4 flex w-fit items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.06] px-3 py-1.5 text-xs text-primary">
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        Scheduled by package · {formatPublishingTime(post.planned_for)} CET/CEST
+                      </div>
+                    ) : null}
 
                     {post.status === "failed" && post.last_publish_error && (
                       <div className="mt-4 rounded-lg border border-red-500/25 bg-red-500/[0.06] p-3 text-xs leading-5 text-red-200">
@@ -426,7 +508,7 @@ function ContentPublisherPage() {
 
                     <div className="mt-5 grid grid-cols-1 gap-2 lg:grid-cols-4">
                       <Channel
-                        label={post.share_to_feed ? "Reel + Feed" : "Reel only"}
+                        label={dryRun.steps[0].label}
                         state={actualState("reel", dryRun.steps[0].state)}
                       />
                       <Channel
@@ -811,13 +893,7 @@ function StatusBadge({ result }: { result: PublisherDryRun }) {
 }
 
 type ChannelState =
-  | "ready"
-  | "blocked"
-  | "skipped"
-  | "manual"
-  | "published"
-  | "publishing"
-  | "failed";
+  "ready" | "blocked" | "skipped" | "manual" | "published" | "publishing" | "failed";
 
 function Channel({ label, state }: { label: string; state: ChannelState }) {
   return (

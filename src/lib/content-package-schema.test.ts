@@ -19,6 +19,7 @@ describe("contentManifestSchema", () => {
     expect(result.content_pillar).toBe("Product showcase");
     expect(result.share_to_feed).toBe(true);
     expect(result.story_publish_mode).toBe("manual_link_sticker");
+    expect(result.content_type).toBe("reel");
     expect(result.highlight_enabled).toBe(true);
     expect(result.story_link_label).toBe("Try it now");
   });
@@ -36,7 +37,37 @@ describe("contentManifestSchema", () => {
   });
 
   it("rejects unsupported manifest versions", () => {
-    expect(() => contentManifestSchema.parse({ ...validManifest, version: 2 })).toThrow();
+    expect(() => contentManifestSchema.parse({ ...validManifest, version: 3 })).toThrow();
+  });
+
+  it("accepts a version 2 carousel and keeps its order", () => {
+    const result = contentManifestSchema.parse({
+      ...validManifest,
+      version: 2,
+      content_type: "carousel",
+      files: { slides: ["slides/01.jpg", "slides/02.jpg"], story: "story.jpg" },
+    });
+    expect(result.content_type).toBe("carousel");
+    if (result.content_type === "carousel") {
+      expect(result.files.slides).toEqual(["slides/01.jpg", "slides/02.jpg"]);
+    }
+  });
+
+  it("keeps an embedded publishing time with an explicit offset", () => {
+    const result = contentManifestSchema.parse({
+      ...validManifest,
+      scheduled_for: "2026-09-01T19:15:00+02:00",
+    });
+    expect(result.scheduled_for).toBe("2026-09-01T19:15:00+02:00");
+  });
+
+  it("rejects publishing times without an explicit timezone", () => {
+    expect(() =>
+      contentManifestSchema.parse({
+        ...validManifest,
+        scheduled_for: "2026-09-01T19:15:00",
+      }),
+    ).toThrow();
   });
 
   it("rejects insecure Story links", () => {
