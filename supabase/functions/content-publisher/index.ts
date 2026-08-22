@@ -2,6 +2,10 @@
 // intentionally omitted because it transitively requires npm:openai.
 import { createClient } from "npm:@supabase/supabase-js@2.110.0";
 import { buildReelContainerFields } from "../_shared/instagram-reel.ts";
+import {
+  buildCarouselContainerFields,
+  buildImageContainerFields,
+} from "../_shared/instagram-feed.ts";
 
 const GRAPH_TIMEOUT_MS = 20_000;
 const SIGNED_URL_SECONDS = 12 * 60 * 60;
@@ -14,6 +18,7 @@ type Publication = {
   status: "pending" | "publishing" | "published" | "skipped" | "failed";
   attempts: number;
   platform_container_id: string | null;
+  platform_child_container_ids: string[];
   platform_media_id: string | null;
 };
 
@@ -108,7 +113,7 @@ async function authorize(
 async function signedMediaUrl(
   admin: ReturnType<typeof createClient>,
   storagePath: string,
-  mediaKind: "video" | "cover",
+  mediaKind: "video" | "image" | "cover",
 ) {
   const { data, error } = await admin.storage
     .from("ig-publish")
@@ -256,6 +261,188 @@ async function processVideoPublication(input: {
   return "done";
 }
 
+async function finishImagePublication(input: {
+  admin: ReturnType<typeof createClient>;
+  postId: string;
+  publication: Publication;
+  label: "image" | "carousel" | "story";
+  igUserId: string;
+  apiBaseUrl: string;
+  token: string;
+}) {
+  const containerId = input.publication.platform_container_id;
+  if (!containerId) throw new Error(`${input.label} container id is missing`);
+  const status = await graphRequest(input.apiBaseUrl, containerId, input.token, "GET", {
+    fields: "status_code,status",
+  });
+  const statusCode = String(status.status_code ?? "").toUpperCase();
+  if (["ERROR", "EXPIRED"].includes(statusCode)) {
+    throw new Error(`${input.label} processing failed: ${String(status.status ?? statusCode)}`);
+  }
+  if (statusCode && statusCode !== "FINISHED") return "waiting";
+
+  const published = await graphRequest(
+    input.apiBaseUrl,
+    `${input.igUserId}/media_publish`,
+    input.token,
+    "POST",
+    { creation_id: containerId },
+  );
+  if (typeof published.id !== "string") {
+    throw new Error(`Instagram did not return a ${input.label} media id`);
+  }
+  let permalink: string | null = null;
+  try {
+    const media = await graphRequest(input.apiBaseUrl, published.id, input.token, "GET", {
+      fields: "id,permalink,media_type,media_product_type,timestamp",
+    });
+    permalink = typeof media.permalink === "string" ? media.permalink : null;
+  } catch {
+    // The post exists. A failed permalink lookup must never create a duplicate retry.
+  }
+  await updatePublication(input.admin, input.publication.id, {
+    status: "published",
+    platform_media_id: published.id,
+    permalink,
+    published_at: new Date().toISOString(),
+    last_error: null,
+  });
+  await addEvent(input.admin, input.postId, `${input.label}_published`, {
+    media_id: published.id,
+    permalink,
+  });
+  return "done";
+}
+
+async function processImagePublication(input: {
+  admin: ReturnType<typeof createClient>;
+  postId: string;
+  publication: Publication;
+  storagePath: string;
+  altText: string;
+  caption: string;
+  asStory?: boolean;
+  igUserId: string;
+  apiBaseUrl: string;
+  token: string;
+}) {
+  const { publication } = input;
+  const label = input.asStory ? "story" : "image";
+  if (publication.status === "published" || publication.status === "skipped") return "done";
+  if (publication.status === "failed") return "failed";
+
+  if (publication.status === "pending") {
+    if (publication.attempts >= MAX_PUBLICATION_ATTEMPTS) {
+      throw new Error(`${label} reached the retry limit`);
+    }
+    const imageUrl = await signedMediaUrl(input.admin, input.storagePath, "image");
+    const created = await graphRequest(
+      input.apiBaseUrl,
+      `${input.igUserId}/media`,
+      input.token,
+      "POST",
+      buildImageContainerFields({
+        imageUrl,
+        altText: input.altText,
+        caption: input.asStory ? "" : input.caption,
+        mediaType: input.asStory ? "STORIES" : undefined,
+      }),
+    );
+    if (typeof created.id !== "string") {
+      throw new Error(`Instagram did not return an ${label} container`);
+    }
+    await updatePublication(input.admin, publication.id, {
+      status: "publishing",
+      attempts: publication.attempts + 1,
+      platform_container_id: created.id,
+      last_error: null,
+    });
+    await addEvent(input.admin, input.postId, `${label}_container_created`, {
+      container_id: created.id,
+    });
+    return "waiting";
+  }
+
+  return finishImagePublication({ ...input, label });
+}
+
+async function processCarouselPublication(input: {
+  admin: ReturnType<typeof createClient>;
+  postId: string;
+  publication: Publication;
+  storagePaths: string[];
+  altTexts: string[];
+  caption: string;
+  igUserId: string;
+  apiBaseUrl: string;
+  token: string;
+}) {
+  const { publication } = input;
+  if (publication.status === "published" || publication.status === "skipped") return "done";
+  if (publication.status === "failed") return "failed";
+  if (input.storagePaths.length < 2 || input.storagePaths.length > 10) {
+    throw new Error("Carousel requires 2–10 slides");
+  }
+
+  if (publication.status === "pending") {
+    if (publication.attempts >= MAX_PUBLICATION_ATTEMPTS) {
+      throw new Error("carousel reached the retry limit");
+    }
+    const childIds = [...(publication.platform_child_container_ids ?? [])];
+    for (let index = childIds.length; index < input.storagePaths.length; index += 1) {
+      const imageUrl = await signedMediaUrl(input.admin, input.storagePaths[index], "image");
+      const created = await graphRequest(
+        input.apiBaseUrl,
+        `${input.igUserId}/media`,
+        input.token,
+        "POST",
+        buildImageContainerFields({
+          imageUrl,
+          altText: input.altTexts[index] ?? input.altTexts[0] ?? "",
+          isCarouselItem: true,
+        }),
+      );
+      if (typeof created.id !== "string") {
+        throw new Error(`Instagram did not return carousel child ${index + 1}`);
+      }
+      childIds.push(created.id);
+      await updatePublication(input.admin, publication.id, {
+        platform_child_container_ids: childIds,
+        last_error: null,
+      });
+      await addEvent(input.admin, input.postId, "carousel_child_created", {
+        position: index + 1,
+        container_id: created.id,
+      });
+    }
+
+    const parent = await graphRequest(
+      input.apiBaseUrl,
+      `${input.igUserId}/media`,
+      input.token,
+      "POST",
+      buildCarouselContainerFields({ children: childIds, caption: input.caption }),
+    );
+    if (typeof parent.id !== "string") {
+      throw new Error("Instagram did not return a carousel container");
+    }
+    await updatePublication(input.admin, publication.id, {
+      status: "publishing",
+      attempts: publication.attempts + 1,
+      platform_container_id: parent.id,
+      platform_child_container_ids: childIds,
+      last_error: null,
+    });
+    await addEvent(input.admin, input.postId, "carousel_container_created", {
+      container_id: parent.id,
+      child_count: childIds.length,
+    });
+    return "waiting";
+  }
+
+  return finishImagePublication({ ...input, label: "carousel" });
+}
+
 async function processFirstComment(input: {
   admin: ReturnType<typeof createClient>;
   postId: string;
@@ -299,7 +486,7 @@ async function processFirstComment(input: {
 async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
   const { data: due, error } = await admin
     .from("content_posts")
-    .select("id,reel_storage_path,story_storage_path,cover_storage_path")
+    .select("id,reel_storage_path,story_storage_path,cover_storage_path,primary_media_storage_paths")
     .is("media_cleaned_at", null)
     .lte("media_cleanup_after", new Date().toISOString())
     .limit(5);
@@ -309,7 +496,12 @@ async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
   for (const post of due ?? []) {
     const paths = [
       ...new Set(
-        [post.reel_storage_path, post.story_storage_path, post.cover_storage_path].filter(Boolean),
+        [
+          post.reel_storage_path,
+          post.story_storage_path,
+          post.cover_storage_path,
+          ...(post.primary_media_storage_paths ?? []),
+        ].filter(Boolean),
       ),
     ] as string[];
     if (paths.length) {
@@ -350,12 +542,12 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
 
   const { data: rows, error: publicationError } = await admin
     .from("content_publications")
-    .select("id,channel,status,attempts,platform_container_id,platform_media_id")
+    .select("id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id")
     .eq("content_post_id", postId);
   if (publicationError) throw publicationError;
   const publications = new Map((rows as Publication[]).map((item) => [item.channel, item]));
-  const reel = publications.get("reel");
-  if (!reel || !post.reel_storage_path) throw new Error("Reel publication is incomplete");
+  const primary = publications.get("reel");
+  if (!primary) throw new Error("Primary publication is incomplete");
 
   const apiBaseUrl = connection.api_base_url ?? "https://graph.facebook.com/v25.0";
   const common = {
@@ -366,25 +558,47 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
     token: connection.page_access_token,
   };
 
-  const reelState = await processVideoPublication({
-    ...common,
-    publication: reel,
-    channel: "reel",
-    storagePath: post.reel_storage_path,
-    coverStoragePath: post.cover_storage_path,
-    caption: post.caption,
-    shareToFeed: post.share_to_feed,
-  });
-  if (reelState !== "done") return { state: reelState, channel: "reel" };
+  let primaryState: string;
+  if (post.content_type === "carousel") {
+    primaryState = await processCarouselPublication({
+      ...common,
+      publication: primary,
+      storagePaths: post.primary_media_storage_paths ?? [],
+      altTexts: post.primary_media_alt_texts ?? [],
+      caption: post.caption,
+    });
+  } else if (post.content_type === "image") {
+    const imagePath = post.primary_media_storage_paths?.[0];
+    if (!imagePath) throw new Error("Feed image publication is incomplete");
+    primaryState = await processImagePublication({
+      ...common,
+      publication: primary,
+      storagePath: imagePath,
+      altText: post.primary_media_alt_texts?.[0] ?? post.alt_text,
+      caption: post.caption,
+    });
+  } else {
+    if (!post.reel_storage_path) throw new Error("Reel publication is incomplete");
+    primaryState = await processVideoPublication({
+      ...common,
+      publication: primary,
+      channel: "reel",
+      storagePath: post.reel_storage_path,
+      coverStoragePath: post.cover_storage_path,
+      caption: post.caption,
+      shareToFeed: post.share_to_feed,
+    });
+  }
+  if (primaryState !== "done") return { state: primaryState, channel: "reel" };
 
-  const refreshedReel =
-    reel.status === "published"
-      ? reel
+  const refreshedPrimary =
+    primary.status === "published"
+      ? primary
       : ((
           await admin
             .from("content_publications")
-            .select("id,channel,status,attempts,platform_container_id,platform_media_id")
-            .eq("id", reel.id)
+            .select("id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id")
+            .eq("id", primary.id)
             .single()
         ).data as Publication);
 
@@ -392,7 +606,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
     admin,
     postId,
     publication: publications.get("first_comment"),
-    reel: refreshedReel,
+    reel: refreshedPrimary,
     message: post.first_comment,
     apiBaseUrl,
     token: connection.page_access_token,
@@ -402,14 +616,24 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
   if (post.story_publish_mode === "automatic_no_link") {
     const story = publications.get("story");
     if (!story || !post.story_storage_path) throw new Error("Story publication is incomplete");
-    const storyState = await processVideoPublication({
-      ...common,
-      publication: story,
-      channel: "story",
-      storagePath: post.story_storage_path,
-      caption: "",
-      shareToFeed: false,
-    });
+    const storyState =
+      post.content_type === "reel"
+        ? await processVideoPublication({
+            ...common,
+            publication: story,
+            channel: "story",
+            storagePath: post.story_storage_path,
+            caption: "",
+            shareToFeed: false,
+          })
+        : await processImagePublication({
+            ...common,
+            publication: story,
+            storagePath: post.story_storage_path,
+            altText: post.alt_text,
+            caption: "",
+            asStory: true,
+          });
     if (storyState !== "done") return { state: storyState, channel: "story" };
   }
 

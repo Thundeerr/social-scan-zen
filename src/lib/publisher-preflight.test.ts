@@ -4,6 +4,7 @@ import { buildPublisherDryRun, type PublisherPreflightPost } from "./publisher-p
 const completePost: PublisherPreflightPost = {
   alt_text: "FollowerStar Live Follower Tracker shown on screen.",
   caption: "Track Instagram follower growth live with FollowerStar.",
+  content_type: "reel",
   cover_storage_path: "user/post/cover.jpg",
   first_comment: "Try the free tracker through the link in our bio.",
   highlight_enabled: true,
@@ -13,6 +14,8 @@ const completePost: PublisherPreflightPost = {
     story: { width: 1080, height: 1920, durationSeconds: 20, bytes: 9_000_000 },
   },
   post_key: "T003-live-001",
+  primary_media_alt_texts: [],
+  primary_media_storage_paths: [],
   quality_report: [],
   reel_storage_path: "user/post/reel.mp4",
   scheduled_for: null,
@@ -58,6 +61,26 @@ describe("buildPublisherDryRun", () => {
       ["story", "ready"],
       ["highlight_handoff", "manual"],
     ]);
+  });
+
+  it("accepts an ordered 4:5 carousel with an image Story", () => {
+    const result = buildPublisherDryRun({
+      ...completePost,
+      content_type: "carousel",
+      cover_storage_path: "user/post/slide-1.jpg",
+      reel_storage_path: null,
+      primary_media_storage_paths: ["user/post/slide-1.jpg", "user/post/slide-2.jpg"],
+      primary_media_alt_texts: ["Slide one", "Slide two"],
+      media_manifest: {
+        slide_1: { width: 1080, height: 1350, bytes: 1_000_000 },
+        slide_2: { width: 1080, height: 1350, bytes: 1_100_000 },
+        story: { width: 1080, height: 1920, bytes: 1_200_000 },
+      },
+      story_publish_mode: "automatic_no_link",
+      story_link_url: "",
+    });
+    expect(result.ready).toBe(true);
+    expect(result.steps[0].label).toBe("Carousel post");
   });
 
   it("blocks missing assets and invalid Story links", () => {

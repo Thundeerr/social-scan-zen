@@ -1,49 +1,88 @@
 import { z } from "zod";
 import { isAllowedFollowerStarStoryUrl, withInstagramStoryTracking } from "./story-link";
 
+const manifestBase = z.object({
+  version: z.union([z.literal(1), z.literal(2)]),
+  post_key: z
+    .string()
+    .trim()
+    .min(3)
+    .max(80)
+    .regex(
+      /^[A-Za-z0-9][A-Za-z0-9._-]+$/,
+      "Use only letters, numbers, dots, dashes and underscores",
+    ),
+  title: z.string().trim().min(2).max(120),
+  hook: z.string().trim().min(2).max(180),
+  caption: z.string().trim().min(10).max(2200),
+  first_comment: z.string().trim().max(2200).default(""),
+  alt_text: z.string().trim().max(1000).default(""),
+  content_pillar: z.string().trim().max(80).default("Product showcase"),
+  highlight_enabled: z.boolean().default(true),
+  highlight_name: z
+    .string()
+    .trim()
+    .max(30)
+    .regex(/^[^\r\n]*$/)
+    .default(""),
+  share_to_feed: z.boolean().default(true),
+  scheduled_for: z.string().datetime({ offset: true }).optional(),
+  story_publish_mode: z
+    .enum(["manual_link_sticker", "automatic_no_link"])
+    .default("manual_link_sticker"),
+  story_link_url: z.string().trim().max(2048).default(""),
+  story_link_label: z
+    .string()
+    .trim()
+    .min(2)
+    .max(50)
+    .regex(/^[^\r\n]+$/, "Story link label must fit on one line")
+    .default("Try it now"),
+});
+
+const reelManifestSchema = manifestBase.extend({
+  content_type: z.literal("reel"),
+  files: z.object({
+    cover: z.string().trim().min(1),
+    reel: z.string().trim().min(1),
+    story: z.string().trim().min(1),
+  }),
+});
+
+const imageManifestSchema = manifestBase.extend({
+  content_type: z.literal("image"),
+  files: z.object({
+    image: z.string().trim().min(1),
+    story: z.string().trim().min(1),
+  }),
+});
+
+const carouselManifestSchema = manifestBase.extend({
+  content_type: z.literal("carousel"),
+  files: z.object({
+    slides: z.array(z.string().trim().min(1)).min(2).max(10),
+    story: z.string().trim().min(1),
+  }),
+});
+
 export const contentManifestSchema = z
-  .object({
-    version: z.literal(1),
-    post_key: z
-      .string()
-      .trim()
-      .min(3)
-      .max(80)
-      .regex(
-        /^[A-Za-z0-9][A-Za-z0-9._-]+$/,
-        "Use only letters, numbers, dots, dashes and underscores",
-      ),
-    title: z.string().trim().min(2).max(120),
-    hook: z.string().trim().min(2).max(180),
-    caption: z.string().trim().min(10).max(2200),
-    first_comment: z.string().trim().max(2200).default(""),
-    alt_text: z.string().trim().max(1000).default(""),
-    content_pillar: z.string().trim().max(80).default("Product showcase"),
-    highlight_enabled: z.boolean().default(true),
-    highlight_name: z
-      .string()
-      .trim()
-      .max(30)
-      .regex(/^[^\r\n]*$/)
-      .default(""),
-    share_to_feed: z.boolean().default(true),
-    story_publish_mode: z
-      .enum(["manual_link_sticker", "automatic_no_link"])
-      .default("manual_link_sticker"),
-    story_link_url: z.string().trim().max(2048).default(""),
-    story_link_label: z
-      .string()
-      .trim()
-      .min(2)
-      .max(50)
-      .regex(/^[^\r\n]+$/, "Story link label must fit on one line")
-      .default("Try it now"),
-    files: z.object({
-      cover: z.string().trim().min(1),
-      reel: z.string().trim().min(1),
-      story: z.string().trim().min(1),
-    }),
-  })
+  .preprocess(
+    (value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+      const input = value as Record<string, unknown>;
+      const files = input.files as Record<string, unknown> | undefined;
+      const inferred =
+        input.content_type ??
+        input.format ??
+        (Array.isArray(files?.slides) ? "carousel" : files?.image ? "image" : "reel");
+      return { ...input, content_type: inferred };
+    },
+    z.discriminatedUnion("content_type", [
+      reelManifestSchema,
+      imageManifestSchema,
+      carouselManifestSchema,
+    ]),
+  )
   .superRefine((manifest, context) => {
     if (
       manifest.story_publish_mode === "manual_link_sticker" &&
@@ -65,7 +104,7 @@ export const contentManifestSchema = z
   });
 
 export type ContentManifest = z.infer<typeof contentManifestSchema>;
-export type PackageFileRole = "cover" | "reel" | "story";
+export type PackageFileRole = "cover" | "reel" | "image" | "story" | `slide_${number}`;
 
 export type MediaMetadata = {
   role: PackageFileRole;
@@ -87,8 +126,9 @@ export type PackageIssue = {
 
 export type PreparedContentPackage = {
   manifest: ContentManifest;
-  files: Record<PackageFileRole, File>;
-  media: Record<PackageFileRole, MediaMetadata>;
+  files: Record<string, File>;
+  media: Record<string, MediaMetadata>;
+  orderedRoles: PackageFileRole[];
   issues: PackageIssue[];
   mediaSha256: string;
   packageSha256: string;
@@ -98,6 +138,7 @@ export const MAX_BATCH_POSTS = 100;
 const MAX_BATCH_BYTES = 5 * 1024 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 256 * 1024;
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 const METADATA_TIMEOUT_MS = 20_000;
 
@@ -216,9 +257,13 @@ async function inspectVideo(file: File) {
   }
 }
 
-async function inspectMedia(role: PackageFileRole, file: File): Promise<MediaMetadata> {
+async function inspectMedia(
+  role: PackageFileRole,
+  file: File,
+  contentType: "image" | "video",
+): Promise<MediaMetadata> {
   const buffer = await file.arrayBuffer();
-  if (role === "cover") {
+  if (contentType === "image") {
     const dimensions = await inspectImage(file);
     return {
       role,
@@ -248,11 +293,137 @@ function ratioClose(width: number, height: number, target: number, tolerance = 0
 
 function validatePreparedPackage(
   manifest: ContentManifest,
-  media: Record<PackageFileRole, MediaMetadata>,
+  media: Record<string, MediaMetadata>,
 ): PackageIssue[] {
   const issues: PackageIssue[] = [];
   const vertical = 9 / 16;
   const coverRatio = 420 / 654;
+
+  if (manifest.scheduled_for) {
+    const plannedAt = new Date(manifest.scheduled_for).getTime();
+    issues.push({
+      severity: plannedAt > Date.now() + 60_000 ? "pass" : "error",
+      code: "scheduled_for",
+      label: "Built-in publishing time",
+      detail:
+        plannedAt > Date.now() + 60_000
+          ? new Intl.DateTimeFormat("en-GB", {
+              dateStyle: "medium",
+              timeStyle: "short",
+              timeZone: "Europe/Berlin",
+            }).format(new Date(plannedAt))
+          : "The built-in publishing time is invalid or already in the past.",
+    });
+  } else {
+    issues.push({
+      severity: "warning",
+      code: "scheduled_for",
+      label: "Built-in publishing time",
+      detail: "No time is embedded; this post must be scheduled manually.",
+    });
+  }
+
+  if (manifest.content_type !== "reel") {
+    const primaryRoles =
+      manifest.content_type === "image"
+        ? (["image"] as PackageFileRole[])
+        : manifest.files.slides.map((_, index) => `slide_${index + 1}` as PackageFileRole);
+
+    for (const role of primaryRoles) {
+      const item = media[role];
+      const label = manifest.content_type === "image" ? "Feed image" : `Slide ${role.slice(6)}`;
+      if (item.contentType !== "image/jpeg") {
+        issues.push({
+          severity: "error",
+          code: `${role}_type`,
+          label: `${label} format`,
+          detail: "Instagram publishing supports JPEG feed images only.",
+        });
+      }
+      if (item.width !== 1080 || item.height !== 1350) {
+        issues.push({
+          severity: "error",
+          code: `${role}_size`,
+          label: `${label} resolution`,
+          detail: `Export as 1080×1350 instead of ${item.width}×${item.height}.`,
+        });
+      } else {
+        issues.push({
+          severity: "pass",
+          code: `${role}_size`,
+          label: `${label} resolution`,
+          detail: "1080×1350 · Instagram-ready",
+        });
+      }
+    }
+
+    const story = media.story;
+    if (story.contentType !== "image/jpeg") {
+      issues.push({
+        severity: "error",
+        code: "story_type",
+        label: "Story format",
+        detail: "Image Stories must be JPEG for reliable Instagram publishing.",
+      });
+    }
+    if (story.width !== 1080 || story.height !== 1920) {
+      issues.push({
+        severity: "error",
+        code: "story_size",
+        label: "Story resolution",
+        detail: `Export Story as 1080×1920 instead of ${story.width}×${story.height}.`,
+      });
+    } else {
+      issues.push({
+        severity: "pass",
+        code: "story_size",
+        label: "Story resolution",
+        detail: "1080×1920 · Instagram-ready",
+      });
+    }
+
+    issues.push({
+      severity: manifest.alt_text ? "pass" : "warning",
+      code: "alt_text",
+      label: "Alt text",
+      detail: manifest.alt_text ? "Included" : "Add alt text for accessibility.",
+    });
+    issues.push({
+      severity: manifest.first_comment ? "pass" : "warning",
+      code: "first_comment",
+      label: "First comment",
+      detail: manifest.first_comment ? "Included" : "No first comment is included.",
+    });
+    if (manifest.content_type === "carousel") {
+      issues.push({
+        severity: "pass",
+        code: "carousel_count",
+        label: "Carousel order",
+        detail: `${primaryRoles.length} ordered JPEG slides`,
+      });
+    }
+    if (manifest.highlight_enabled) {
+      issues.push({
+        severity: "pass",
+        code: "highlight_handoff",
+        label: "Highlight target",
+        detail: manifest.highlight_name || suggestedHighlightName(manifest.content_pillar),
+      });
+    }
+    issues.push({
+      severity: "pass",
+      code: "story_delivery",
+      label:
+        manifest.story_publish_mode === "automatic_no_link"
+          ? "Automatic Story"
+          : "Story link handoff",
+      detail:
+        manifest.story_publish_mode === "automatic_no_link"
+          ? "Publishes automatically without a link sticker."
+          : `${manifest.story_link_label} · FollowerStar HTTPS link`,
+    });
+    return issues;
+  }
 
   if (media.cover.contentType !== "image/jpeg") {
     issues.push({
@@ -464,15 +635,39 @@ export async function prepareContentPackage(
     return matches[0];
   };
 
-  const files = {
-    cover: resolveFile(parsed.data.files.cover, "cover"),
-    reel: resolveFile(parsed.data.files.reel, "reel"),
-    story: resolveFile(parsed.data.files.story, "story"),
-  };
+  const files: Record<string, File> = {};
+  const orderedRoles: PackageFileRole[] = [];
+  if (parsed.data.content_type === "reel") {
+    files.cover = resolveFile(parsed.data.files.cover, "cover");
+    files.reel = resolveFile(parsed.data.files.reel, "reel");
+    files.story = resolveFile(parsed.data.files.story, "story");
+    orderedRoles.push("cover", "reel", "story");
+  } else if (parsed.data.content_type === "image") {
+    files.image = resolveFile(parsed.data.files.image, "image");
+    files.story = resolveFile(parsed.data.files.story, "story");
+    orderedRoles.push("image", "story");
+  } else {
+    const seenSlideNames = new Set<string>();
+    parsed.data.files.slides.forEach((name, index) => {
+      const normalized = baseName(name);
+      if (seenSlideNames.has(normalized)) throw new Error(`Carousel slide is repeated: ${name}`);
+      seenSlideNames.add(normalized);
+      const role = `slide_${index + 1}` as PackageFileRole;
+      files[role] = resolveFile(name, role);
+      orderedRoles.push(role);
+    });
+    files.story = resolveFile(parsed.data.files.story, "story");
+    orderedRoles.push("story");
+  }
 
   for (const [role, file] of Object.entries(files) as [PackageFileRole, File][]) {
     if (file.size <= 0) throw new Error(`${file.name} is empty.`);
-    const limit = role === "cover" ? MAX_COVER_BYTES : MAX_VIDEO_BYTES;
+    const limit =
+      parsed.data.content_type === "reel" && role !== "cover"
+        ? MAX_VIDEO_BYTES
+        : role === "cover"
+          ? MAX_COVER_BYTES
+          : MAX_IMAGE_BYTES;
     if (file.size > limit) {
       const limitMb = Math.round(limit / 1024 / 1024);
       throw new Error(`${file.name} exceeds the ${limitMb} MB ${role} safety limit.`);
@@ -480,11 +675,13 @@ export async function prepareContentPackage(
   }
 
   const inspected: MediaMetadata[] = [];
-  for (const [role, file] of Object.entries(files) as [PackageFileRole, File][]) {
-    inspected.push(await inspectMedia(role, file));
+  for (const role of orderedRoles) {
+    const file = files[role];
+    const contentType = parsed.data.content_type === "reel" && role !== "cover" ? "video" : "image";
+    inspected.push(await inspectMedia(role, file, contentType));
   }
   const media = Object.fromEntries(inspected.map((item) => [item.role, item])) as Record<
-    PackageFileRole,
+    string,
     MediaMetadata
   >;
   const mediaSha256 = await sha256(
@@ -513,6 +710,7 @@ export async function prepareContentPackage(
     },
     files,
     media,
+    orderedRoles,
     issues: validatePreparedPackage(parsed.data, media),
     mediaSha256,
     packageSha256,

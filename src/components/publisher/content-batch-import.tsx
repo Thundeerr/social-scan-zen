@@ -89,7 +89,13 @@ export function ContentBatchImport({ onImported }: Props) {
       setCoverUrl(null);
       return;
     }
-    const next = URL.createObjectURL(selected.files.cover);
+    const previewRole =
+      selected.manifest.content_type === "reel"
+        ? "cover"
+        : selected.manifest.content_type === "image"
+          ? "image"
+          : "slide_1";
+    const next = URL.createObjectURL(selected.files[previewRole]);
     setCoverUrl(next);
     return () => URL.revokeObjectURL(next);
   }, [selected]);
@@ -171,15 +177,14 @@ export function ContentBatchImport({ onImported }: Props) {
       }
 
       const sharedBatchId = plan.reusableBatchKey ?? crypto.randomUUID();
-      const roles: PackageFileRole[] = ["cover", "reel", "story"];
-      const totalFiles = pending.length * roles.length;
+      const totalFiles = pending.reduce((sum, item) => sum + item.orderedRoles.length, 0);
       let completedFiles = 0;
 
       for (const item of pending) {
         if (controller.signal.aborted) throw new DOMException("Upload cancelled", "AbortError");
         const root = `${auth.user.id}/content/${item.manifest.post_key}/${item.packageSha256}`;
         const paths = Object.fromEntries(
-          roles.map((role) => {
+          item.orderedRoles.map((role) => {
             const file = item.files[role];
             const hash = item.media[role].sha256.slice(0, 16);
             return [role, `${root}/${role}-${hash}.${storageExtension(file)}`];
@@ -192,7 +197,7 @@ export function ContentBatchImport({ onImported }: Props) {
             .remove(Object.values(paths));
           if (orphanError) throw new Error(`Could not clean an earlier partial upload.`);
 
-          for (const role of roles) {
+          for (const role of item.orderedRoles) {
             const file = item.files[role];
             await uploadContentFile({
               file,
@@ -208,10 +213,23 @@ export function ContentBatchImport({ onImported }: Props) {
 
           const mediaManifest = {
             package_sha256: item.packageSha256,
+            content_type: item.manifest.content_type,
             ...Object.fromEntries(
-              roles.map((role) => [role, { ...item.media[role], storage_path: paths[role] }]),
+              item.orderedRoles.map((role) => [
+                role,
+                { ...item.media[role], storage_path: paths[role] },
+              ]),
             ),
           };
+          const primaryRoles = item.orderedRoles.filter(
+            (role) => role !== "story" && role !== "cover",
+          );
+          const previewRole =
+            item.manifest.content_type === "reel"
+              ? "cover"
+              : item.manifest.content_type === "image"
+                ? "image"
+                : "slide_1";
           const { error: insertError } = await supabase.from("content_posts").insert({
             user_id: auth.user.id,
             post_key: item.manifest.post_key,
@@ -227,11 +245,15 @@ export function ContentBatchImport({ onImported }: Props) {
             story_link_url: item.manifest.story_link_url,
             story_link_label: item.manifest.story_link_label,
             story_publish_mode: item.manifest.story_publish_mode,
+            planned_for: item.manifest.scheduled_for ?? null,
             manifest_version: item.manifest.version,
+            content_type: item.manifest.content_type,
             batch_key: sharedBatchId,
-            cover_storage_path: paths.cover,
-            reel_storage_path: paths.reel,
+            cover_storage_path: paths[previewRole],
+            reel_storage_path: item.manifest.content_type === "reel" ? paths.reel : null,
             story_storage_path: paths.story,
+            primary_media_storage_paths: primaryRoles.map((role) => paths[role]),
+            primary_media_alt_texts: primaryRoles.map(() => item.manifest.alt_text),
             media_sha256: item.mediaSha256,
             media_manifest: mediaManifest,
             quality_report: item.issues,
@@ -326,8 +348,8 @@ export function ContentBatchImport({ onImported }: Props) {
             </div>
             <p className="mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
               Select one post folder or a parent folder containing many post folders. Every
-              manifest, 1080×1920 Reel, Story, cover and Story link are checked before private
-              upload.
+              manifest, Reel or Carousel media, Story, cover and Story settings are checked before
+              private upload.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-3 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
@@ -369,6 +391,11 @@ export function ContentBatchImport({ onImported }: Props) {
                     </span>
                   </div>
                   <h3 className="mt-1 text-lg font-semibold">{selected.manifest.title}</h3>
+                  <div className="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    {selected.manifest.content_type === "carousel"
+                      ? `${selected.manifest.files.slides.length}-slide carousel`
+                      : selected.manifest.content_type}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="border-primary/30 text-primary">
