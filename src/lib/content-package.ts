@@ -166,6 +166,35 @@ function directoryName(value: string) {
   return slash >= 0 ? normalized.slice(0, slash) : "";
 }
 
+export function belongsToManifestPackage(
+  manifestPath: string,
+  candidatePath: string,
+  allManifestPaths: string[],
+) {
+  const directory = directoryName(manifestPath);
+  const directoryPrefix = directory ? `${directory}/` : "";
+  const normalizedCandidate = candidatePath.replaceAll("\\", "/");
+  const belongsToDirectory =
+    directory === "" ||
+    normalizedCandidate === directory ||
+    normalizedCandidate.startsWith(directoryPrefix);
+  if (!belongsToDirectory) return false;
+
+  return !allManifestPaths.some((otherManifestPath) => {
+    const nestedDirectory = directoryName(otherManifestPath);
+    if (
+      nestedDirectory === directory ||
+      (directory !== "" && !nestedDirectory.startsWith(directoryPrefix))
+    ) {
+      return false;
+    }
+    return (
+      normalizedCandidate === nestedDirectory ||
+      normalizedCandidate.startsWith(`${nestedDirectory}/`)
+    );
+  });
+}
+
 function extension(value: string) {
   const name = baseName(value);
   const dot = name.lastIndexOf(".");
@@ -741,8 +770,11 @@ export async function prepareContentBatch(
 
   const packages: PreparedContentPackage[] = [];
   for (const manifest of manifests) {
-    const directory = directoryName(selectedPath(manifest));
-    const files = selectedFiles.filter((file) => directoryName(selectedPath(file)) === directory);
+    const manifestPath = selectedPath(manifest);
+    const allManifestPaths = manifests.map(selectedPath);
+    const files = selectedFiles.filter((file) =>
+      belongsToManifestPackage(manifestPath, selectedPath(file), allManifestPaths),
+    );
     packages.push(await prepareContentPackage(files));
     onProgress?.(packages.length, manifests.length);
   }
