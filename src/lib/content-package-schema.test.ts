@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentManifestSchema } from "./content-package";
+import { belongsToManifestPackage, contentManifestSchema } from "./content-package";
 
 const validManifest = {
   version: 1,
@@ -102,5 +102,56 @@ describe("contentManifestSchema", () => {
         story_publish_mode: "automatic_no_link",
       }),
     ).toThrow();
+  });
+});
+
+describe("belongsToManifestPackage", () => {
+  const manifests = [
+    "13_MONTH_01/E001-first-30-minutes-001/manifest.json",
+    "13_MONTH_01/E002-best-time-to-post-001/manifest.json",
+  ];
+
+  it("keeps nested carousel slides with their manifest", () => {
+    expect(
+      belongsToManifestPackage(
+        manifests[0],
+        "13_MONTH_01/E001-first-30-minutes-001/slides/01.jpg",
+        manifests,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not pull files from a sibling package", () => {
+    expect(
+      belongsToManifestPackage(
+        manifests[0],
+        "13_MONTH_01/E002-best-time-to-post-001/slides/01.jpg",
+        manifests,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not pull files from a nested package with its own manifest", () => {
+    const nestedManifests = [
+      "batch/manifest.json",
+      "batch/nested/manifest.json",
+    ];
+    expect(
+      belongsToManifestPackage(
+        nestedManifests[0],
+        "batch/nested/slides/01.jpg",
+        nestedManifests,
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps a root manifest from absorbing a nested package", () => {
+    expect(
+      belongsToManifestPackage(
+        "manifest.json",
+        "nested/slides/01.jpg",
+        ["manifest.json", "nested/manifest.json"],
+      ),
+    ).toBe(false);
   });
 });
