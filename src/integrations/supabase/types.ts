@@ -283,8 +283,8 @@ export type Database = {
           media_cleanup_after: string | null
           media_manifest: Json
           media_sha256: string | null
-          post_key: string
           planned_for: string | null
+          post_key: string
           primary_media_alt_texts: string[]
           primary_media_storage_paths: string[]
           publish_attempts: number
@@ -327,8 +327,8 @@ export type Database = {
           media_cleanup_after?: string | null
           media_manifest?: Json
           media_sha256?: string | null
-          post_key: string
           planned_for?: string | null
+          post_key: string
           primary_media_alt_texts?: string[]
           primary_media_storage_paths?: string[]
           publish_attempts?: number
@@ -371,8 +371,8 @@ export type Database = {
           media_cleanup_after?: string | null
           media_manifest?: Json
           media_sha256?: string | null
-          post_key?: string
           planned_for?: string | null
+          post_key?: string
           primary_media_alt_texts?: string[]
           primary_media_storage_paths?: string[]
           publish_attempts?: number
@@ -405,8 +405,8 @@ export type Database = {
           id: string
           last_error: string | null
           permalink: string | null
-          platform_container_id: string | null
           platform_child_container_ids: string[]
+          platform_container_id: string | null
           platform_media_id: string | null
           published_at: string | null
           status: string
@@ -421,8 +421,8 @@ export type Database = {
           id?: string
           last_error?: string | null
           permalink?: string | null
-          platform_container_id?: string | null
           platform_child_container_ids?: string[]
+          platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
           status?: string
@@ -437,8 +437,8 @@ export type Database = {
           id?: string
           last_error?: string | null
           permalink?: string | null
-          platform_container_id?: string | null
           platform_child_container_ids?: string[]
+          platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
           status?: string
@@ -1648,6 +1648,7 @@ export type Database = {
       }
     }
     Functions: {
+      approve_content_batch: { Args: { _batch_key: string }; Returns: number }
       can_access_asset: { Args: { _asset_id: string }; Returns: boolean }
       claim_due_content_post: {
         Args: { _content_post_id?: string; _user_id?: string }
@@ -1704,10 +1705,6 @@ export type Database = {
       release_content_publish_lease: {
         Args: { _content_post_id: string }
         Returns: undefined
-      }
-      approve_content_batch: {
-        Args: { _batch_key: string }
-        Returns: number
       }
       review_content_post: {
         Args: { _content_post_id: string; _decision: string; _note?: string }
