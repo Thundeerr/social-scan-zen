@@ -317,7 +317,7 @@ def cycle(cloud, library, instance, ffprobe, ffmpeg):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument("--once",action="store_true");args=parser.parse_args()
     if os.name != "nt": raise InboxError("setup")
-    state=Path(os.environ["LOCALAPPDATA"]) / "InstaScanner" / "ReelInbox"
+    state=Path(os.environ["USERPROFILE"]) / ".local" / "share" / "InstaScanner" / "ReelInbox"
     safe_path(state,state);state.mkdir(parents=True,exist_ok=True)
     # OS-released lock, so a crash does not leave a permanent lock file.
     import msvcrt

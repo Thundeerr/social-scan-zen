@@ -6,7 +6,7 @@ param(
   [switch]$Autostart
 )
 $ErrorActionPreference = 'Stop'
-$state = Join-Path $env:LOCALAPPDATA 'InstaScanner\ReelInbox'
+$state = Join-Path $env:USERPROFILE '.local\share\InstaScanner\ReelInbox'
 foreach ($tool in @($Python,$Ffmpeg,$Ffprobe)) { if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) { throw 'Werkzeugpfad nicht gefunden.' } }
 if (Test-Path -LiteralPath (Join-Path $state 'config.json')) { throw 'Bereits eingerichtet. Zuerst Deinstallieren.ps1 ausführen; Medien bleiben erhalten.' }
 New-Item -ItemType Directory -Path $state -Force | Out-Null

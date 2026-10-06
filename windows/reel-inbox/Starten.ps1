@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
-$state = Join-Path $env:LOCALAPPDATA 'InstaScanner\ReelInbox'
+$state = Join-Path $env:USERPROFILE '.local\share\InstaScanner\ReelInbox'
 $config = Get-Content -LiteralPath (Join-Path $state 'config.json') -Raw | ConvertFrom-Json
 $stopFile = Join-Path $state 'STOP'
 if (Test-Path -LiteralPath $stopFile) { Write-Host 'Helfer gestoppt. Fortsetzen.ps1 verwenden.'; exit }
-$secret = Get-Content -LiteralPath (Join-Path $state 'token.dpapi') -Raw | ConvertTo-SecureString
+$secret = (Get-Content -LiteralPath (Join-Path $state 'token.dpapi') -Raw).Trim() | ConvertTo-SecureString
 $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
 try {
   $env:REEL_INBOX_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)

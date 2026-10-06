@@ -1,4 +1,4 @@
-$state = Join-Path $env:LOCALAPPDATA 'InstaScanner\ReelInbox'
+$state = Join-Path $env:USERPROFILE '.local\share\InstaScanner\ReelInbox'
 $stopFile = Join-Path $state 'STOP'
 if (Test-Path -LiteralPath $stopFile) { Remove-Item -LiteralPath $stopFile }
 Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-File',('"' + (Join-Path $state 'Starten.ps1') + '"'))
