@@ -290,7 +290,7 @@ class Cloud:
             raise InboxError("setup")
         self.token=token
     def call(self,payload):
-        req=urllib.request.Request(ORIGIN+"/api/reel-inbox/worker",data=json.dumps(payload).encode(),headers={"Authorization":"Bearer "+self.token,"Content-Type":"application/json"},method="POST")
+        req=urllib.request.Request(ORIGIN+"/api/reel-inbox/worker",data=json.dumps(payload).encode(),headers={"Authorization":"Bearer "+self.token,"Content-Type":"application/json","User-Agent":"InstaScanner-ReelInbox/1.0 (+https://instascanner.app)"},method="POST")
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self,*args,**kwargs): return None
         with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(req,timeout=30) as response:
