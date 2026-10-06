@@ -6,6 +6,7 @@ import { stages, type InboxSnapshot } from "@/lib/reel-inbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ReelInboxDm } from "@/components/reel-inbox-dm";
 
 export const Route = createFileRoute("/_authenticated/reel-inbox")({ component: ReelInbox });
 const statuses = {
@@ -88,6 +89,7 @@ function ReelInbox() {
           <span> Zuletzt: {new Date(device.last_seen_at).toLocaleString("de-DE")}</span>
         )}
       </p>
+      <ReelInboxDm userId={user.id} />
       <section className="space-y-3 rounded-xl border bg-card p-4">
         <label htmlFor="reels" className="font-medium">
           Instagram-Reel-Links
