@@ -28,6 +28,8 @@ Das Skript installiert die festgelegte yt-dlp-Version in einer eigenen Python-Um
 - **Stoppen.ps1**: dauerhaften Stopp vormerken. Der aktuelle begrenzte Abruf darf noch enden, vor Dateiablage wird abgebrochen. Höchstens ca. 3 Minuten bis zum nächsten Prüfpunkt.
 - **Deinstallieren.ps1**: Aufgabe entfernen und lokale Kopplung löschen. Medien und Programmdateien bleiben erhalten. Zusätzlich in der App **PC-Zugriff widerrufen** verwenden.
 
+Im Installationsordner gibt es auch **Stoppen.cmd**, **Fortsetzen.cmd** und **Deinstallieren.cmd** zum Doppelklicken.
+
 Lokaler Betriebszustand: `%USERPROFILE%\.local\share\InstaScanner\ReelInbox\status.json`. Dieser Pfad vermeidet die AppData-Umleitung paketierter Windows-Apps. Installationszustand und Schlüssel liegen außerhalb OneDrive und Git. Unvollständige Versuche bleiben unter `Videos\.staging` zur Prüfung erhalten; es gibt keine automatische Löschung.
 
 ## Sicherheits- und Fehlerverhalten
