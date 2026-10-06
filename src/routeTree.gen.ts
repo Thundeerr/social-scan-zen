@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedTelegramRouteImport } from './routes/_authenticated/telegram'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
+import { Route as AuthenticatedReelInboxRouteImport } from './routes/_authenticated/reel-inbox'
 import { Route as AuthenticatedPublisherRouteImport } from './routes/_authenticated/publisher'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
 import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
@@ -24,6 +25,7 @@ import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
+import { Route as ApiReelInboxWorkerRouteImport } from './routes/api/reel-inbox/worker'
 import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
@@ -60,6 +62,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
 const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
   id: '/scanner',
   path: '/scanner',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReelInboxRoute = AuthenticatedReelInboxRouteImport.update({
+  id: '/reel-inbox',
+  path: '/reel-inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPublisherRoute = AuthenticatedPublisherRouteImport.update({
@@ -108,6 +115,11 @@ const AuthenticatedMonitorIndexRoute =
     path: '/monitor/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiReelInboxWorkerRoute = ApiReelInboxWorkerRouteImport.update({
+  id: '/api/reel-inbox/worker',
+  path: '/api/reel-inbox/worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedMonitorAccountIdRoute =
   AuthenticatedMonitorAccountIdRouteImport.update({
     id: '/monitor/$accountId',
@@ -166,11 +178,13 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/publisher': typeof AuthenticatedPublisherRoute
+  '/reel-inbox': typeof AuthenticatedReelInboxRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
@@ -189,12 +203,14 @@ export interface FileRoutesByTo {
   '/downloads': typeof AuthenticatedDownloadsRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/publisher': typeof AuthenticatedPublisherRoute
+  '/reel-inbox': typeof AuthenticatedReelInboxRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/telegram': typeof AuthenticatedTelegramRoute
   '/': typeof AuthenticatedIndexRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
@@ -215,12 +231,14 @@ export interface FileRoutesById {
   '/_authenticated/downloads': typeof AuthenticatedDownloadsRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
   '/_authenticated/publisher': typeof AuthenticatedPublisherRoute
+  '/_authenticated/reel-inbox': typeof AuthenticatedReelInboxRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/_authenticated/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
@@ -242,11 +260,13 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/locations'
     | '/publisher'
+    | '/reel-inbox'
     | '/scanner'
     | '/settings'
     | '/telegram'
     | '/discovery/analytics'
     | '/monitor/$accountId'
+    | '/api/reel-inbox/worker'
     | '/monitor/'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
@@ -265,12 +285,14 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/locations'
     | '/publisher'
+    | '/reel-inbox'
     | '/scanner'
     | '/settings'
     | '/telegram'
     | '/'
     | '/discovery/analytics'
     | '/monitor/$accountId'
+    | '/api/reel-inbox/worker'
     | '/monitor'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
@@ -290,12 +312,14 @@ export interface FileRouteTypes {
     | '/_authenticated/downloads'
     | '/_authenticated/locations'
     | '/_authenticated/publisher'
+    | '/_authenticated/reel-inbox'
     | '/_authenticated/scanner'
     | '/_authenticated/settings'
     | '/_authenticated/telegram'
     | '/_authenticated/'
     | '/_authenticated/discovery/analytics'
     | '/_authenticated/monitor/$accountId'
+    | '/api/reel-inbox/worker'
     | '/_authenticated/monitor/'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
@@ -308,6 +332,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiReelInboxWorkerRoute: typeof ApiReelInboxWorkerRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
   ApiPublicCronDispatchRoute: typeof ApiPublicCronDispatchRoute
   ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
@@ -358,6 +383,13 @@ declare module '@tanstack/react-router' {
       path: '/scanner'
       fullPath: '/scanner'
       preLoaderRoute: typeof AuthenticatedScannerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reel-inbox': {
+      id: '/_authenticated/reel-inbox'
+      path: '/reel-inbox'
+      fullPath: '/reel-inbox'
+      preLoaderRoute: typeof AuthenticatedReelInboxRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/publisher': {
@@ -422,6 +454,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/monitor/'
       preLoaderRoute: typeof AuthenticatedMonitorIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/reel-inbox/worker': {
+      id: '/api/reel-inbox/worker'
+      path: '/api/reel-inbox/worker'
+      fullPath: '/api/reel-inbox/worker'
+      preLoaderRoute: typeof ApiReelInboxWorkerRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/monitor/$accountId': {
       id: '/_authenticated/monitor/$accountId'
@@ -505,6 +544,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDownloadsRoute: typeof AuthenticatedDownloadsRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
   AuthenticatedPublisherRoute: typeof AuthenticatedPublisherRoute
+  AuthenticatedReelInboxRoute: typeof AuthenticatedReelInboxRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTelegramRoute: typeof AuthenticatedTelegramRoute
@@ -522,6 +562,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDownloadsRoute: AuthenticatedDownloadsRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
   AuthenticatedPublisherRoute: AuthenticatedPublisherRoute,
+  AuthenticatedReelInboxRoute: AuthenticatedReelInboxRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTelegramRoute: AuthenticatedTelegramRoute,
@@ -536,6 +577,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiReelInboxWorkerRoute: ApiReelInboxWorkerRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
   ApiPublicCronDispatchRoute: ApiPublicCronDispatchRoute,
   ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,

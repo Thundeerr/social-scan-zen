@@ -26,6 +26,7 @@ const items = [
   { to: "/assets", label: "New Assets", icon: Images },
   { to: "/discovery", label: "Discovery", icon: Sparkles },
   { to: "/downloads", label: "Archive", icon: Download },
+  { to: "/reel-inbox", label: "Reel Inbox", icon: Clapperboard },
   { to: "/scanner", label: "Scanner", icon: Radar },
   { to: "/publisher", label: "Content Publisher", icon: Clapperboard },
   { to: "/burn", label: "Token Burn Rate", icon: Flame },
