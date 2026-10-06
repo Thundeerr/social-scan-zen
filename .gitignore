@@ -19,6 +19,10 @@ dist-ssr
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+.tools/
+__pycache__/
+.reel-inbox-test/
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*
