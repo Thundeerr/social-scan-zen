@@ -101,7 +101,68 @@ assert.equal((await db.query("select * from public.reel_inbox_items")).rows.leng
 await db.exec("reset role; set role anon");
 await assert.rejects(db.exec("select * from public.reel_inbox_items"));
 await assert.rejects(call("list", a));
+await db.exec("reset role");
+await db.exec(
+  await readFile(
+    new URL("../supabase/migrations/20261006025347_reel_inbox_dm.sql", import.meta.url),
+    "utf8",
+  ),
+);
+await db.query(
+  "insert into public.reel_inbox_dm_sources(user_id,receiver_id,enabled) values($1,'10',true)",
+  [a],
+);
+const dm = async (
+  sender,
+  username,
+  hash = "b".repeat(64),
+  links = [{ shortcode: "NewReel123", url: "https://www.instagram.com/reel/NewReel123/" }],
+) =>
+  (
+    await db.query("select public.reel_inbox_dm_ingest('10',$1,$2,$3,$4) as value", [
+      sender,
+      username,
+      hash,
+      JSON.stringify(links),
+    ])
+  ).rows[0].value;
+await db.exec("set role authenticated");
+await assert.rejects(dm("20", "kiikii.bat"));
+for (const table of ["sources", "senders", "receipts"])
+  await assert.rejects(db.exec(`select * from public.reel_inbox_dm_${table}`));
+await db.exec("reset role; set role service_role");
+assert.equal((await dm("20", "stranger")).ignored, true);
+await dm("20", "kiikii.bat");
+assert.equal((await dm("20", "kiikii.bat")).duplicate, true);
+assert.equal((await dm("21", "kiikii.bat")).ignored, true);
+assert.equal((await dm("20", "thundeerr999")).ignored, true);
+await dm("21", "thundeerr999", "c".repeat(64), []);
+assert.equal(
+  (
+    await db.query("select status from reel_inbox_dm_receipts where message_hash=$1", [
+      "c".repeat(64),
+    ])
+  ).rows[0].status,
+  "no_reel_link",
+);
+assert.equal(
+  (await db.query("select status from reel_inbox_items where shortcode='NewReel123'")).rows[0]
+    .status,
+  "queued",
+);
+await assert.rejects(
+  dm("20", "kiikii.bat", "d".repeat(64), [{ shortcode: "BadReel123", url: "https://evil.test/" }]),
+);
+assert.equal(
+  (await db.query("select count(*)::int as n from reel_inbox_dm_receipts")).rows[0].n,
+  2,
+);
+await db.exec("update reel_inbox_dm_sources set enabled=false");
+assert.equal((await dm("20", "kiikii.bat", "e".repeat(64))).ignored, true);
 await db.close();
+console.log(
+  "PASS: DM sender allowlist, pinned identity, replay dedupe, atomic rollback, offline queue, pause and service-only grants",
+);
 console.log(
   "PASS: transactional queue, dedupe, cross-user isolation, role grants, leases, offline reclaim, stale receipt, move acknowledgment, retry, revocation",
 );
