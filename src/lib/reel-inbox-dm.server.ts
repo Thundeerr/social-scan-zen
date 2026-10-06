@@ -49,7 +49,8 @@ async function graph(path: string, token: string, fields?: string, body?: URLSea
     method: body ? "POST" : "GET",
     headers: { Authorization: `Bearer ${token}` },
     body,
-    redirect: "error",
+    // Edge runtime supports manual redirects; non-2xx responses are rejected below.
+    redirect: "manual",
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error("Meta-Verbindung prüfen; bitte erneut versuchen.");
