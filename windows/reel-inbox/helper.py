@@ -290,7 +290,7 @@ class Cloud:
             raise InboxError("setup")
         self.token=token
     def call(self,payload):
-        req=urllib.request.Request(ORIGIN+"/api/reel-inbox/worker",data=json.dumps(payload).encode(),headers={"Authorization":"Bearer "+self.token,"Content-Type":"application/json"},method="POST")
+        req=urllib.request.Request(ORIGIN+"/api/reel-inbox/worker",data=json.dumps(payload).encode(),headers={"Authorization":"Bearer "+self.token,"Content-Type":"application/json","User-Agent":"InstaScanner-ReelInbox/1.0 (+https://instascanner.app)"},method="POST")
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self,*args,**kwargs): return None
         with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect()).open(req,timeout=30) as response:
@@ -317,7 +317,7 @@ def cycle(cloud, library, instance, ffprobe, ffmpeg):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument("--once",action="store_true");args=parser.parse_args()
     if os.name != "nt": raise InboxError("setup")
-    state=Path(os.environ["LOCALAPPDATA"]) / "InstaScanner" / "ReelInbox"
+    state=Path(os.environ["USERPROFILE"]) / ".local" / "share" / "InstaScanner" / "ReelInbox"
     safe_path(state,state);state.mkdir(parents=True,exist_ok=True)
     # OS-released lock, so a crash does not leave a permanent lock file.
     import msvcrt

@@ -6,7 +6,7 @@ param(
   [switch]$Autostart
 )
 $ErrorActionPreference = 'Stop'
-$state = Join-Path $env:LOCALAPPDATA 'InstaScanner\ReelInbox'
+$state = Join-Path $env:USERPROFILE '.local\share\InstaScanner\ReelInbox'
 foreach ($tool in @($Python,$Ffmpeg,$Ffprobe)) { if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) { throw 'Werkzeugpfad nicht gefunden.' } }
 if (Test-Path -LiteralPath (Join-Path $state 'config.json')) { throw 'Bereits eingerichtet. Zuerst Deinstallieren.ps1 ausführen; Medien bleiben erhalten.' }
 New-Item -ItemType Directory -Path $state -Force | Out-Null
@@ -22,6 +22,12 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'helper.py') -Destination (Join-
 Copy-Item -LiteralPath $Ffmpeg -Destination (Join-Path $state 'ffmpeg.exe')
 Copy-Item -LiteralPath $Ffprobe -Destination (Join-Path $state 'ffprobe.exe')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Starten.ps1') -Destination (Join-Path $state 'Starten.ps1')
+foreach ($name in @('Stoppen.ps1','Fortsetzen.ps1','Deinstallieren.ps1','README.md')) {
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $state $name)
+}
+foreach ($name in @('Stoppen','Fortsetzen','Deinstallieren')) {
+  ('@echo off' + "`r`n" + 'powershell.exe -NoProfile -File "%~dp0' + $name + '.ps1"' + "`r`npause`r`n") | Set-Content -LiteralPath (Join-Path $state ($name + '.cmd')) -Encoding ascii
+}
 $secret = if ($Token) { $Token } else { Read-Host 'PC-Schlüssel aus Reel Inbox eingeben (verdeckt)' -AsSecureString }
 # DPAPI: decryptable only by this Windows user on this PC.
 $secret | ConvertFrom-SecureString | Set-Content -LiteralPath (Join-Path $state 'token.dpapi')

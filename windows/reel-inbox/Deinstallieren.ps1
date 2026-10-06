@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$state = Join-Path $env:LOCALAPPDATA 'InstaScanner\ReelInbox'
+$state = Join-Path $env:USERPROFILE '.local\share\InstaScanner\ReelInbox'
 & (Join-Path $PSScriptRoot 'Stoppen.ps1')
 $task = Get-ScheduledTask -TaskName 'InstaScanner Reel Inbox' -ErrorAction SilentlyContinue
 if ($task) { Stop-ScheduledTask -InputObject $task; Unregister-ScheduledTask -InputObject $task -Confirm:$false }
