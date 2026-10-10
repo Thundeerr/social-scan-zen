@@ -42,6 +42,75 @@ beforeEach(() => {
   mock.rpc.mockResolvedValue({ data: { ok: true }, error: null });
 });
 describe("DM parsing", () => {
+  it.each(["share", "ig_reel", "reel", "ig_post", "post"])(
+    "extracts a permalink from a %s card without text",
+    (type) => {
+      const parsed = dmEvents(
+        payload(
+          event({
+            text: undefined,
+            attachments: [
+              {
+                type,
+                payload: {
+                  url: "https://lookaside.fbsbx.com/temporary?secret=hidden",
+                  permalink: "https://www.instagram.com/kiikii.bat/reel/Chunk8-jurw/",
+                },
+              },
+            ],
+          }),
+        ),
+      )[0];
+      expect(parsed.links).toEqual([
+        { shortcode: "Chunk8-jurw", url: "https://www.instagram.com/reel/Chunk8-jurw/" },
+      ]);
+      expect(parsed.diagnostics.outcome).toBe("link_found");
+      expect(JSON.stringify(parsed.diagnostics)).not.toContain("hidden");
+    },
+  );
+  it("retains text links when an attachment has no usable payload", () => {
+    for (const p of [null, undefined, "malformed", { url: 123 }]) {
+      expect(
+        dmEvents(payload(event({ attachments: [{ type: "ig_reel", payload: p }] })))[0].links,
+      ).toHaveLength(1);
+    }
+  });
+  it("diagnoses unsupported and CDN-only cards without inventing a permalink", () => {
+    expect(
+      dmEvents(payload(event({ text: undefined, is_unsupported: true })))[0].diagnostics.outcome,
+    ).toBe("unsupported");
+    const parsed = dmEvents(
+      payload(
+        event({
+          text: undefined,
+          attachments: [
+            {
+              type: "ig_reel",
+              payload: { url: "https://lookaside.fbsbx.com/media?id=123", id: "123", title: link },
+            },
+          ],
+        }),
+      ),
+    )[0];
+    expect(parsed.links).toEqual([]);
+    expect(parsed.diagnostics.outcome).toBe("no_permalink");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("does not mine arbitrary attachment fields for links", () => {
+    expect(
+      dmEvents(
+        payload(
+          event({
+            text: undefined,
+            attachments: [
+              { type: "image", payload: { url: link } },
+              { type: "share", payload: { title: link, nested: { url: link } } },
+            ],
+          }),
+        ),
+      )[0].links,
+    ).toEqual([]);
+  });
   it("canonicalizes text and shared posts with dedupe", () => {
     const p = payload(event({ attachments: [{ type: "share", payload: { url: link } }] }));
     expect(dmEvents(p)[0].links).toEqual([
@@ -131,6 +200,12 @@ describe("DM authentication and durable intake", () => {
     expect((await dmWebhook(request(payload()))).status).toBe(200);
     expect(fetch).not.toHaveBeenCalled();
     expect(mock.rpc).toHaveBeenCalledOnce();
+    expect(mock.rpc).toHaveBeenCalledWith(
+      "reel_inbox_dm_ingest_v2",
+      expect.objectContaining({
+        p_diagnostics: expect.objectContaining({ outcome: "link_found" }),
+      }),
+    );
   });
   it("does not acknowledge failed persistence and exposes no secrets", async () => {
     account([{ sender_id: "20", username: "kiikii.bat" }]);

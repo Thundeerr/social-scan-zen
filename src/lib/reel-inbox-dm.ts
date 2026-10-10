@@ -13,12 +13,13 @@ const message = z.object({
       mid: z.string().min(1).max(2000),
       is_echo: z.boolean().optional(),
       is_deleted: z.boolean().optional(),
+      is_unsupported: z.boolean().optional(),
       text: z.string().max(20000).optional(),
       attachments: z
         .array(
           z.object({
             type: z.string(),
-            payload: z.object({ url: z.string().max(8000).optional() }).passthrough(),
+            payload: z.unknown().optional(),
           }),
         )
         .max(50)
@@ -30,6 +31,25 @@ const envelope = z.object({
   object: z.literal("instagram"),
   entry: z.array(z.object({ id, messaging: z.array(z.unknown()).max(100).optional() })).max(100),
 });
+
+export function dmReceiptExplanation(diagnostics: unknown): string {
+  const outcome =
+    diagnostics && typeof diagnostics === "object"
+      ? (diagnostics as Record<string, unknown>).outcome
+      : null;
+  switch (outcome) {
+    case "unsupported":
+      return "Instagram meldet diese Nachricht als nicht unterstützt.";
+    case "no_permalink":
+      return "Der geteilte Anhang enthält keinen direkt nutzbaren Instagram-Reel-Link.";
+    case "attachment_without_link":
+      return "Ein Anhang wurde empfangen, aber kein nutzbarer Reel-Link übermittelt.";
+    case "no_attachment":
+      return "Die Nachricht enthält weder einen Anhang noch einen nutzbaren Reel-Link.";
+    default:
+      return "Kein nutzbarer Reel-Link enthalten; für ältere Nachrichten fehlen Diagnosedaten.";
+  }
+}
 
 export function dmEvents(body: unknown) {
   const parsed = envelope.safeParse(body);
@@ -47,12 +67,21 @@ export function dmEvents(body: unknown) {
       )
         return [];
       const data = event.data.message;
-      const candidates = [
-        ...(data.text?.match(/https:\/\/[^\s<>"']+/g) ?? []),
-        ...(data.attachments ?? [])
-          .filter((a) => a.type === "share" || a.type === "ig_reel" || a.type === "reel")
-          .map((a) => a.payload.url ?? ""),
-      ];
+      const attachments = data.attachments ?? [];
+      const shareTypes = new Set(["share", "ig_reel", "reel", "ig_post", "post"]);
+      const attachmentUrls = attachments
+        .filter((a) => shareTypes.has(a.type))
+        .flatMap((a) => {
+          const payload = a.payload;
+          if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+          // Read only explicit link fields. Never scan captions/titles or infer a
+          // shortcode from a numeric media ID or a signed CDN URL.
+          const fields = payload as Record<string, unknown>;
+          return [fields.url, fields.permalink].filter(
+            (url): url is string => typeof url === "string" && url.length <= 8000,
+          );
+        });
+      const candidates = [...(data.text?.match(/https:\/\/[^\s<>"']+/g) ?? []), ...attachmentUrls];
       const links = new Map<string, ReturnType<typeof canonicalReel>>();
       for (const candidate of candidates) {
         try {
@@ -69,6 +98,21 @@ export function dmEvents(body: unknown) {
           sender: event.data.sender.id,
           mid: data.mid,
           links: [...links.values()],
+          diagnostics: {
+            attachment_count: attachments.length,
+            share_count: attachments.filter((a) => shareTypes.has(a.type)).length,
+            url_count: attachmentUrls.length,
+            unsupported: data.is_unsupported === true,
+            outcome: links.size
+              ? "link_found"
+              : data.is_unsupported
+                ? "unsupported"
+                : attachmentUrls.length
+                  ? "no_permalink"
+                  : attachments.length
+                    ? "attachment_without_link"
+                    : "no_attachment",
+          },
         },
       ];
     }),
