@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reelInboxDmFn } from "@/lib/reel-inbox-dm.functions";
 import { Button } from "@/components/ui/button";
+import { dmReceiptExplanation } from "@/lib/reel-inbox-dm";
 
 export function ReelInboxDm({ userId }: { userId: string }) {
   const cache = useQueryClient();
@@ -56,7 +57,7 @@ export function ReelInboxDm({ userId }: { userId: string }) {
           @{r.sender} · {new Date(r.received_at).toLocaleString("de-DE")} ·{" "}
           {r.status === "queued"
             ? `${r.link_count} Reel-Link(s) an die Inbox übergeben`
-            : "Kein nutzbarer Reel-Link enthalten. Bitte den kopierten Reel-Link als Text senden."}
+            : `${dmReceiptExplanation(r.diagnostics)} Bitte ersatzweise den kopierten Reel-Link als Text senden.`}
         </p>
       ))}
       <div className="flex flex-wrap gap-2">

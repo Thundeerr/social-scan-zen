@@ -12,11 +12,13 @@ export function canonicalReel(input: string) {
     url.port
   )
     throw new Error("Bitte einen HTTPS-Link zu einem Instagram-Reel verwenden.");
-  const match = /^\/(?:reel|reels|p)\/([A-Za-z0-9_-]{5,64})\/?$/.exec(url.pathname);
+  const match = /^\/(?:[A-Za-z0-9._]{1,30}\/)?(reel|reels|p)\/([A-Za-z0-9_-]{5,64})\/?$/.exec(
+    url.pathname,
+  );
   if (!match) throw new Error("Der Link führt nicht zu einem einzelnen Instagram-Reel.");
   return {
-    shortcode: match[1],
-    url: `https://www.instagram.com/${url.pathname.startsWith("/p/") ? "p" : "reel"}/${match[1]}/`,
+    shortcode: match[2],
+    url: `https://www.instagram.com/${match[1] === "p" ? "p" : "reel"}/${match[2]}/`,
   };
 }
 export function parseReelLinks(text: string) {

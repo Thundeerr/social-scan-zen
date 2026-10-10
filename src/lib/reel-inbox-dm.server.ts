@@ -119,7 +119,7 @@ export async function dmOperator(user: string, action: "status" | "enable" | "di
   const receipts = checked(
     await db
       .from("reel_inbox_dm_receipts")
-      .select("sender,status,link_count,received_at")
+      .select("sender,status,link_count,received_at,diagnostics")
       .eq("user_id", user)
       .order("received_at", { ascending: false })
       .limit(10),
@@ -166,12 +166,13 @@ export async function ingestDm(body: unknown) {
       if (!DM_SENDERS.some((name) => name === username)) continue;
     }
     checked(
-      await db.rpc("reel_inbox_dm_ingest", {
+      await db.rpc("reel_inbox_dm_ingest_v2", {
         p_receiver: event.receiver,
         p_sender: event.sender,
         p_username: username,
         p_hash: createHash("sha256").update(event.mid).digest("hex"),
         p_links: event.links,
+        p_diagnostics: event.diagnostics,
       }),
     );
   }

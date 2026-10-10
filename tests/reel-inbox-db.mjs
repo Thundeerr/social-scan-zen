@@ -159,6 +159,53 @@ assert.equal(
 );
 await db.exec("update reel_inbox_dm_sources set enabled=false");
 assert.equal((await dm("20", "kiikii.bat", "e".repeat(64))).ignored, true);
+await db.exec("reset role");
+await db.exec(
+  await readFile(
+    new URL("../supabase/migrations/20261010122517_reel_card_diagnostics.sql", import.meta.url),
+    "utf8",
+  ),
+);
+const diagnostic = {
+  outcome: "no_permalink",
+  attachment_count: 1,
+  share_count: 1,
+  url_count: 1,
+  unsupported: false,
+};
+const dm2 = async (value = diagnostic, sender = "20") =>
+  (
+    await db.query(
+      "select public.reel_inbox_dm_ingest_v2('10',$1,'kiikii.bat',$2,'[]'::jsonb,$3) as value",
+      [sender, "f".repeat(64), JSON.stringify(value)],
+    )
+  ).rows[0].value;
+await db.exec("set role authenticated");
+await assert.rejects(dm2());
+await db.exec("reset role; set role service_role");
+assert.equal((await dm2()).ignored, true);
+await db.exec("update reel_inbox_dm_sources set enabled=true");
+assert.equal((await dm2(diagnostic, "999")).ignored, true);
+await dm2({ ...diagnostic, text: "PRIVATE", url: "SECRET" });
+const diagnosticRow = (
+  await db.query("select diagnostics from reel_inbox_dm_receipts where message_hash=$1", [
+    "f".repeat(64),
+  ])
+).rows[0];
+assert.deepEqual(diagnosticRow.diagnostics, diagnostic);
+assert.equal((await dm2({ ...diagnostic, outcome: "unsupported" })).duplicate, true);
+assert.deepEqual(
+  (
+    await db.query("select diagnostics from reel_inbox_dm_receipts where message_hash=$1", [
+      "f".repeat(64),
+    ])
+  ).rows[0].diagnostics,
+  diagnostic,
+);
+await assert.rejects(dm2({ ...diagnostic, attachment_count: 51 }));
+console.log(
+  "PASS: private shape-only diagnostics, pinned sender, service-only access, replay immutability",
+);
 await db.close();
 console.log(
   "PASS: DM sender allowlist, pinned identity, replay dedupe, atomic rollback, offline queue, pause and service-only grants",
