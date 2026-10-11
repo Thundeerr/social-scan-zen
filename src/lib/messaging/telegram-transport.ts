@@ -134,15 +134,26 @@ export async function contentReviewTelegramCall(
 
 /** Same private review bot; fixed API allowlist, no webhook/polling methods. */
 export async function channelAlertTelegramCall(
-  method: "sendMessage" | "deleteMessages" | "getMe" | "getChatMember" | "editMessageReplyMarkup",
+  method:
+    | "sendMessage"
+    | "deleteMessages"
+    | "getMe"
+    | "getChatMember"
+    | "editMessageReplyMarkup"
+    | "editMessageCaption",
   body: Record<string, unknown>,
 ): Promise<TelegramApiResult> {
   const token = process.env.CONTENT_REVIEW_BOT_TOKEN;
   if (
     !token?.startsWith("8905298936:") ||
-    !["sendMessage", "deleteMessages", "getMe", "getChatMember", "editMessageReplyMarkup"].includes(
-      method,
-    )
+    ![
+      "sendMessage",
+      "deleteMessages",
+      "getMe",
+      "getChatMember",
+      "editMessageReplyMarkup",
+      "editMessageCaption",
+    ].includes(method)
   )
     return { ok: false, status: 0 };
   try {
@@ -152,8 +163,20 @@ export async function channelAlertTelegramCall(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });
-    const data = (await response.json()) as { ok?: boolean; result?: unknown };
-    return { ok: response.ok && data.ok === true, status: response.status, result: data.result };
+    const data = (await response.json()) as {
+      ok?: boolean;
+      result?: unknown;
+      description?: string;
+    };
+    const unchanged =
+      method === "editMessageCaption" &&
+      response.status === 400 &&
+      data.description?.includes("message is not modified");
+    return {
+      ok: (response.ok && data.ok === true) || !!unchanged,
+      status: response.status,
+      result: data.result,
+    };
   } catch {
     return { ok: false, status: 0 };
   }

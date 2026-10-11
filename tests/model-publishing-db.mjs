@@ -58,6 +58,7 @@ try {
   await db.exec(await migration("20261011102726_channel_alerts.sql"));
   await db.exec(await migration("20261011112049_model_trial_reels.sql"));
   await db.exec(await migration("20261011125819_model_posting_queue.sql"));
+  await db.exec(await migration("20261011131405_review_card_status_sync.sql"));
   await db.exec("set role service_role");
   await assert.rejects(call("status", ref, other));
   await assert.rejects(call("prepare", prepare));
@@ -212,6 +213,50 @@ try {
     )
   ).rows[0];
   assert.equal(Number(dst.hours), 25);
+  await db.query("update content_review_items set telegram_message_id=10 where id=$1", [b.id]);
+  const sync = async (action, data) =>
+    (
+      await db.query("select review_card_sync_command($1,$2,$3) v", [
+        owner,
+        action,
+        JSON.stringify(data),
+      ])
+    ).rows[0].v;
+  const claimed = await sync("claim", { id: b.id });
+  assert.equal(claimed.item.telegram_message_id, 10);
+  assert.equal(claimed.post.status, "scheduled");
+  assert.equal(await sync("claim", { id: b.id }), null);
+  await call("unschedule", b); // A newer change during an edit cannot be lost.
+  await sync("done", { id: b.id, lease: claimed.lease });
+  const newer = await sync("claim", { id: b.id });
+  assert.equal(newer.post.status, "approved");
+  await assert.rejects(sync("done", { id: b.id, lease: claimed.lease }));
+  await sync("retry", { id: b.id, lease: newer.lease });
+  assert.equal(await sync("claim", { id: b.id }), null);
+  await db.query(
+    "update review_card_sync set retry_at=now()-interval '1 second' where item_id=$1",
+    [b.id],
+  );
+  const retried = await sync("claim", { id: b.id });
+  await sync("done", { id: b.id, lease: retried.lease });
+  assert.equal(await sync("claim", { id: b.id }), null);
+  await call("cancel", b);
+  await db.query("select content_review_command($1,'edit',$2)", [
+    owner,
+    JSON.stringify({ ...b, caption: "New caption" }),
+  ]);
+  const edited = (
+    await db.query(
+      "select revision,status,telegram_message_id from content_review_items where id=$1",
+      [b.id],
+    )
+  ).rows[0];
+  assert.equal(edited.telegram_message_id, 10);
+  assert.equal(edited.status, "pending");
+  assert.equal(edited.revision, 2);
+  console.log(
+    "Telegram card queue passed: lease isolation, new changes preserved, stale receipts rejected, delayed retry and successful completion.",
+  );
   console.log(
     "Posting queue passed: 14 slots, explicit confirmation, account, revision, isolation, collision, idempotency, cancellation, expiry and DST.",
   );
