@@ -15,6 +15,7 @@ export const reviewAction = z.discriminatedUnion("action", [
   z.object({ action: z.literal("finalize"), ...item }),
   z.object({ action: z.literal("preview"), ...item }),
   z.object({ action: z.literal("notify"), ...item }),
+  z.object({ action: z.literal("refresh_card"), ...item }),
   z.object({ action: z.literal("edit"), ...item, caption: z.string().max(2200) }),
   z.object({
     action: z.literal("decide"),
@@ -38,6 +39,7 @@ export type ReviewItem = {
   bytes: number | null;
   created_at: string;
   publish_post_id?: string | null;
+  telegram_message_id?: number | null;
 };
 export type ReviewResult = {
   items?: ReviewItem[];
@@ -52,11 +54,17 @@ export function reviewCard(item: ReviewItem, origin: string, chatId: string) {
   const url = new URL("/content-review", origin);
   if (url.protocol !== "https:" || url.username || url.password) throw new Error("HTTPS required");
   url.searchParams.set("item", item.id);
+  const mini = new URL("/telegram-review", origin);
+  mini.searchParams.set("item", item.id);
   return {
     chat_id: chatId,
-    caption: `${models[item.model]} · Reel-Freigabe · Version ${item.revision}\n${item.title}\n\nVideo und Caption in InstaScanner prüfen. Freigeben veröffentlicht noch nichts.`,
+    caption: `${models[item.model]} · Reel-Freigabe · Version ${item.revision}\n${item.title}\n\nVideo, Caption und Hashtags direkt in Telegram prüfen. Freigeben veröffentlicht noch nichts. Der Button zeigt immer die aktuelle Version.`,
     reply_markup: {
-      inline_keyboard: [[{ text: `${models[item.model]}: Prüfen & freigeben`, url: url.href }]],
+      inline_keyboard: [
+        [{ text: `${models[item.model]}: In Telegram prüfen`, web_app: { url: mini.href } }],
+        [{ text: "✏️ Caption & Hashtags bearbeiten", web_app: { url: mini.href } }],
+        [{ text: "Im Browser öffnen", url: url.href }],
+      ],
     },
     protect_content: true,
   };

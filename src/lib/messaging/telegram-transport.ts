@@ -134,13 +134,15 @@ export async function contentReviewTelegramCall(
 
 /** Same private review bot; fixed API allowlist, no webhook/polling methods. */
 export async function channelAlertTelegramCall(
-  method: "sendMessage" | "deleteMessages" | "getMe" | "getChatMember",
+  method: "sendMessage" | "deleteMessages" | "getMe" | "getChatMember" | "editMessageReplyMarkup",
   body: Record<string, unknown>,
 ): Promise<TelegramApiResult> {
   const token = process.env.CONTENT_REVIEW_BOT_TOKEN;
   if (
     !token?.startsWith("8905298936:") ||
-    !["sendMessage", "deleteMessages", "getMe", "getChatMember"].includes(method)
+    !["sendMessage", "deleteMessages", "getMe", "getChatMember", "editMessageReplyMarkup"].includes(
+      method,
+    )
   )
     return { ok: false, status: 0 };
   try {

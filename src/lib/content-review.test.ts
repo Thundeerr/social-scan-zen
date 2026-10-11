@@ -21,11 +21,12 @@ describe("Content Review boundary", () => {
         .success,
     ).toBe(false);
   });
-  it("uses login-gated links, never FanWake callback handlers", () => {
+  it("opens an authenticated Mini App without taking over FanWake callbacks", () => {
     const card = reviewCard(item, "https://instascanner.app", "8556103033");
     expect(card.caption).toContain("Tuuva");
-    expect(card.reply_markup.inline_keyboard[0][0].url).toBe(
-      "https://instascanner.app/content-review?item=" + item.id,
+    const button = card.reply_markup.inline_keyboard[0][0];
+    expect("web_app" in button ? button.web_app.url : null).toBe(
+      "https://instascanner.app/telegram-review?item=" + item.id,
     );
     expect(JSON.stringify(card)).not.toContain("callback_data");
     expect(() => reviewCard(item, "http://example.com", "1")).toThrow();

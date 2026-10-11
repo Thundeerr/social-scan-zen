@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TelegramReviewRouteImport } from './routes/telegram-review'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
@@ -31,6 +32,7 @@ import { Route as ApiChannelAlertsTickRouteImport } from './routes/api/channel-a
 import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
+import { Route as ApiPublicTelegramReviewRouteImport } from './routes/api/public/telegram/review'
 import { Route as ApiPublicInstagramInboxWebhookRouteImport } from './routes/api/public/instagram/inbox-webhook'
 import { Route as ApiPublicInstagramCallbackRouteImport } from './routes/api/public/instagram/callback'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
@@ -38,6 +40,11 @@ import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/pu
 import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron/dispatch'
 import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
 
+const TelegramReviewRoute = TelegramReviewRouteImport.update({
+  id: '/telegram-review',
+  path: '/telegram-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -152,6 +159,11 @@ const ApiPublicTelegramWebhookRoute =
     path: '/api/public/telegram/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTelegramReviewRoute = ApiPublicTelegramReviewRouteImport.update({
+  id: '/api/public/telegram/review',
+  path: '/api/public/telegram/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicInstagramInboxWebhookRoute =
   ApiPublicInstagramInboxWebhookRouteImport.update({
     id: '/api/public/instagram/inbox-webhook',
@@ -190,6 +202,7 @@ const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
+  '/telegram-review': typeof TelegramReviewRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/assets': typeof AuthenticatedAssetsRoute
@@ -214,10 +227,12 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
   '/api/public/instagram/inbox-webhook': typeof ApiPublicInstagramInboxWebhookRoute
+  '/api/public/telegram/review': typeof ApiPublicTelegramReviewRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/telegram-review': typeof TelegramReviewRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/activity': typeof AuthenticatedActivityRoute
   '/assets': typeof AuthenticatedAssetsRoute
@@ -243,12 +258,14 @@ export interface FileRoutesByTo {
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
   '/api/public/instagram/inbox-webhook': typeof ApiPublicInstagramInboxWebhookRoute
+  '/api/public/telegram/review': typeof ApiPublicTelegramReviewRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/telegram-review': typeof TelegramReviewRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
@@ -274,6 +291,7 @@ export interface FileRoutesById {
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
   '/api/public/instagram/inbox-webhook': typeof ApiPublicInstagramInboxWebhookRoute
+  '/api/public/telegram/review': typeof ApiPublicTelegramReviewRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -281,6 +299,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/telegram-review'
     | '/accounts'
     | '/activity'
     | '/assets'
@@ -305,10 +324,12 @@ export interface FileRouteTypes {
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
     | '/api/public/instagram/inbox-webhook'
+    | '/api/public/telegram/review'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/telegram-review'
     | '/accounts'
     | '/activity'
     | '/assets'
@@ -334,11 +355,13 @@ export interface FileRouteTypes {
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
     | '/api/public/instagram/inbox-webhook'
+    | '/api/public/telegram/review'
     | '/api/public/telegram/webhook'
   id:
     | '__root__'
     | '/_authenticated'
     | '/login'
+    | '/telegram-review'
     | '/_authenticated/accounts'
     | '/_authenticated/activity'
     | '/_authenticated/assets'
@@ -364,12 +387,14 @@ export interface FileRouteTypes {
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
     | '/api/public/instagram/inbox-webhook'
+    | '/api/public/telegram/review'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  TelegramReviewRoute: typeof TelegramReviewRoute
   ApiChannelAlertsTickRoute: typeof ApiChannelAlertsTickRoute
   ApiReelInboxWorkerRoute: typeof ApiReelInboxWorkerRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
@@ -378,11 +403,19 @@ export interface RootRouteChildren {
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicInstagramCallbackRoute: typeof ApiPublicInstagramCallbackRoute
   ApiPublicInstagramInboxWebhookRoute: typeof ApiPublicInstagramInboxWebhookRoute
+  ApiPublicTelegramReviewRoute: typeof ApiPublicTelegramReviewRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/telegram-review': {
+      id: '/telegram-review'
+      path: '/telegram-review'
+      fullPath: '/telegram-review'
+      preLoaderRoute: typeof TelegramReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -537,6 +570,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telegram/review': {
+      id: '/api/public/telegram/review'
+      path: '/api/public/telegram/review'
+      fullPath: '/api/public/telegram/review'
+      preLoaderRoute: typeof ApiPublicTelegramReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/instagram/inbox-webhook': {
       id: '/api/public/instagram/inbox-webhook'
       path: '/api/public/instagram/inbox-webhook'
@@ -640,6 +680,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  TelegramReviewRoute: TelegramReviewRoute,
   ApiChannelAlertsTickRoute: ApiChannelAlertsTickRoute,
   ApiReelInboxWorkerRoute: ApiReelInboxWorkerRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
@@ -648,6 +689,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicInstagramCallbackRoute: ApiPublicInstagramCallbackRoute,
   ApiPublicInstagramInboxWebhookRoute: ApiPublicInstagramInboxWebhookRoute,
+  ApiPublicTelegramReviewRoute: ApiPublicTelegramReviewRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
