@@ -160,11 +160,23 @@ export async function ingestDm(body: unknown) {
     );
     let username = allowed?.find((s) => s.sender_id === event.sender)?.username;
     if (!username) {
-      if (allowed?.length === DM_SENDERS.length) continue;
+      const profiles = checked(
+        await db
+          .from("model_pipeline_profiles")
+          .select("sender_username")
+          .eq("user_id", src.user_id),
+      );
+      const names = new Set<string>([
+        ...DM_SENDERS,
+        ...(profiles ?? [])
+          .map((p) => p.sender_username)
+          .filter((s): s is string => typeof s === "string"),
+      ]);
+      if ([...names].every((name) => allowed?.some((s) => s.username === name))) continue;
       // Resolve minimal identity through Meta, never trust message text/display names.
       const profile = await graph(event.sender, c.page_access_token, "username");
       username = typeof profile.username === "string" ? profile.username.toLowerCase() : "";
-      if (!DM_SENDERS.some((name) => name === username)) continue;
+      if (!names.has(username)) continue;
     }
     checked(
       await db.rpc("reel_inbox_dm_ingest_v2", {

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChannelAlerts } from "@/components/channel-alerts";
 import { ModelPublish } from "@/components/model-publish";
+import { ModelPipeline } from "@/components/model-pipeline";
 
 export const Route = createFileRoute("/_authenticated/content-review")({
   validateSearch: z.object({ item: z.string().uuid().optional().catch(undefined) }),
@@ -112,6 +113,7 @@ function ContentReview() {
           : "Freigaben in InstaScanner. Die Verbindung zum gemeinsamen Review-Bot ist noch nicht vollständig eingerichtet."}
       </div>
       <ChannelAlerts userId={user.id} />
+      <ModelPipeline />
       <details className="rounded-xl border bg-card p-4">
         <summary className="cursor-pointer font-medium">Reel zur Freigabe hinzufügen</summary>
         <div className="mt-4 grid gap-3">

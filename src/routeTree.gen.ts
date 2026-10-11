@@ -28,6 +28,7 @@ import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
 import { Route as ApiReelInboxWorkerRouteImport } from './routes/api/reel-inbox/worker'
+import { Route as ApiModelPipelineWorkerRouteImport } from './routes/api/model-pipeline/worker'
 import { Route as ApiChannelAlertsTickRouteImport } from './routes/api/channel-alerts/tick'
 import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
@@ -136,6 +137,11 @@ const ApiReelInboxWorkerRoute = ApiReelInboxWorkerRouteImport.update({
   path: '/api/reel-inbox/worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiModelPipelineWorkerRoute = ApiModelPipelineWorkerRouteImport.update({
+  id: '/api/model-pipeline/worker',
+  path: '/api/model-pipeline/worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChannelAlertsTickRoute = ApiChannelAlertsTickRouteImport.update({
   id: '/api/channel-alerts/tick',
   path: '/api/channel-alerts/tick',
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
+  '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
+  '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/_authenticated/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
+  '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
@@ -316,6 +325,7 @@ export interface FileRouteTypes {
     | '/discovery/analytics'
     | '/monitor/$accountId'
     | '/api/channel-alerts/tick'
+    | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/monitor/'
     | '/api/public/cron/check'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/discovery/analytics'
     | '/monitor/$accountId'
     | '/api/channel-alerts/tick'
+    | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/monitor'
     | '/api/public/cron/check'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/_authenticated/discovery/analytics'
     | '/_authenticated/monitor/$accountId'
     | '/api/channel-alerts/tick'
+    | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/_authenticated/monitor/'
     | '/api/public/cron/check'
@@ -396,6 +408,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   TelegramReviewRoute: typeof TelegramReviewRoute
   ApiChannelAlertsTickRoute: typeof ApiChannelAlertsTickRoute
+  ApiModelPipelineWorkerRoute: typeof ApiModelPipelineWorkerRoute
   ApiReelInboxWorkerRoute: typeof ApiReelInboxWorkerRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
   ApiPublicCronDispatchRoute: typeof ApiPublicCronDispatchRoute
@@ -542,6 +555,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReelInboxWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/model-pipeline/worker': {
+      id: '/api/model-pipeline/worker'
+      path: '/api/model-pipeline/worker'
+      fullPath: '/api/model-pipeline/worker'
+      preLoaderRoute: typeof ApiModelPipelineWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/channel-alerts/tick': {
       id: '/api/channel-alerts/tick'
       path: '/api/channel-alerts/tick'
@@ -682,6 +702,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   TelegramReviewRoute: TelegramReviewRoute,
   ApiChannelAlertsTickRoute: ApiChannelAlertsTickRoute,
+  ApiModelPipelineWorkerRoute: ApiModelPipelineWorkerRoute,
   ApiReelInboxWorkerRoute: ApiReelInboxWorkerRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
   ApiPublicCronDispatchRoute: ApiPublicCronDispatchRoute,
