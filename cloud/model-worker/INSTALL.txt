@@ -1,6 +1,7 @@
 MODEL PIPELINE — Contabo / Ubuntu 24.04 LTS
 
-Status: server package prepared; no server purchased or connected yet.
+Status (2026-10-11): VPS connected; worker installed and paired. Authenticated
+source download verified (8.125 seconds, 720x1280); first full job resumed.
 The database queue, budget and Telegram review live in InstaScanner.
 This container only downloads, generates and uploads drafts. It cannot approve or publish.
 
@@ -30,8 +31,8 @@ INSTALLATION (operator / Codex, after the owner provides the provisioned server)
 BEHAVIOR AND RECOVERY:
 - Source clips must be vertical, 2–15 seconds. Longer clips stop for review instead
   of silently truncating. Public extraction may be denied by Instagram from a VPS;
-  no working datacenter-IP download has been verified yet. Do not buy a proxy or
-  transfer browser cookies automatically. Source import fallback needs review.
+  the explicitly authorized VPS Firefox session enables the tested source.
+  Do not transfer desktop browser profiles or buy a proxy automatically.
 - Three hash-verified SFW references per model. Original clothing/body preserved.
 - Caption uses an editable model template; semantic caption generation is not
   implemented. Do not describe these drafts as tailored AI copywriting.
@@ -51,5 +52,23 @@ BEHAVIOR AND RECOVERY:
 - Existing FanWake webhook and existing Windows downloader are preserved.
 
 BEFORE PRODUCTION ACCEPTANCE:
-Container build/run, actual VPS download, paid request/restart recovery and
-PC-off end-to-end run remain unverified until a server exists.
+Container build/run, heartbeat and authenticated VPS download are verified.
+Paid request/restart recovery and PC-off end-to-end run remain unverified.
+
+OPTIONAL SERVER INSTAGRAM SESSION (explicitly authorized 2026-10-11):
+- The owner signs into Firefox on the VPS through SSH-tunneled, token-protected
+  noVNC. The desktop browser profile is never transferred. VNC is loopback-only.
+- export_session.py exports only Instagram cookies from the dedicated VPS
+  Firefox profile every minute. Credentials stay on that server; values are not
+  logged. A missing/expired session clears the exported jar.
+- Installed units: kiikii-instagram-session.service and .timer. The export lives
+  in /var/lib/kiikii-instagram-session, accessible only to root and worker UID 10001.
+- ALWAYS include the optional override for this configured installation:
+  docker compose -f cloud/model-worker/compose.yaml -f cloud/model-worker/compose.session.yaml build
+  docker compose -f cloud/model-worker/compose.yaml -f cloud/model-worker/compose.session.yaml up -d
+- The worker mounts the session read-only; yt-dlp gets a disposable private copy.
+- The owner completed server login after resetting their password. Session export
+  and source download are verified. Job 28d33f98-78b9-48e7-a886-c60feb99533f was
+  requeued only after verifying it had no provider submission or cost reservation.
+- A successful session may expire. Phone-only session renewal is not yet provided;
+  the present administration tunnel uses the PC. Generation itself runs on the VPS.

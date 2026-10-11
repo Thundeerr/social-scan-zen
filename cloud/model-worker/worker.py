@@ -1,4 +1,4 @@
-"""Single outbound worker. No Instagram login, bot token, DB key or publishing permission."""
+"""Outbound draft worker; optional operator-provided IG session, no publishing permission."""
 import hashlib
 import json
 import math
@@ -154,7 +154,7 @@ def tick():
         source=folder/"source.mp4"
         if not source.exists():
             try:
-                url,metadata=media.extract(job["source_url"])
+                url,metadata=media.extract(job["source_url"], cookie_file=os.environ.get("INSTAGRAM_COOKIE_FILE"))
                 partial=folder/"source.part"
                 if partial.exists():partial.unlink()
                 media.download_public(url,partial)
