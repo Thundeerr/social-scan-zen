@@ -1,0 +1,55 @@
+MODEL PIPELINE — Contabo / Ubuntu 24.04 LTS
+
+Status: server package prepared; no server purchased or connected yet.
+The database queue, budget and Telegram review live in InstaScanner.
+This container only downloads, generates and uploads drafts. It cannot approve or publish.
+
+Suggested host: Contabo Cloud VPS 4, 4 vCPU / 8 GB RAM / 100 GB SSD.
+The AI runs at WaveSpeed; no GPU is needed. Server pricing is separate from the
+shared 3 USD/day generation ceiling (Europe/Berlin, 720p, both models combined).
+
+INSTALLATION (operator / Codex, after the owner provides the provisioned server):
+1. Use an SSH key and a non-root administration account. Apply OS updates.
+2. Install Docker Engine and Compose from Docker's official Ubuntu repository.
+3. Transfer this prepared project bundle to /opt/kiikii-pipeline.
+   Preserve the references folder and its models.json hash manifest.
+4. Copy cloud/model-worker/.env.example to cloud/model-worker/.env; chmod 600.
+   Set WAVESPEED_API_KEY securely using the existing key (never in Git or chat).
+   In InstaScanner Content Review > Automatic Pipeline > Server setup, generate
+   the separate PIPELINE_WORKER_TOKEN and enter it in that protected .env.
+5. Run: docker compose -f cloud/model-worker/compose.yaml build
+   Then: docker compose -f cloud/model-worker/compose.yaml up -d
+   No inbound application port is exposed. Restrict SSH to administration access.
+6. Verify last_seen_at updates while processing is paused. Check reference hashes.
+   Ensure queue contains only user-selected, not-yet-used Reels before enabling.
+7. Enable generation in InstaScanner. Send a NEW Reel from @kiikii.bat to
+   @followerstarteam. Verify source, billed cost, 720p output, source audio,
+   correct model, Telegram delivery, editing and explicit publishing confirmation.
+8. Repeat with the PC shut down. Only then label the full pipeline operational.
+
+BEHAVIOR AND RECOVERY:
+- Source clips must be vertical, 2–15 seconds. Longer clips stop for review instead
+  of silently truncating. Public extraction may be denied by Instagram from a VPS;
+  no working datacenter-IP download has been verified yet. Do not buy a proxy or
+  transfer browser cookies automatically. Source import fallback needs review.
+- Three hash-verified SFW references per model. Original clothing/body preserved.
+- Caption uses an editable model template; semantic caption generation is not
+  implemented. Do not describe these drafts as tailored AI copywriting.
+- Database reserves ceil(seconds) * 20 US cents before the paid 720p request.
+  Both input and output are billed. Insufficient budget waits until next day.
+  Reservations remain charged to the ceiling after ambiguous or failed requests.
+  Manually submitted external generations require ledger reconciliation.
+- A persistent pre-submit checkpoint prevents automatic resubmission after a
+  timeout. For provider_uncertain inspect WaveSpeed history and reconcile the
+  exact prediction; never clear the checkpoint and blindly retry.
+- After provider completion the original audio is restored locally, MP4 fully
+  decoded, size checked, privately uploaded and sent once to the review bot.
+- No automatic public posting. Trial graduation stays MANUAL; no Trial alerts.
+- Tuuva needs a real IG account and an explicit sender mapping before intake.
+- Keep /data persistent. Source/output/checkpoint files are retained; monitor disk
+  usage and back up state. No automatic deletion of originals is configured.
+- Existing FanWake webhook and existing Windows downloader are preserved.
+
+BEFORE PRODUCTION ACCEPTANCE:
+Container build/run, actual VPS download, paid request/restart recovery and
+PC-off end-to-end run remain unverified until a server exists.
