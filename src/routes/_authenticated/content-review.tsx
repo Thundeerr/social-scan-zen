@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ChannelAlerts } from "@/components/channel-alerts";
 
 export const Route = createFileRoute("/_authenticated/content-review")({
   validateSearch: z.object({ item: z.string().uuid().optional().catch(undefined) }),
@@ -109,6 +110,7 @@ function ContentReview() {
           ? "Review-Bot verbunden. Karten werden nur an deinen privaten Chat gesendet."
           : "Freigaben in InstaScanner. Die Verbindung zum gemeinsamen Review-Bot ist noch nicht vollständig eingerichtet."}
       </div>
+      <ChannelAlerts userId={user.id} />
       <details className="rounded-xl border bg-card p-4">
         <summary className="cursor-pointer font-medium">Reel zur Freigabe hinzufügen</summary>
         <div className="mt-4 grid gap-3">
