@@ -28,7 +28,7 @@ def request(url, data=None, method="POST", headers=None, timeout=90):
     # Never log URLs or raw provider exceptions: these can contain credentials.
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     try:
-        with opener.open(urllib.request.Request(url, data=data, headers=headers or {}, method=method), timeout=timeout) as r:
+        with opener.open(urllib.request.Request(url, data=data, headers={"User-Agent":"InstaScanner-ModelWorker/1.0", **(headers or {})}, method=method), timeout=timeout) as r:
             return json.loads(r.read(2 * 1024 * 1024))
     except (OSError, ValueError, urllib.error.URLError):
         raise StopJob("unconfirmed") from None
