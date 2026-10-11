@@ -87,6 +87,7 @@ async function loadPosts() {
   const { data, error } = await supabase
     .from("content_posts")
     .select("*")
+    .eq("destination", "followerstar")
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw error;
@@ -129,22 +130,29 @@ async function loadPosts() {
     }
   }
 
-  return data.map((post): ReviewablePost => ({
-    ...post,
-    publications: publicationsByPost.get(post.id) ?? [],
-    coverUrl: post.cover_storage_path ? (signedByPath.get(post.cover_storage_path) ?? null) : null,
-    reelUrl: post.reel_storage_path ? (signedByPath.get(post.reel_storage_path) ?? null) : null,
-    primaryUrls: post.primary_media_storage_paths
-      .map((path) => signedByPath.get(path) ?? null)
-      .filter((url): url is string => Boolean(url)),
-    storyUrl: post.story_storage_path ? (signedByPath.get(post.story_storage_path) ?? null) : null,
-  }));
+  return data.map(
+    (post): ReviewablePost => ({
+      ...post,
+      publications: publicationsByPost.get(post.id) ?? [],
+      coverUrl: post.cover_storage_path
+        ? (signedByPath.get(post.cover_storage_path) ?? null)
+        : null,
+      reelUrl: post.reel_storage_path ? (signedByPath.get(post.reel_storage_path) ?? null) : null,
+      primaryUrls: post.primary_media_storage_paths
+        .map((path) => signedByPath.get(path) ?? null)
+        .filter((url): url is string => Boolean(url)),
+      storyUrl: post.story_storage_path
+        ? (signedByPath.get(post.story_storage_path) ?? null)
+        : null,
+    }),
+  );
 }
 
 async function loadInstagramConnection(): Promise<InstagramConnection | null> {
   const { data, error } = await supabase
     .from("ig_connections")
     .select("ig_username,token_expires_at,status,last_error,login_type")
+    .eq("destination", "followerstar")
     .maybeSingle();
   if (error) throw error;
   return data;
@@ -893,7 +901,13 @@ function StatusBadge({ result }: { result: PublisherDryRun }) {
 }
 
 type ChannelState =
-  "ready" | "blocked" | "skipped" | "manual" | "published" | "publishing" | "failed";
+  | "ready"
+  | "blocked"
+  | "skipped"
+  | "manual"
+  | "published"
+  | "publishing"
+  | "failed";
 
 function Channel({ label, state }: { label: string; state: ChannelState }) {
   return (
