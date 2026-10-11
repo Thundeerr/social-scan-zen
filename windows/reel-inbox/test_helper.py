@@ -88,4 +88,22 @@ class LibraryTests(unittest.TestCase):
             cloud.offline=False
             self.assertTrue(helper.cycle(cloud,self.library,str(uuid.uuid4()),'x','y'))
 
+class CookieIsolation(unittest.TestCase):
+    def test_extractor_failure_cleans_private_copy_and_preserves_source(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source=Path(folder)/'session.txt';source.write_text('test-session')
+            copies=[]
+            def fail(args,timeout):
+                jar=Path(args[args.index('--cookies')+1]);copies.append(jar)
+                self.assertNotEqual(jar,source)
+                self.assertEqual(jar.read_text(),'test-session')
+                jar.write_text('extractor changes')
+                raise helper.InboxError('unavailable')
+            with patch.object(helper,'run_tool',side_effect=fail):
+                with self.assertRaises(helper.InboxError):
+                    helper.extract('https://www.instagram.com/reel/DeQGhsDvDqd/',cookie_file=source)
+            self.assertEqual(source.read_text(),'test-session')
+            self.assertEqual(len(copies),1)
+            self.assertFalse(copies[0].exists())
+
 if __name__=='__main__':unittest.main()

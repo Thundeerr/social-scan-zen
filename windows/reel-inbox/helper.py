@@ -15,6 +15,7 @@ import socket
 import subprocess
 import sys
 import time
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -128,10 +129,18 @@ def run_tool(args, timeout=90):
         raise InboxError("validation")
     return result.stdout
 
-def extract(raw):
+def extract(raw, cookie_file=None):
     url, _ = reel_url(raw)
     try:
-        data = json.loads(run_tool([sys.executable, "-m", "yt_dlp", "--ignore-config", "--no-playlist", "--skip-download", "--dump-single-json", "--socket-timeout", "20", "--retries", "1", "--extractor-retries", "1", "--", url], 75))
+        with tempfile.TemporaryDirectory(prefix="ig-extract-") as scratch:
+            args = [sys.executable, "-m", "yt_dlp", "--ignore-config", "--no-playlist", "--skip-download", "--dump-single-json", "--socket-timeout", "20", "--retries", "1", "--extractor-retries", "1"]
+            if cookie_file is not None and Path(cookie_file).is_file():
+                # yt-dlp saves its cookie jar on exit. Never mutate the shared session.
+                jar = Path(scratch) / "cookies.txt"
+                jar.write_bytes(Path(cookie_file).read_bytes())
+                jar.chmod(0o600)
+                args.extend(["--cookies", str(jar)])
+            data = json.loads(run_tool([*args, "--", url], 75))
     except (InboxError, ValueError) as e:
         if isinstance(e, InboxError) and e.code in ("setup", "interrupted"):
             raise

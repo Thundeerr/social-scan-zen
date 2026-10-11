@@ -1,0 +1,6 @@
+services:
+  model-worker:
+    environment:
+      INSTAGRAM_COOKIE_FILE: /session/instagram.txt
+    volumes:
+      - /var/lib/kiikii-instagram-session:/session:ro
