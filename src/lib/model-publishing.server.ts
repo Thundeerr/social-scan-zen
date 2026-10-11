@@ -18,6 +18,8 @@ export async function modelPublishing(
   user: string,
   action: ModelPublishAction,
 ): Promise<ModelPublishStatus> {
+  if (action.action === "queue" || action.action === "schedule_preview")
+    return command(user, action.action, action);
   const status = (await command(user, "status", action)) as ModelPublishStatus;
   if (action.action === "status") return status;
   if (action.action === "prepare" && !status.post_id) {
