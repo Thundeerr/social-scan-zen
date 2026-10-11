@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ChannelAlerts } from "@/components/channel-alerts";
+import { ModelPublish } from "@/components/model-publish";
 
 export const Route = createFileRoute("/_authenticated/content-review")({
   validateSearch: z.object({ item: z.string().uuid().optional().catch(undefined) }),
@@ -263,6 +264,7 @@ function ReviewCard({
           className="mt-2"
           value={caption}
           maxLength={2200}
+          disabled={!!item.publish_post_id}
           onChange={(e) => setCaption(e.target.value)}
         />
       </label>
@@ -315,6 +317,9 @@ function ReviewCard({
         </>
       )}
       {item.note && <p className="whitespace-pre-wrap text-sm">{item.note}</p>}
+      {(item.status === "approved" || item.publish_post_id) && (
+        <ModelPublish item={item} dirty={dirty} />
+      )}
       <p className="text-xs text-muted-foreground">
         {notifyLabels[item.notification]} ·{" "}
         {item.bytes ? (item.bytes / 1048576).toFixed(1) + " MB" : "Upload ausstehend"}

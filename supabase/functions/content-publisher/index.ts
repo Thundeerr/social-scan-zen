@@ -172,6 +172,7 @@ async function processVideoPublication(input: {
   channel: "reel" | "story";
   storagePath: string;
   coverStoragePath?: string;
+  allowVideoCover?: boolean;
   caption: string;
   shareToFeed: boolean;
   igUserId: string;
@@ -192,16 +193,25 @@ async function processVideoPublication(input: {
       video_url: videoUrl,
     };
     if (channel === "reel") {
-      if (!input.coverStoragePath) throw new Error("Reel cover is missing");
-      const coverUrl = await signedMediaUrl(admin, input.coverStoragePath, "cover");
-      Object.assign(
-        body,
-        buildReelContainerFields({
+      if (!input.coverStoragePath && !input.allowVideoCover)
+        throw new Error("Reel cover is missing");
+      if (!input.coverStoragePath) {
+        Object.assign(body, {
           caption: input.caption,
-          shareToFeed: input.shareToFeed,
-          coverUrl,
-        }),
-      );
+          share_to_feed: input.shareToFeed,
+          thumb_offset: 0,
+        });
+      } else {
+        const coverUrl = await signedMediaUrl(admin, input.coverStoragePath, "cover");
+        Object.assign(
+          body,
+          buildReelContainerFields({
+            caption: input.caption,
+            shareToFeed: input.shareToFeed,
+            coverUrl,
+          }),
+        );
+      }
     }
     const created = await graphRequest(apiBaseUrl, `${input.igUserId}/media`, token, "POST", body);
     if (typeof created.id !== "string")
@@ -488,7 +498,9 @@ async function processFirstComment(input: {
 async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
   const { data: due, error } = await admin
     .from("content_posts")
-    .select("id,reel_storage_path,story_storage_path,cover_storage_path,primary_media_storage_paths")
+    .select(
+      "id,reel_storage_path,story_storage_path,cover_storage_path,primary_media_storage_paths",
+    )
     .is("media_cleaned_at", null)
     .lte("media_cleanup_after", new Date().toISOString())
     .limit(5);
@@ -539,13 +551,17 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
     .eq("status", "active")
     .single();
   if (connectionError || !connection) throw new Error("Healthy Instagram connection not found");
+  if (post.destination !== "followerstar" && post.target_ig_user_id !== connection.ig_user_id)
+    throw new Error("Instagram destination changed after approval");
   if (new Date(connection.token_expires_at).getTime() <= Date.now() + 60 * 60 * 1000) {
     throw new Error("Instagram access token expires too soon");
   }
 
   const { data: rows, error: publicationError } = await admin
     .from("content_publications")
-    .select("id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id")
+    .select(
+      "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id",
+    )
     .eq("content_post_id", postId);
   if (publicationError) throw publicationError;
   const publications = new Map((rows as Publication[]).map((item) => [item.channel, item]));
@@ -588,6 +604,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
       channel: "reel",
       storagePath: post.reel_storage_path,
       coverStoragePath: post.cover_storage_path,
+      allowVideoCover: post.destination !== "followerstar",
       caption: post.caption,
       shareToFeed: post.share_to_feed,
     });
@@ -600,7 +617,9 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
       : ((
           await admin
             .from("content_publications")
-            .select("id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id")
+            .select(
+              "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id",
+            )
             .eq("id", primary.id)
             .single()
         ).data as Publication);
