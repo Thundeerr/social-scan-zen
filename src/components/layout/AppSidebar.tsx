@@ -47,6 +47,7 @@ const groups: NavGroup[] = [
       { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
       { to: "/downloads", label: "Archive", icon: Download, hint: null },
       { to: "/reel-inbox", label: "Reel Inbox", icon: Clapperboard, hint: null },
+      { to: "/content-review", label: "Content Review", icon: Clapperboard, hint: null },
     ],
   },
   {
