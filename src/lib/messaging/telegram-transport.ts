@@ -73,7 +73,8 @@ export async function telegramApiCall(
   // Provider: lovable connector gateway.
   const lovableKey = process.env.LOVABLE_API_KEY;
   const connKey = process.env.TELEGRAM_API_KEY;
-  if (!lovableKey) return { ok: false, status: 0, description: "LOVABLE_API_KEY is not configured" };
+  if (!lovableKey)
+    return { ok: false, status: 0, description: "LOVABLE_API_KEY is not configured" };
   if (!connKey) return { ok: false, status: 0, description: "TELEGRAM_API_KEY is not configured" };
   try {
     const res = await fetch(`https://connector-gateway.lovable.dev/telegram/${method}`, {
@@ -108,4 +109,25 @@ export async function telegramApiCall(
 /** Which provider will be used for the next call — for logs/debug only. */
 export function activeTelegramProvider(): Provider {
   return getProvider();
+}
+
+/** Dedicated review bot, never falls back to the scanner bot or modifies webhooks. */
+export async function contentReviewTelegramCall(
+  body: Record<string, unknown>,
+): Promise<TelegramApiResult> {
+  const token = process.env.CONTENT_REVIEW_BOT_TOKEN;
+  if (!token) return { ok: false, status: 0 };
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = (await response.json()) as { ok?: boolean; result?: unknown };
+    return { ok: response.ok && data.ok === true, status: response.status, result: data.result };
+  } catch {
+    // Errors can contain a URL with the bot token. Never return or log them.
+    return { ok: false, status: 0 };
+  }
 }

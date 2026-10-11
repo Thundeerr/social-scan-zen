@@ -1,0 +1,64 @@
+Content Review - InstaScanner extension (2026-10-11)
+
+PURPOSE
+Private review queue for Kiikii and Tuuva at /content-review.
+Upload MP4 (max 40 MiB), review video and caption together, request changes,
+reject or approve. Approval does NOT publish and does not enter content_posts.
+Both models are explicitly selected. Source account names are not model identities.
+Only the app owner may operate this queue.
+
+HOSTING
+Uses the existing TanStack Start backend, Supabase database and private storage.
+After upload, viewing and approval do not require the Windows PC.
+Local downloads and generation are still separate; this change does not turn
+the existing Windows worker into a cloud generation pipeline.
+
+TELEGRAM / FANWAKE
+Existing bot handle: @KiikiiPrivateReviewBot
+Display name: Content Review | Kiikii & Tuuva
+Only one new secret is required in the InstaScanner server environment:
+  CONTENT_REVIEW_BOT_TOKEN = the EXISTING bot token, never rotate/reset it.
+Do not use VITE_ prefixes. Never commit the value or paste it into chat.
+Do not overwrite TELEGRAM_API_KEY, TELEGRAM_BOT_TOKEN or TELEGRAM_PROVIDER:
+those belong to InstaScanner's existing scanner bot.
+Optional deployment overrides:
+  CONTENT_REVIEW_OWNER_ID (defaults to verified app owner UUID)
+  CONTENT_REVIEW_TELEGRAM_CHAT_ID (defaults to verified owner's private chat)
+  CONTENT_REVIEW_ORIGIN (defaults to https://instascanner.app)
+
+Cards use sendVideo with a 10-minute signed media URL and a normal HTTPS button.
+The button opens the app's login-protected Content Review page and selects the
+job. It is not an inline callback or Telegram Mini App. FanWake keeps its webhook.
+No setWebhook, deleteWebhook, getUpdates, public channel sends or publishing.
+No automatic resends after ambiguous delivery. Check the bot chat manually.
+Configuration presence is not proof of successful live bot connection.
+
+DATA & AUTHORIZATION
+Migration: supabase/migrations/20261011100940_content_review.sql
+RLS on both tables; authenticated clients may only read own rows.
+All mutations go through owner-only service-role RPC after live getUser().
+No client storage policies; private bucket, signed insert-only upload, no upsert.
+Server checks size/MP4 signature and computes SHA256 before setting pending.
+This is a container signature check, not a full audiovisual quality inspection.
+Caption edits increment revision and invalidate any earlier approval.
+RPC row locks prevent conflicting decisions and duplicate notifications.
+Media never overwritten. New video requires a new review entry.
+Open upload rows remain visible if the upload fails. Already uploaded media
+can be finalized using the card's retry button; failed uploads need a fresh entry.
+
+TUUVA CHANNEL
+Tuuva private announcement channel created: -1003979039770.
+Bot has post_messages only. Public handle not chosen.
+IG account and Tuuva Fanvue/FanWake model connection are still outstanding.
+Announcement policy remains planned: at most once/channel/day, delete after
+12 hours, only alongside explicit publication approval. No scheduler added here.
+
+VALIDATION
+npm test
+node tests/content-review-db.mjs
+node node_modules/typescript/bin/tsc --noEmit
+npm run build
+Tests cover owner separation, RLS/direct-write denial, stale reviews,
+caption invalidation, duplicate notification reservations and token redaction.
+Live acceptance still requires real owner login, upload/playback and a private
+Telegram card using the server secret. Never claim mocks prove live delivery.
