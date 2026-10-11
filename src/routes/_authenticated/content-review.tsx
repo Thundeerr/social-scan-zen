@@ -317,6 +317,15 @@ function ReviewCard({
         </>
       )}
       {item.note && <p className="whitespace-pre-wrap text-sm">{item.note}</p>}
+      {item.telegram_message_id && (
+        <Button
+          variant="outline"
+          disabled={busy || !telegramReady}
+          onClick={() => void run({ action: "refresh_card", ...base })}
+        >
+          Telegram-Buttons aktualisieren
+        </Button>
+      )}
       {(item.status === "approved" || item.publish_post_id) && (
         <ModelPublish item={item} dirty={dirty} />
       )}

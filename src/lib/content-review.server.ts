@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { contentReviewTelegramCall } from "./messaging/telegram-transport";
+import {
+  contentReviewTelegramCall,
+  channelAlertTelegramCall,
+} from "./messaging/telegram-transport";
 import {
   MAX_REVIEW_BYTES,
   reviewCard,
@@ -52,6 +55,18 @@ export async function reviewCommand(user: string, action: ReviewAction): Promise
   const item = (await command(user, "get", action)) as ReviewItem;
   if (item.revision !== action.revision)
     throw new Error("Neuere Version vorhanden. Bitte aktualisieren.");
+  if (action.action === "refresh_card") {
+    const config = telegramConfig(user);
+    if (!config || !item.telegram_message_id)
+      throw new Error("Keine bestätigte Bot-Karte vorhanden.");
+    const response = await channelAlertTelegramCall("editMessageReplyMarkup", {
+      chat_id: config.chat,
+      message_id: item.telegram_message_id,
+      reply_markup: reviewCard(item, config.origin, config.chat).reply_markup,
+    });
+    if (!response.ok) throw new Error("Karte nicht bestätigt. Bitte im Bot prüfen.");
+    return { item };
+  }
   const storage = supabaseAdmin.storage.from(bucket);
   if (action.action === "upload") {
     if (item.status !== "uploading") throw new Error("Video ist bereits gespeichert.");
