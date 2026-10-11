@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const db = new PGlite(),
-  owner = crypto.randomUUID(),
+  owner = "e4ee414f-fbb6-4f82-b5fc-22d74ed6b3cc",
   other = crypto.randomUUID();
 const migration = async (name) =>
   readFile(new URL("../supabase/migrations/" + name, import.meta.url), "utf8");
@@ -37,16 +37,26 @@ try {
     "grant all on all tables in schema public to service_role;grant all on content_posts to authenticated;",
   );
   await db.query("insert into auth.users values($1),($2)", [owner, other]);
+  await db.exec(
+    "create schema cron; create function cron.schedule(text,text,text) returns bigint language sql as 'select 1::bigint'",
+  );
   await db.query("insert into user_roles values($1,'owner')", [owner]);
   await db.query("insert into profiles values($1,true)", [owner]);
   const id = crypto.randomUUID(),
     sha = "a".repeat(64),
     ref = { id, revision: 1 },
-    prepare = { ...ref, sha256: sha, storage_path: `${owner}/model-review/${id}/${sha}.mp4` };
+    prepare = {
+      ...ref,
+      sha256: sha,
+      publish_mode: "trial",
+      storage_path: `${owner}/model-review/${id}/${sha}.mp4`,
+    };
   await db.query(
     "insert into content_review_items(id,user_id,model,title,caption,status,media_path,sha256,bytes,reviewed_at) values($1,$2,'kiikii','Test','Approved caption','approved','private/video.mp4',$3,20,now())",
     [id, owner, sha],
   );
+  await db.exec(await migration("20261011102726_channel_alerts.sql"));
+  await db.exec(await migration("20261011112049_model_trial_reels.sql"));
   await db.exec("set role service_role");
   await assert.rejects(call("status", ref, other));
   await assert.rejects(call("prepare", prepare));
@@ -70,13 +80,18 @@ try {
     db.query("update content_posts set status='scheduled' where id=$1", [first.post_id]),
   );
   await db.exec("reset role;set role service_role");
-  const publish = { ...ref, confirmation: "PUBLISH", ig_user_id: "123" };
+  const publish = { ...ref, confirmation: "PUBLISH", publish_mode: "trial", ig_user_id: "123" };
   await assert.rejects(call("publish", publish)); // paused
   await call("cancel", ref);
   assert.equal((await call("status", ref)).post_id, null);
   const second = await call("prepare", prepare);
+  assert.equal((await call("status", ref)).publish_mode, "trial");
+  await assert.rejects(
+    db.query("update content_posts set publish_mode='normal' where id=$1", [second.post_id]),
+  );
   await db.query("update profiles set publishing_paused=false where id=$1", [owner]);
   await assert.rejects(call("publish", { ...publish, confirmation: "APPROVE" }));
+  await assert.rejects(call("publish", { ...publish, publish_mode: "normal" }));
   await assert.rejects(call("publish", { ...publish, ig_user_id: "456" }));
   await db.query("update ig_connections set ig_user_id='456' where user_id=$1", [owner]);
   await assert.rejects(call("publish", publish));
@@ -93,6 +108,19 @@ try {
     1,
   );
   await assert.rejects(call("cancel", ref));
+  await db.query("update content_posts set status='published' where id=$1", [second.post_id]);
+  await db.query(
+    "update content_publications set status='published',platform_media_id='media',permalink='https://www.instagram.com/reel/TrialTest/',published_at=now(),published_ig_user_id='123' where content_post_id=$1",
+    [second.post_id],
+  );
+  await db.query(
+    "update model_alert_channels set ig_user_id='123',bot_ready=true,enabled_since=now()-interval '1 day' where model='kiikii'",
+  );
+  const alert = await db.query(
+    "select model_alert_command('claim',null,'{\"allow_send\":true}') as v",
+  );
+  assert.equal(alert.rows[0].v, null);
+  assert.equal((await db.query("select count(*)::int n from model_channel_alerts")).rows[0].n, 0);
   console.log(
     "Model publishing DB passed: owner, revision, separate account, immutable review/target/media, pause, exact confirmation, prepare/cancel, idempotent publish.",
   );

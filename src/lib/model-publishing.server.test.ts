@@ -23,13 +23,13 @@ beforeEach(() => {
 });
 it("authorizes before accessing private files", async () => {
   m.rpc.mockResolvedValue({ error: { message: "secret" } });
-  await expect(modelPublishing("intruder", { action: "prepare", ...ref })).rejects.toThrow(
-    "nicht möglich",
-  );
+  await expect(
+    modelPublishing("intruder", { action: "prepare", publish_mode: "trial", ...ref }),
+  ).rejects.toThrow("nicht möglich");
   expect(m.download).not.toHaveBeenCalled();
 });
 it("copies only verified media insert-only and never publishes on prepare", async () => {
-  await modelPublishing("owner", { action: "prepare", ...ref });
+  await modelPublishing("owner", { action: "prepare", publish_mode: "trial", ...ref });
   expect(m.upload).toHaveBeenCalledWith(expect.stringContaining(sha256), bytes, {
     contentType: "video/mp4",
     upsert: false,
@@ -39,12 +39,14 @@ it("copies only verified media insert-only and never publishes on prepare", asyn
 });
 it("rejects changed media before transfer", async () => {
   m.download.mockResolvedValue({ data: new Blob([Buffer.alloc(bytes.length)]), error: null });
-  await expect(modelPublishing("owner", { action: "prepare", ...ref })).rejects.toThrow("geändert");
+  await expect(
+    modelPublishing("owner", { action: "prepare", publish_mode: "trial", ...ref }),
+  ).rejects.toThrow("geändert");
   expect(m.upload).not.toHaveBeenCalled();
 });
 it("accepts a lost upload receipt only after verifying the existing copy", async () => {
   m.upload.mockResolvedValue({ error: { message: "conflict" } });
-  await modelPublishing("owner", { action: "prepare", ...ref });
+  await modelPublishing("owner", { action: "prepare", publish_mode: "trial", ...ref });
   expect(m.download).toHaveBeenCalledTimes(2);
 });
 it("rejects an unverified conflicting destination", async () => {
@@ -52,9 +54,9 @@ it("rejects an unverified conflicting destination", async () => {
   m.download
     .mockResolvedValueOnce({ data: new Blob([bytes]) })
     .mockResolvedValueOnce({ data: new Blob(["different"]) });
-  await expect(modelPublishing("owner", { action: "prepare", ...ref })).rejects.toThrow(
-    "nicht bestätigt",
-  );
+  await expect(
+    modelPublishing("owner", { action: "prepare", publish_mode: "trial", ...ref }),
+  ).rejects.toThrow("nicht bestätigt");
 });
 it("requires explicit publish confirmation and numeric account identity", () => {
   expect(modelPublishAction.safeParse({ action: "publish", ...ref }).success).toBe(false);
@@ -63,6 +65,7 @@ it("requires explicit publish confirmation and numeric account identity", () => 
       action: "publish",
       ...ref,
       confirmation: "PUBLISH",
+      publish_mode: "trial",
       ig_user_id: "123",
     }).success,
   ).toBe(true);

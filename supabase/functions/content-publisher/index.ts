@@ -1,7 +1,7 @@
 // Edge-runtime types come from the Deno runtime itself; the jsr type import is
 // intentionally omitted because it transitively requires npm:openai.
 import { createClient } from "npm:@supabase/supabase-js@2.110.0";
-import { buildReelContainerFields } from "../_shared/instagram-reel.ts";
+import { buildReelContainerFields, applyModelReelMode } from "../_shared/instagram-reel.ts";
 import {
   buildCarouselContainerFields,
   buildImageContainerFields,
@@ -173,6 +173,7 @@ async function processVideoPublication(input: {
   storagePath: string;
   coverStoragePath?: string;
   allowVideoCover?: boolean;
+  modelPublishMode?: string;
   caption: string;
   shareToFeed: boolean;
   igUserId: string;
@@ -213,6 +214,7 @@ async function processVideoPublication(input: {
         );
       }
     }
+    if (input.modelPublishMode) applyModelReelMode(body, input.modelPublishMode);
     const created = await graphRequest(apiBaseUrl, `${input.igUserId}/media`, token, "POST", body);
     if (typeof created.id !== "string")
       throw new Error(`Instagram did not return a ${channel} container`);
@@ -605,6 +607,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
       storagePath: post.reel_storage_path,
       coverStoragePath: post.cover_storage_path,
       allowVideoCover: post.destination !== "followerstar",
+      modelPublishMode: post.destination !== "followerstar" ? post.publish_mode : undefined,
       caption: post.caption,
       shareToFeed: post.share_to_feed,
     });

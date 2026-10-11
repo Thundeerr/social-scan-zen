@@ -8,6 +8,7 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
   const cache = useQueryClient(),
     [busy, setBusy] = useState(false),
     [confirm, setConfirm] = useState(false),
+    [mode, setMode] = useState<"normal" | "trial">("normal"),
     [error, setError] = useState("");
   const ref = { id: item.id, revision: item.revision };
   const query = useQuery({
@@ -69,9 +70,24 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
         </p>
       )}
       {!p?.post_id && (
+        <label className="block text-sm">
+          Veröffentlichungsart
+          <select
+            aria-label="Veröffentlichungsart"
+            value={mode}
+            disabled={busy}
+            onChange={(e) => setMode(e.target.value as "normal" | "trial")}
+            className="ml-2 rounded border bg-background p-2"
+          >
+            <option value="normal">Normales Reel</option>
+            <option value="trial">Trial Reel · manuelle Übernahme</option>
+          </select>
+        </label>
+      )}
+      {!p?.post_id && (
         <Button
           disabled={busy || dirty || !p?.connected}
-          onClick={() => void act({ action: "prepare", ...ref })}
+          onClick={() => void act({ action: "prepare", publish_mode: mode, ...ref })}
         >
           Veröffentlichung vorbereiten
         </Button>
@@ -80,13 +96,17 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
         <>
           <p className="text-sm">
             Das freigegebene Video und die Caption sind fest übernommen. Cover: erstes Videobild. Es
-            wird ein Reel mit Anzeige im Feed gepostet.
+            {p.publish_mode === "trial"
+              ? "wird ein Trial Reel für Nicht-Follower gepostet. Keine automatische Übernahme in den normalen Feed und keine Telegram-Ankündigung."
+              : "wird ein normales Reel mit Anzeige im Feed gepostet."}
           </p>
           {confirm ? (
             <div className="rounded border border-primary p-3 space-y-3">
               <p>
-                Jetzt öffentlich auf @{p.username} posten? Die Channel-Ankündigung folgt nach
-                Erfolg, sofern sie aktiviert und heute noch frei ist.
+                Jetzt als {p.publish_mode === "trial" ? "Trial Reel" : "normales Reel"} auf @
+                {p.username} posten?
+                {p.publish_mode !== "trial" &&
+                  " Die Channel-Ankündigung folgt nach Erfolg, sofern sie aktiviert und heute noch frei ist."}
               </p>
               <Button
                 disabled={busy || dirty || p.paused || !p.connected || !p.ig_user_id}
@@ -95,11 +115,13 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
                     action: "publish",
                     ...ref,
                     confirmation: "PUBLISH",
+                    publish_mode: p.publish_mode!,
                     ig_user_id: p.ig_user_id!,
                   })
                 }
               >
-                Jetzt auf @{p.username} veröffentlichen
+                Jetzt {p.publish_mode === "trial" ? "Trial Reel" : "Reel"} auf @{p.username}{" "}
+                veröffentlichen
               </Button>
               <Button variant="outline" onClick={() => setConfirm(false)}>
                 Zurück
