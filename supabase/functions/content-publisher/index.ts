@@ -250,6 +250,7 @@ async function processVideoPublication(input: {
   await updatePublication(admin, publication.id, {
     status: "published",
     platform_media_id: published.id,
+    published_ig_user_id: input.igUserId,
     permalink,
     published_at: new Date().toISOString(),
     last_error: null,
@@ -303,6 +304,7 @@ async function finishImagePublication(input: {
   await updatePublication(input.admin, input.publication.id, {
     status: "published",
     platform_media_id: published.id,
+    published_ig_user_id: input.igUserId,
     permalink,
     published_at: new Date().toISOString(),
     last_error: null,
