@@ -57,6 +57,7 @@ try {
   );
   await db.exec(await migration("20261011102726_channel_alerts.sql"));
   await db.exec(await migration("20261011112049_model_trial_reels.sql"));
+  await db.exec(await migration("20261011125819_model_posting_queue.sql"));
   await db.exec("set role service_role");
   await assert.rejects(call("status", ref, other));
   await assert.rejects(call("prepare", prepare));
@@ -121,6 +122,99 @@ try {
   );
   assert.equal(alert.rows[0].v, null);
   assert.equal((await db.query("select count(*)::int n from model_channel_alerts")).rows[0].n, 0);
+  const make = async (n) => {
+    const id = crypto.randomUUID(),
+      hash = n.toString(16).padStart(64, "0");
+    await db.query(
+      "insert into content_review_items(id,user_id,model,title,caption,status,media_path,sha256,bytes,reviewed_at) values($1,$2,'kiikii','Queued test','Approved caption','approved','private/'||($1::uuid)::text||'.mp4',$3,20,now())",
+      [id, owner, hash],
+    );
+    const ref = { id, revision: 1 };
+    await call("prepare", {
+      ...ref,
+      publish_mode: "normal",
+      sha256: hash,
+      storage_path: `${owner}/model-review/${id}/${hash}.mp4`,
+    });
+    return ref;
+  };
+  const a = await make(1),
+    b = await make(2);
+  const slot = await call("schedule_preview", a);
+  assert.equal((await call("status", a)).status, "approved");
+  const schedule = {
+    ...a,
+    confirmation: "SCHEDULE",
+    publish_mode: "normal",
+    ig_user_id: "123",
+    scheduled_for: slot.scheduled_for,
+  };
+  await assert.rejects(call("schedule", { ...schedule, confirmation: "PUBLISH" }));
+  await assert.rejects(call("schedule", { ...schedule, revision: 2 }));
+  await assert.rejects(call("schedule", { ...schedule, ig_user_id: "456" }));
+  await assert.rejects(call("schedule", { ...schedule, scheduled_for: new Date(0).toISOString() }));
+  await assert.rejects(call("queue", {}, other));
+  await call("schedule", schedule);
+  await call("schedule", schedule); // Lost-response retry does not allocate another slot.
+  assert.equal((await call("queue", {})).queue.length, 1);
+  assert.equal(
+    new Date((await call("status", a)).scheduled_for).valueOf(),
+    new Date(slot.scheduled_for).valueOf(),
+  );
+  await assert.rejects(call("schedule", { ...schedule, ...b }));
+  const next = await call("schedule_preview", b);
+  assert.ok(new Date(next.scheduled_for) > new Date(slot.scheduled_for));
+  for (let n = 2; n <= 14; n++) {
+    const ref = n === 2 ? b : await make(n),
+      preview = await call("schedule_preview", ref);
+    const local = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date(preview.scheduled_for));
+    assert.ok(["00:00", "19:00"].includes(local));
+    await call("schedule", { ...schedule, ...ref, scheduled_for: preview.scheduled_for });
+  }
+  assert.equal((await call("queue", {})).queue.length, 14);
+  assert.equal(
+    (
+      await db.query(
+        "select count(*)::int n from content_posts where status='scheduled' and scheduled_for<=now()",
+      )
+    ).rows[0].n,
+    0,
+  );
+  await call("unschedule", a);
+  assert.equal((await call("status", a)).status, "approved");
+  assert.equal((await call("status", a)).scheduled_for, null);
+  assert.equal((await call("queue", {})).queue.length, 13);
+  assert.equal(
+    new Date((await call("schedule_preview", a)).scheduled_for).valueOf(),
+    new Date(slot.scheduled_for).valueOf(),
+  );
+  await call("schedule", schedule);
+  await db.query(
+    "update content_posts set status='publishing' where id=(select publish_post_id from content_review_items where id=$1)",
+    [a.id],
+  );
+  await assert.rejects(call("unschedule", a));
+  const expiryRef = await make(15);
+  await db.query(
+    "update ig_connections set token_expires_at=now()+interval '1 hour' where user_id=$1",
+    [owner],
+  );
+  await assert.rejects(call("schedule_preview", expiryRef));
+  // PostgreSQL timezone conversion follows daylight saving rather than fixed UTC offsets.
+  const dst = (
+    await db.query(
+      "select extract(epoch from (timestamp '2026-10-26 00:00' at time zone 'Europe/Berlin')-(timestamp '2026-10-25 00:00' at time zone 'Europe/Berlin'))/3600 as hours",
+    )
+  ).rows[0];
+  assert.equal(Number(dst.hours), 25);
+  console.log(
+    "Posting queue passed: 14 slots, explicit confirmation, account, revision, isolation, collision, idempotency, cancellation, expiry and DST.",
+  );
   console.log(
     "Model publishing DB passed: owner, revision, separate account, immutable review/target/media, pause, exact confirmation, prepare/cancel, idempotent publish.",
   );
