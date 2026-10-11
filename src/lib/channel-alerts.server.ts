@@ -108,7 +108,14 @@ export async function alertTick(request: Request) {
     const verified = await db().rpc("verify_publisher_cron_secret", { _candidate: secret });
     if (verified.error || verified.data !== true)
       return new Response("Unauthorized", { status: 401, headers });
-    return Response.json(await runAlerts(), { headers });
+    const alerts = await runAlerts();
+    try {
+      const { syncReviewCards } = await import("./review-card-sync.server");
+      await syncReviewCards();
+    } catch {
+      /* Next tick resumes the durable edit queue. */
+    }
+    return Response.json(alerts, { headers });
   } catch {
     return Response.json({ error: "Channel worker unavailable" }, { status: 503, headers });
   }

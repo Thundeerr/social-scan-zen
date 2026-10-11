@@ -66,5 +66,13 @@ export async function modelPublishing(
     }
     await command(user, "prepare", { ...action, storage_path: path, sha256: item.sha256 });
   } else if (action.action !== "prepare") await command(user, action.action, action);
-  return command(user, "status", action);
+  const latest = await command(user, "status", action);
+  // Posting state is authoritative; a failed message edit must never undo a schedule.
+  try {
+    const { syncReviewCards } = await import("./review-card-sync.server");
+    await syncReviewCards(user, action.id);
+  } catch {
+    /* Durable outbox retries through the cloud tick. */
+  }
+  return latest;
 }
