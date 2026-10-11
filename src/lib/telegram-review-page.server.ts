@@ -28,6 +28,7 @@ function controls(){document.querySelectorAll('button').forEach(b=>b.disabled=bu
 $('save').disabled=busy||!dirty()||!!item.publish_post_id;
 $('caption').disabled=busy||!!item.publish_post_id;
 ['approve','changes','reject'].forEach(id=>$(id).disabled=busy||dirty()||item.status!=='pending'||!!item.publish_post_id);
+$('approve').disabled=$('approve').disabled||!$('caption').value.trim();
 $('prepare').disabled=busy||dirty()||item.status!=='approved'||!pub||!pub.connected||pub.paused;
 $('showConfirm').disabled=busy||dirty()||!pub||!pub.connected||pub.paused;
 $('publish').disabled=busy||dirty()||!$('checked').checked||!pub||pub.status!=='approved'||!pub.connected||pub.paused;
