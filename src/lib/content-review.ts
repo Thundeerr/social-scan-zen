@@ -37,6 +37,7 @@ export type ReviewItem = {
   sha256: string | null;
   bytes: number | null;
   created_at: string;
+  publish_post_id?: string | null;
 };
 export type ReviewResult = {
   items?: ReviewItem[];
