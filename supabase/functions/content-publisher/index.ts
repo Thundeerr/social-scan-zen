@@ -535,6 +535,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
     .from("ig_connections")
     .select("ig_user_id,ig_username,page_access_token,token_expires_at,status,api_base_url")
     .eq("user_id", post.user_id)
+    .eq("destination", post.destination)
     .eq("status", "active")
     .single();
   if (connectionError || !connection) throw new Error("Healthy Instagram connection not found");
@@ -706,7 +707,7 @@ Deno.serve(async (request: Request) => {
   try {
     const { data: claimedPost } = await admin
       .from("content_posts")
-      .select("user_id")
+      .select("user_id,destination")
       .eq("id", claimedId)
       .single();
     if (claimedPost?.user_id) {
@@ -714,6 +715,7 @@ Deno.serve(async (request: Request) => {
         .from("ig_connections")
         .select("page_access_token")
         .eq("user_id", claimedPost.user_id)
+        .eq("destination", claimedPost.destination)
         .eq("status", "active")
         .maybeSingle();
       token = claimedConnection?.page_access_token;

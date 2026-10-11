@@ -7,6 +7,8 @@
  */
 
 import { randomBytes } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
+export type PublishingDestination = "followerstar" | "kiikii" | "tuuva";
 import {
   IG_API_BASE_URL,
   IG_GRAPH_HOST,
@@ -37,10 +39,12 @@ export async function createOAuthState(
   db: AdminClient,
   userId: string,
   redirectUri: string,
+  destination: PublishingDestination = "followerstar",
 ): Promise<string> {
   await db.rpc("purge_ig_oauth_states");
   const state = randomBytes(32).toString("base64url");
-  const { error } = await db.from("ig_oauth_states").insert({
+  const { error } = await (db as SupabaseClient).from("ig_oauth_states").insert({
+    destination,
     state,
     user_id: userId,
     redirect_uri: redirectUri,
@@ -57,18 +61,19 @@ export async function createOAuthState(
 export async function consumeOAuthState(
   db: AdminClient,
   state: string,
-): Promise<{ userId: string; redirectUri: string } | null> {
+): Promise<{ userId: string; redirectUri: string; destination: PublishingDestination } | null> {
   if (!state || state.length > 200) return null;
-  const { data, error } = await db
+  const { data, error } = await (db as SupabaseClient)
     .from("ig_oauth_states")
     .update({ consumed_at: new Date().toISOString() })
     .eq("state", state)
     .is("consumed_at", null)
     .gt("expires_at", new Date().toISOString())
-    .select("user_id, redirect_uri")
+    .select("user_id, redirect_uri, destination")
     .maybeSingle();
   if (error || !data) return null;
-  return { userId: data.user_id, redirectUri: data.redirect_uri };
+  if (!["followerstar", "kiikii", "tuuva"].includes(data.destination)) return null;
+  return { userId: data.user_id, redirectUri: data.redirect_uri, destination: data.destination };
 }
 
 type TokenResponse = {
@@ -78,11 +83,7 @@ type TokenResponse = {
 };
 
 export function normalizeGrantedPermissions(value: unknown): string[] {
-  const raw = Array.isArray(value)
-    ? value
-    : typeof value === "string"
-      ? value.split(",")
-      : [];
+  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
 
   return raw
     .filter((scope): scope is string => typeof scope === "string")
@@ -100,8 +101,7 @@ async function readJson(response: Response, label: string) {
   }
   if (!response.ok || !payload) {
     const detail =
-      (payload as { error_message?: string; error?: { message?: string } } | null)
-        ?.error_message ??
+      (payload as { error_message?: string; error?: { message?: string } } | null)?.error_message ??
       (payload as { error?: { message?: string } } | null)?.error?.message ??
       `HTTP ${response.status}`;
     throw new Error(`${label}: ${redactSecrets(String(detail)).slice(0, 200)}`);
@@ -177,12 +177,14 @@ export async function fetchInstagramProfile(accessToken: string) {
 
 /**
  * Full server-side callback handling: consume state, exchange, verify scopes,
- * upsert exactly one connection for the operator.
+ * upsert only the destination bound to the one-time state.
  */
 export async function completeInstagramConnection(
   db: AdminClient,
   input: { code: string; state: string },
-): Promise<{ ok: true; username: string } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; username: string; destination: PublishingDestination } | { ok: false; error: string }
+> {
   const consumed = await consumeOAuthState(db, input.state);
   if (!consumed) {
     return { ok: false, error: "This authorization link is invalid or already used." };
@@ -202,8 +204,23 @@ export async function completeInstagramConnection(
     const long = await exchangeForLongLivedToken(short.accessToken);
     const profile = await fetchInstagramProfile(long.accessToken);
 
-    const { error } = await db.from("ig_connections").upsert(
+    if (consumed.destination === "kiikii" && profile.username.toLowerCase() !== "kiikii.bat")
+      throw new Error(
+        "Für Kiikii bitte mit @kiikii.bat anmelden. Bestehende Konten bleiben erhalten.",
+      );
+    const existing = await (db as SupabaseClient)
+      .from("ig_connections")
+      .select("ig_user_id")
+      .eq("user_id", consumed.userId)
+      .eq("destination", consumed.destination)
+      .maybeSingle();
+    if (existing.error) throw new Error("Connection check failed");
+    if (existing.data && existing.data.ig_user_id !== profile.igUserId)
+      throw new Error("Dieses Ziel gehört bereits zu einem anderen Instagram-Konto.");
+
+    const { error } = await (db as SupabaseClient).from("ig_connections").upsert(
       {
+        destination: consumed.destination,
         user_id: consumed.userId,
         ig_user_id: profile.igUserId,
         ig_username: profile.username,
@@ -217,11 +234,24 @@ export async function completeInstagramConnection(
         login_type: IG_LOGIN_TYPE,
         granted_scopes: granted,
       },
-      { onConflict: "user_id" },
+      { onConflict: "user_id,destination" },
     );
     if (error) throw new Error(error.message);
 
-    return { ok: true, username: profile.username };
+    if (consumed.destination !== "followerstar") {
+      const { error: mappingError } = await (db as SupabaseClient)
+        .from("model_alert_channels")
+        .update({
+          ig_user_id: profile.igUserId,
+          ig_username: profile.username,
+          enabled_since: new Date().toISOString(),
+        })
+        .eq("user_id", consumed.userId)
+        .eq("model", consumed.destination);
+      if (mappingError)
+        throw new Error("Konto verbunden, Channel-Zuordnung bitte in Content Review prüfen.");
+    }
+    return { ok: true, username: profile.username, destination: consumed.destination };
   } catch (error) {
     // Never persist a partial connection and never touch an existing healthy one.
     return {

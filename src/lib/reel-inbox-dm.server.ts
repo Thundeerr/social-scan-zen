@@ -28,6 +28,7 @@ async function connection(user: string) {
       .from("ig_connections")
       .select("ig_user_id,ig_username,page_access_token,status,granted_scopes,token_expires_at")
       .eq("user_id", user)
+      .eq("destination", "followerstar")
       .maybeSingle(),
   );
 }

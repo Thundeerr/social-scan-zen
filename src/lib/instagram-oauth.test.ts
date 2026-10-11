@@ -94,9 +94,7 @@ describe("token permissions", () => {
 
   it("keeps compatibility with comma-separated responses", () => {
     expect(
-      normalizeGrantedPermissions(
-        "instagram_business_basic, instagram_business_manage_comments",
-      ),
+      normalizeGrantedPermissions("instagram_business_basic, instagram_business_manage_comments"),
     ).toEqual(["instagram_business_basic", "instagram_business_manage_comments"]);
   });
 
@@ -165,7 +163,11 @@ function fakeDb(rows: Row[]) {
           if (!row) return { data: null, error: null };
           row.consumed = true;
           return {
-            data: { user_id: row.user_id, redirect_uri: row.redirect_uri },
+            data: {
+              user_id: row.user_id,
+              redirect_uri: row.redirect_uri,
+              destination: "followerstar",
+            },
             error: null,
           };
         },
@@ -200,6 +202,7 @@ describe("oauth state consumption", () => {
     await expect(consumeOAuthState(db, "good")).resolves.toEqual({
       userId: "user-1",
       redirectUri: "https://app.test/cb",
+      destination: "followerstar",
     });
     // replay of the same state must fail
     await expect(consumeOAuthState(db, "good")).resolves.toBeNull();

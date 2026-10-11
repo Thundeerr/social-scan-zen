@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { channelAlertsFn } from "@/lib/channel-alerts.functions";
 import type { AlertAction, AlertChannel } from "@/lib/channel-alerts";
 import { Button } from "./ui/button";
+import { startInstagramOAuthFn } from "@/lib/instagram-oauth.functions";
 export function ChannelAlerts({ userId }: { userId: string }) {
   const cache = useQueryClient(),
     [busy, setBusy] = useState(false),
@@ -90,6 +91,21 @@ function Channel({
   act: (a: AlertAction) => Promise<void>;
 }) {
   const [connection, setConnection] = useState("");
+  const [authorizeUrl, setAuthorizeUrl] = useState("");
+  const [connectError, setConnectError] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  async function connect() {
+    setConnecting(true);
+    setConnectError("");
+    try {
+      const { authorizeUrl: url } = await startInstagramOAuthFn({ data: { destination: c.model } });
+      setAuthorizeUrl(url);
+    } catch {
+      setConnectError("Instagram-Verbindung konnte nicht gestartet werden.");
+    } finally {
+      setConnecting(false);
+    }
+  }
   const label = c.model === "kiikii" ? "Kiikii" : "Tuuva";
   return (
     <section className="rounded-lg border p-3 space-y-3">
@@ -108,6 +124,16 @@ function Channel({
         {c.bot_ready ? "Bot darf posten und eigene Nachrichten löschen" : "Bot-Zugriff prüfen"}
       </p>
       <div className="flex flex-wrap gap-2">
+        <Button size="sm" disabled={connecting || busy} onClick={() => void connect()}>
+          {c.ig_username ? label + " erneut verbinden" : label + " mit Instagram verbinden"}
+        </Button>
+        {authorizeUrl && (
+          <Button size="sm" asChild>
+            <a href={authorizeUrl} target="_blank" rel="noopener noreferrer">
+              Instagram für {label} öffnen
+            </a>
+          </Button>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -125,6 +151,11 @@ function Channel({
           {c.enabled ? "Pausieren" : "Aktivieren"}
         </Button>
       </div>
+      {connectError && (
+        <p role="alert" className="text-sm">
+          {connectError}
+        </p>
+      )}
       <details>
         <summary className="text-sm cursor-pointer">Instagram-Zuordnung ändern</summary>
         <p className="my-2 text-xs">

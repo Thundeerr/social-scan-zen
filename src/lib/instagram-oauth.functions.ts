@@ -6,18 +6,32 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildAuthorizeUrl, instagramOAuthCallbackUrl } from "./instagram-oauth";
+import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const startInstagramOAuthFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator(z.object({ destination: z.enum(["followerstar", "kiikii", "tuuva"]) }).optional())
+  .handler(async ({ context, data }) => {
     const { instagramAppCredentials, createOAuthState } = await import("./instagram-oauth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { clientId } = instagramAppCredentials();
+    const { data: roles, error } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    if (error || !roles?.some((r) => r.role === "owner" || r.role === "cofounder"))
+      throw new Error("Not authorized");
 
     // Meta compares redirect URIs exactly. Never derive this from preview,
     // localhost, or the www host (which redirects to the apex domain).
     const redirectUri = instagramOAuthCallbackUrl();
-    const state = await createOAuthState(supabaseAdmin, context.userId, redirectUri);
+    const state = await createOAuthState(
+      supabaseAdmin,
+      context.userId,
+      redirectUri,
+      data?.destination ?? "followerstar",
+    );
 
     return { authorizeUrl: buildAuthorizeUrl({ clientId, redirectUri, state }) };
   });
@@ -47,10 +61,11 @@ export const disconnectInstagramFn = createServerFn({ method: "POST" })
       .eq("id", context.userId);
     if (pauseError) throw new Error(pauseError.message);
 
-    const { error } = await supabaseAdmin
+    const { error } = await (supabaseAdmin as SupabaseClient)
       .from("ig_connections")
       .delete()
-      .eq("user_id", context.userId);
+      .eq("user_id", context.userId)
+      .eq("destination", "followerstar");
     if (error) throw new Error(error.message);
 
     return { ok: true as const };

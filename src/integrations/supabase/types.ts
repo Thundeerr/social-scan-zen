@@ -262,6 +262,7 @@ export type Database = {
       }
       content_posts: {
         Row: {
+          destination: string
           alt_text: string
           approved_at: string | null
           approved_by: string | null
@@ -306,6 +307,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          destination?: string
           alt_text?: string
           approved_at?: string | null
           approved_by?: string | null
@@ -350,6 +352,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          destination?: string
           alt_text?: string
           approved_at?: string | null
           approved_by?: string | null
@@ -741,6 +744,7 @@ export type Database = {
       }
       ig_connections: {
         Row: {
+          destination: string
           api_base_url: string
           created_at: string
           granted_scopes: string[]
@@ -758,6 +762,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          destination?: string
           api_base_url?: string
           created_at?: string
           granted_scopes?: string[]
@@ -775,6 +780,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          destination?: string
           api_base_url?: string
           created_at?: string
           granted_scopes?: string[]
@@ -795,6 +801,7 @@ export type Database = {
       }
       ig_oauth_states: {
         Row: {
+          destination: string
           consumed_at: string | null
           created_at: string
           expires_at: string
@@ -803,6 +810,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          destination?: string
           consumed_at?: string | null
           created_at?: string
           expires_at: string
@@ -811,6 +819,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          destination?: string
           consumed_at?: string | null
           created_at?: string
           expires_at?: string
