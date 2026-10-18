@@ -22,6 +22,7 @@ import { Route as AuthenticatedLocationsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
 import { Route as AuthenticatedDiscoveryRouteImport } from './routes/_authenticated/discovery'
 import { Route as AuthenticatedContentReviewRouteImport } from './routes/_authenticated/content-review'
+import { Route as AuthenticatedCatalogueRouteImport } from './routes/_authenticated/catalogue'
 import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/burn'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
@@ -106,6 +107,11 @@ const AuthenticatedContentReviewRoute =
     path: '/content-review',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCatalogueRoute = AuthenticatedCatalogueRouteImport.update({
+  id: '/catalogue',
+  path: '/catalogue',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedBurnRoute = AuthenticatedBurnRouteImport.update({
   id: '/burn',
   path: '/burn',
@@ -213,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof AuthenticatedActivityRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/burn': typeof AuthenticatedBurnRoute
+  '/catalogue': typeof AuthenticatedCatalogueRoute
   '/content-review': typeof AuthenticatedContentReviewRoute
   '/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/downloads': typeof AuthenticatedDownloadsRoute
@@ -244,6 +251,7 @@ export interface FileRoutesByTo {
   '/activity': typeof AuthenticatedActivityRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/burn': typeof AuthenticatedBurnRoute
+  '/catalogue': typeof AuthenticatedCatalogueRoute
   '/content-review': typeof AuthenticatedContentReviewRoute
   '/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/downloads': typeof AuthenticatedDownloadsRoute
@@ -278,6 +286,7 @@ export interface FileRoutesById {
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/burn': typeof AuthenticatedBurnRoute
+  '/_authenticated/catalogue': typeof AuthenticatedCatalogueRoute
   '/_authenticated/content-review': typeof AuthenticatedContentReviewRoute
   '/_authenticated/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/_authenticated/downloads': typeof AuthenticatedDownloadsRoute
@@ -313,6 +322,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/assets'
     | '/burn'
+    | '/catalogue'
     | '/content-review'
     | '/discovery'
     | '/downloads'
@@ -344,6 +354,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/assets'
     | '/burn'
+    | '/catalogue'
     | '/content-review'
     | '/discovery'
     | '/downloads'
@@ -377,6 +388,7 @@ export interface FileRouteTypes {
     | '/_authenticated/activity'
     | '/_authenticated/assets'
     | '/_authenticated/burn'
+    | '/_authenticated/catalogue'
     | '/_authenticated/content-review'
     | '/_authenticated/discovery'
     | '/_authenticated/downloads'
@@ -511,6 +523,13 @@ declare module '@tanstack/react-router' {
       path: '/content-review'
       fullPath: '/content-review'
       preLoaderRoute: typeof AuthenticatedContentReviewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/catalogue': {
+      id: '/_authenticated/catalogue'
+      path: '/catalogue'
+      fullPath: '/catalogue'
+      preLoaderRoute: typeof AuthenticatedCatalogueRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/burn': {
@@ -661,6 +680,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedBurnRoute: typeof AuthenticatedBurnRoute
+  AuthenticatedCatalogueRoute: typeof AuthenticatedCatalogueRoute
   AuthenticatedContentReviewRoute: typeof AuthenticatedContentReviewRoute
   AuthenticatedDiscoveryRoute: typeof AuthenticatedDiscoveryRouteWithChildren
   AuthenticatedDownloadsRoute: typeof AuthenticatedDownloadsRoute
@@ -680,6 +700,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedActivityRoute: AuthenticatedActivityRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedBurnRoute: AuthenticatedBurnRoute,
+  AuthenticatedCatalogueRoute: AuthenticatedCatalogueRoute,
   AuthenticatedContentReviewRoute: AuthenticatedContentReviewRoute,
   AuthenticatedDiscoveryRoute: AuthenticatedDiscoveryRouteWithChildren,
   AuthenticatedDownloadsRoute: AuthenticatedDownloadsRoute,
