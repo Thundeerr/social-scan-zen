@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CatalogueOffers } from "@/components/catalogue-offers";
+import { CatalogueImport } from "@/components/catalogue-import";
 
 export const Route = createFileRoute("/_authenticated/catalogue")({
   component: ContentCatalogue,
@@ -290,6 +291,7 @@ function ContentCatalogue() {
         </>
       )}
       {view === "bundles" && <CatalogueOffers userId={user.id} />}
+      <CatalogueImport userId={user.id} />
     </div>
   );
 }

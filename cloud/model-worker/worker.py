@@ -5,12 +5,14 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 import time
 import urllib.request
 import urllib.parse
 import urllib.error
 import uuid
 import inbox_helper as media
+from source_upload import download_upload
 
 ROOT = Path(os.environ.get("WORK_DIR", "/data"))
 REFS = Path(os.environ.get("REFERENCE_DIR", "/references"))
@@ -19,6 +21,39 @@ WAVE = "https://api.wavespeed.ai/api/v3"
 
 class StopJob(Exception):
     pass
+
+def generation_prompt(config, job):
+    feedback = job.get("revision_notes", "").strip()
+    if not feedback:
+        return config["prompt"]
+    return (config["prompt"] + "\n\nREVISION REQUEST: Recreate from the ORIGINAL source video. "
+        "Apply the following reviewer corrections; preserve everything not mentioned. "
+        "Maintain temporal consistency across every frame.\n" + feedback +
+        "\nFor clothing consistency corrections, preserve the exact original source outfit, "
+        "colors, coverage, cut and accessories throughout. Do not import clothing from identity reference images.")
+
+def prepare_source(source):
+    info=media.validate_video(source,"ffprobe","ffmpeg")
+    duration=info["duration"]
+    if not 2<=duration<=17:
+        raise StopJob("duration")
+    if duration<=15:
+        return info
+    original=source.with_name("source.original.mp4")
+    if not original.exists():
+        shutil.copyfile(source,original)
+    trimmed=source.with_name("source.trim.part.mp4")
+    media.run_tool(["ffmpeg","-nostdin","-v","error","-y","-i",str(source),
+        "-t","15","-map","0:v:0","-map","0:a:0?","-c:v","libx264",
+        "-preset","fast","-crf","18","-c:a","aac","-b:a","192k",
+        "-movflags","+faststart",str(trimmed)],180)
+    checked=media.validate_video(trimmed,"ffprobe","ffmpeg")
+    if not 14.8<=checked["duration"]<=15:
+        raise StopJob("validation")
+    os.replace(trimmed,source)
+    source.with_name("trim.json").write_text(json.dumps({"original_duration":duration,
+        "start":0,"end":15,"reason":"User approved shortening sources up to 17 seconds inclusive"}))
+    return checked
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
@@ -113,7 +148,7 @@ def deliver(state, folder, config):
         checked=media.validate_video(folder/"final.part.mp4","ffprobe","ffmpeg")
         if checked["bytes"]>40*1024*1024:raise StopJob("validation")
         os.replace(folder/"final.part.mp4",final)
-    upload_info=api("review",job,caption=config["caption"])
+    upload_info=api("review",job,caption=job.get("revision_caption") if job.get("revision_caption") is not None else config["caption"])
     if not upload_info.get("uploaded"):
         target=urllib.parse.urlsplit(upload_info["upload_url"])
         if target.scheme!="https" or target.hostname!="vkudzmoaqskmglfajzkz.supabase.co" or not target.path.startswith("/storage/v1/object/upload/sign/content-review/"):
@@ -152,21 +187,34 @@ def tick():
             # Crash or timeout after submission: manual reconciliation; never charge twice.
             raise StopJob("provider_uncertain")
         source=folder/"source.mp4"
+        if not source.exists() and job.get("parent_job_id"):
+            parent_id=str(uuid.UUID(job["parent_job_id"]))
+            original=ROOT/parent_id/"source.mp4"
+            if original.is_file():
+                shutil.copyfile(original,folder/"source.part")
+                media.validate_video(folder/"source.part","ffprobe","ffmpeg")
+                os.replace(folder/"source.part",source)
         if not source.exists():
             try:
-                url,metadata=media.extract(job["source_url"], cookie_file=os.environ.get("INSTAGRAM_COOKIE_FILE"))
                 partial=folder/"source.part"
                 if partial.exists():partial.unlink()
-                media.download_public(url,partial)
+                if job.get("source_upload_id"):
+                    try:
+                        download_upload(ORIGIN, os.environ["PIPELINE_WORKER_TOKEN"], job, partial)
+                    except Exception:
+                        raise media.InboxError("source_unavailable") from None
+                    metadata={"source":"private-upload"}
+                else:
+                    url,metadata=media.extract(job["source_url"], cookie_file=os.environ.get("INSTAGRAM_COOKIE_FILE"))
+                    media.download_public(url,partial)
                 media.validate_video(partial,"ffprobe","ffmpeg")
                 os.replace(partial,source)
                 (folder/"source.json").write_text(json.dumps(metadata),encoding="utf8")
             except media.InboxError:raise StopJob("source_unavailable") from None
-        info=media.validate_video(source,"ffprobe","ffmpeg")
-        if not 2<=info["duration"]<=15:raise StopJob("duration")
+        info=prepare_source(source)
         if not 0.5<=info["width"]/info["height"]<=0.65:raise StopJob("validation")
         # Uploads precede reservation so expensive side effects happen immediately afterwards.
-        request_body={"prompt":config["prompt"],"video":upload(source,"video/mp4"),"reference_images":[upload(p,"image/png" if p.suffix==".png" else "image/jpeg") for p in refs],"resolution":"720p","duration":math.ceil(info["duration"]),"generate_audio":False,"enable_prompt_expansion":False}
+        request_body={"prompt":generation_prompt(config,job),"video":upload(source,"video/mp4"),"reference_images":[upload(p,"image/png" if p.suffix==".png" else "image/jpeg") for p in refs],"resolution":"720p","duration":math.ceil(info["duration"]),"generate_audio":False,"enable_prompt_expansion":False}
         reservation=api("reserve",job,seconds=info["duration"])
         if reservation.get("budget_wait"):
             state["budget_wait"]=True;archive(state);return

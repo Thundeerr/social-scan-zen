@@ -19,6 +19,7 @@ import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedReelInboxRouteImport } from './routes/_authenticated/reel-inbox'
 import { Route as AuthenticatedPublisherRouteImport } from './routes/_authenticated/publisher'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
+import { Route as AuthenticatedGenerateRouteImport } from './routes/_authenticated/generate'
 import { Route as AuthenticatedDownloadsRouteImport } from './routes/_authenticated/downloads'
 import { Route as AuthenticatedDiscoveryRouteImport } from './routes/_authenticated/discovery'
 import { Route as AuthenticatedContentReviewRouteImport } from './routes/_authenticated/content-review'
@@ -30,6 +31,7 @@ import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
 import { Route as ApiReelInboxWorkerRouteImport } from './routes/api/reel-inbox/worker'
 import { Route as ApiModelPipelineWorkerRouteImport } from './routes/api/model-pipeline/worker'
+import { Route as ApiModelPipelineSourceRouteImport } from './routes/api/model-pipeline/source'
 import { Route as ApiChannelAlertsTickRouteImport } from './routes/api/channel-alerts/tick'
 import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
@@ -91,6 +93,11 @@ const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
   path: '/locations',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGenerateRoute = AuthenticatedGenerateRouteImport.update({
+  id: '/generate',
+  path: '/generate',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDownloadsRoute = AuthenticatedDownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
@@ -146,6 +153,11 @@ const ApiReelInboxWorkerRoute = ApiReelInboxWorkerRouteImport.update({
 const ApiModelPipelineWorkerRoute = ApiModelPipelineWorkerRouteImport.update({
   id: '/api/model-pipeline/worker',
   path: '/api/model-pipeline/worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiModelPipelineSourceRoute = ApiModelPipelineSourceRouteImport.update({
+  id: '/api/model-pipeline/source',
+  path: '/api/model-pipeline/source',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChannelAlertsTickRoute = ApiChannelAlertsTickRouteImport.update({
@@ -223,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/content-review': typeof AuthenticatedContentReviewRoute
   '/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/downloads': typeof AuthenticatedDownloadsRoute
+  '/generate': typeof AuthenticatedGenerateRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/publisher': typeof AuthenticatedPublisherRoute
   '/reel-inbox': typeof AuthenticatedReelInboxRoute
@@ -232,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
+  '/api/model-pipeline/source': typeof ApiModelPipelineSourceRoute
   '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor/': typeof AuthenticatedMonitorIndexRoute
@@ -255,6 +269,7 @@ export interface FileRoutesByTo {
   '/content-review': typeof AuthenticatedContentReviewRoute
   '/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/downloads': typeof AuthenticatedDownloadsRoute
+  '/generate': typeof AuthenticatedGenerateRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/publisher': typeof AuthenticatedPublisherRoute
   '/reel-inbox': typeof AuthenticatedReelInboxRoute
@@ -265,6 +280,7 @@ export interface FileRoutesByTo {
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
+  '/api/model-pipeline/source': typeof ApiModelPipelineSourceRoute
   '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor': typeof AuthenticatedMonitorIndexRoute
@@ -290,6 +306,7 @@ export interface FileRoutesById {
   '/_authenticated/content-review': typeof AuthenticatedContentReviewRoute
   '/_authenticated/discovery': typeof AuthenticatedDiscoveryRouteWithChildren
   '/_authenticated/downloads': typeof AuthenticatedDownloadsRoute
+  '/_authenticated/generate': typeof AuthenticatedGenerateRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
   '/_authenticated/publisher': typeof AuthenticatedPublisherRoute
   '/_authenticated/reel-inbox': typeof AuthenticatedReelInboxRoute
@@ -300,6 +317,7 @@ export interface FileRoutesById {
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/_authenticated/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
+  '/api/model-pipeline/source': typeof ApiModelPipelineSourceRoute
   '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
@@ -326,6 +344,7 @@ export interface FileRouteTypes {
     | '/content-review'
     | '/discovery'
     | '/downloads'
+    | '/generate'
     | '/locations'
     | '/publisher'
     | '/reel-inbox'
@@ -335,6 +354,7 @@ export interface FileRouteTypes {
     | '/discovery/analytics'
     | '/monitor/$accountId'
     | '/api/channel-alerts/tick'
+    | '/api/model-pipeline/source'
     | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/monitor/'
@@ -358,6 +378,7 @@ export interface FileRouteTypes {
     | '/content-review'
     | '/discovery'
     | '/downloads'
+    | '/generate'
     | '/locations'
     | '/publisher'
     | '/reel-inbox'
@@ -368,6 +389,7 @@ export interface FileRouteTypes {
     | '/discovery/analytics'
     | '/monitor/$accountId'
     | '/api/channel-alerts/tick'
+    | '/api/model-pipeline/source'
     | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/monitor'
@@ -392,6 +414,7 @@ export interface FileRouteTypes {
     | '/_authenticated/content-review'
     | '/_authenticated/discovery'
     | '/_authenticated/downloads'
+    | '/_authenticated/generate'
     | '/_authenticated/locations'
     | '/_authenticated/publisher'
     | '/_authenticated/reel-inbox'
@@ -402,6 +425,7 @@ export interface FileRouteTypes {
     | '/_authenticated/discovery/analytics'
     | '/_authenticated/monitor/$accountId'
     | '/api/channel-alerts/tick'
+    | '/api/model-pipeline/source'
     | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/_authenticated/monitor/'
@@ -420,6 +444,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   TelegramReviewRoute: typeof TelegramReviewRoute
   ApiChannelAlertsTickRoute: typeof ApiChannelAlertsTickRoute
+  ApiModelPipelineSourceRoute: typeof ApiModelPipelineSourceRoute
   ApiModelPipelineWorkerRoute: typeof ApiModelPipelineWorkerRoute
   ApiReelInboxWorkerRoute: typeof ApiReelInboxWorkerRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
@@ -504,6 +529,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLocationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/generate': {
+      id: '/_authenticated/generate'
+      path: '/generate'
+      fullPath: '/generate'
+      preLoaderRoute: typeof AuthenticatedGenerateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/downloads': {
       id: '/_authenticated/downloads'
       path: '/downloads'
@@ -579,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/api/model-pipeline/worker'
       fullPath: '/api/model-pipeline/worker'
       preLoaderRoute: typeof ApiModelPipelineWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/model-pipeline/source': {
+      id: '/api/model-pipeline/source'
+      path: '/api/model-pipeline/source'
+      fullPath: '/api/model-pipeline/source'
+      preLoaderRoute: typeof ApiModelPipelineSourceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/channel-alerts/tick': {
@@ -684,6 +723,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedContentReviewRoute: typeof AuthenticatedContentReviewRoute
   AuthenticatedDiscoveryRoute: typeof AuthenticatedDiscoveryRouteWithChildren
   AuthenticatedDownloadsRoute: typeof AuthenticatedDownloadsRoute
+  AuthenticatedGenerateRoute: typeof AuthenticatedGenerateRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
   AuthenticatedPublisherRoute: typeof AuthenticatedPublisherRoute
   AuthenticatedReelInboxRoute: typeof AuthenticatedReelInboxRoute
@@ -704,6 +744,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedContentReviewRoute: AuthenticatedContentReviewRoute,
   AuthenticatedDiscoveryRoute: AuthenticatedDiscoveryRouteWithChildren,
   AuthenticatedDownloadsRoute: AuthenticatedDownloadsRoute,
+  AuthenticatedGenerateRoute: AuthenticatedGenerateRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
   AuthenticatedPublisherRoute: AuthenticatedPublisherRoute,
   AuthenticatedReelInboxRoute: AuthenticatedReelInboxRoute,
@@ -723,6 +764,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   TelegramReviewRoute: TelegramReviewRoute,
   ApiChannelAlertsTickRoute: ApiChannelAlertsTickRoute,
+  ApiModelPipelineSourceRoute: ApiModelPipelineSourceRoute,
   ApiModelPipelineWorkerRoute: ApiModelPipelineWorkerRoute,
   ApiReelInboxWorkerRoute: ApiReelInboxWorkerRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,

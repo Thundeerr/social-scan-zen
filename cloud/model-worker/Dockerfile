@@ -5,6 +5,7 @@ COPY windows/reel-inbox/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY windows/reel-inbox/helper.py inbox_helper.py
 COPY cloud/model-worker/worker.py worker.py
+COPY cloud/model-worker/source_upload.py source_upload.py
 RUN useradd --uid 10001 --create-home worker && mkdir /data && chown worker:worker /data
 USER 10001:10001
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
