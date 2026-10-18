@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/catalogue")({
 });
 
 const assignments: Record<ClipAssignment, string> = {
-  unassigned: "Unassigned · Nicht zugeordnet",
+  unassigned: "Noch offen",
   wall: "Wall",
   ppv: "PPV",
 };
@@ -30,11 +30,11 @@ function ReviewPreview({ id, revision }: { id: string; revision: number }) {
   });
   return (
     <div className="space-y-2">
-      <Button variant="outline" size="sm" disabled={preview.isPending}
+      <Button variant="outline" className="h-14 w-full text-base" disabled={preview.isPending}
         onClick={() => { setUrl(""); preview.mutate(); }}>
         {preview.isPending ? "Lädt …" : url ? "Vorschau erneuern" : "Video ansehen"}
       </Button>
-      {url && <video className="max-h-72 w-48 rounded" src={url} controls preload="metadata"
+      {url && <video className="max-h-96 w-full rounded-xl" src={url} controls preload="metadata"
         onError={() => setUrl("")} />}
       {preview.isError && <p role="alert" className="text-xs text-destructive">{preview.error.message}</p>}
     </div>
@@ -63,6 +63,7 @@ function ContentCatalogue() {
   const cache = useQueryClient();
   const [clipPage, setClipPage] = useState(0);
   const [reviewPage, setReviewPage] = useState(0);
+  const [view, setView] = useState<"videos" | "add" | "bundles">("videos");
   const [reviewId, setReviewId] = useState("");
   const [code, setCode] = useState("");
   const [notice, setNotice] = useState("");
@@ -97,6 +98,9 @@ function ContentCatalogue() {
       setCode("");
       setReviewId("");
       setClipPage(0);
+      setFilters(catalogueFilterSchema.parse({}));
+      setSearchInput("");
+      setView("videos");
     },
     onError: (error) => setActionError(error.message),
     onSettled: async () => {
@@ -112,13 +116,13 @@ function ContentCatalogue() {
   const clearMessages = () => { setNotice(""); setActionError(""); };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6 [&_button]:min-h-12 [&_input]:min-h-12 [&_select]:min-h-12">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Content Catalogue</h1>
+          <h1 className="text-3xl font-bold">Deine Videos</h1>
           <p className="mt-2 text-muted-foreground">
-            Kiikii &amp; Tuuva · Permanente Clip-IDs und Zuordnung zu Wall oder PPV.
-            Eine Zuordnung veröffentlicht nichts.
+            Videos sammeln. Wall oder PPV wählen. Bundles zusammenstellen.
+            Hier wird nichts veröffentlicht.
           </p>
         </div>
         <Button variant="outline" disabled={busy || query.isFetching} onClick={() => void refresh()}>
@@ -126,6 +130,17 @@ function ContentCatalogue() {
         </Button>
       </header>
 
+      <nav aria-label="Videobibliothek" className="grid grid-cols-2 gap-3">
+        <Button className="h-16 text-lg" variant={view !== "bundles" ? "default" : "outline"}
+          aria-pressed={view !== "bundles"} onClick={() => setView("videos")}>Meine Videos</Button>
+        <Button className="h-16 text-lg" variant={view === "bundles" ? "default" : "outline"}
+          aria-pressed={view === "bundles"} onClick={() => setView("bundles")}>Meine Bundles</Button>
+      </nav>
+      {view === "videos" && <Button className="h-16 w-full text-lg" onClick={() => setView("add")}>
+        + Video hinzufügen
+      </Button>}
+      {view === "videos" && <details className="rounded-xl border p-4">
+        <summary className="cursor-pointer py-3 text-base font-semibold">Suchen &amp; filtern{filtered ? " · Filter aktiv" : ""}</summary>
       <section aria-label="Bibliothek filtern" className="space-y-3 rounded-xl border p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="grid gap-1 text-sm">Charakter
@@ -141,17 +156,17 @@ function ContentCatalogue() {
               {Object.entries(assignments).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-sm">Offer-Mitgliedschaft
+          <label className="grid gap-1 text-sm">Bundle
             <select className="rounded border bg-background p-2" value={filters.membership} disabled={busy}
               onChange={(event) => updateFilters({ membership: event.target.value as CatalogueFilters["membership"] })}>
-              <option value="all">Alle Clips</option><option value="in_offer">In einem Offer</option><option value="no_offer">In keinem Offer</option>
+              <option value="all">Alle Clips</option><option value="in_offer">In einem Bundle</option><option value="no_offer">In keinem Bundle</option>
             </select>
           </label>
           <label className="grid gap-1 text-sm">Sortierung
             <select className="rounded border bg-background p-2" value={filters.sort} disabled={busy}
               onChange={(event) => updateFilters({ sort: event.target.value as CatalogueFilters["sort"] })}>
               <option value="newest">Neueste zuerst</option><option value="clip_code">Clip-ID aufsteigend</option>
-              <option value="assignment">Unassigned → Wall → PPV</option>
+              <option value="assignment">Noch offen → Wall → PPV</option>
             </select>
           </label>
         </div>
@@ -169,7 +184,7 @@ function ContentCatalogue() {
         </form>
         <p className="text-xs text-muted-foreground">Filter gelten für die Bibliothek auf allen Seiten. Offers und freigegebene Reviews bleiben ungefiltert.</p>
         {query.isFetching && !query.isPending && <p role="status" className="text-sm">Bibliothek wird aktualisiert …</p>}
-      </section>
+      </section></details>}
 
       {query.isPending && <p role="status">Katalog wird geladen …</p>}
       {query.isError && (
@@ -183,87 +198,56 @@ function ContentCatalogue() {
       {notice && <p role="status" className="rounded-lg border p-3">{notice}</p>}
       {actionError && <p role="alert" className="rounded-lg border border-destructive p-3">{actionError}</p>}
 
-      {query.data && (
+      {query.data && view !== "bundles" && (
         <>
-          <section aria-labelledby="catalogue-clips-heading" className="space-y-4">
+          {view === "videos" && <section aria-labelledby="catalogue-clips-heading" className="space-y-4">
             <h2 id="catalogue-clips-heading" className="text-lg font-semibold">
-              Bibliothek ({query.data.clip_count}{filtered ? " Treffer" : ""})
+              Meine Videos ({query.data.clip_count}{filtered ? " Treffer" : ""})
             </h2>
             {query.data.clips.length === 0 ? (
               <p className="text-muted-foreground">
-                {filtered ? "Keine Clips für diese Filter gefunden." : clipPage === 0 ? "Noch keine Clips. Übernimm unten ein freigegebenes Review." : "Keine Clips auf dieser Seite."}
+                {filtered ? "Keine Clips für diese Filter gefunden." : clipPage === 0 ? "Hier ist noch Platz für deine Videos. Klicke oben auf „+ Video hinzufügen“." : "Keine Clips auf dieser Seite."}
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border">
-                <table className="w-full text-left text-sm">
-                  <caption className="sr-only">Deine katalogisierten Clips</caption>
-                  <thead className="bg-muted">
-                    <tr>
-                      {["Clip-ID", "Charakter", "Zuordnung", "Offers", "Erstellt", "Medium"].map((label) => (
-                        <th key={label} scope="col" className="p-3">{label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {query.data.clips.map((clip) => (
-                      <tr key={clip.id} className="border-t align-top">
-                        <th scope="row" className="p-3 font-medium">{clip.clip_code}</th>
-                        <td className="p-3">{models[clip.model]}</td>
-                        <td className="p-3">
-                          <Badge variant="outline" className={clip.assignment === "wall"
-                            ? "mb-2 border-blue-500 text-blue-600 dark:text-blue-300"
-                            : clip.assignment === "ppv" ? "mb-2 border-violet-500 text-violet-600 dark:text-violet-300"
-                              : "mb-2 text-muted-foreground"}>{assignments[clip.assignment]}</Badge>
-                          <select
-                            aria-label={"Zuordnung für " + clip.clip_code}
-                            aria-describedby={clip.in_offer ? "locked-" + clip.id : undefined}
-                            className="max-w-full rounded border bg-background p-2"
-                            value={clip.assignment}
-                            disabled={disabled || clip.in_offer}
-                            onChange={(event) => {
-                              clearMessages();
-                              changed.mutate({ data: {
-                                clip_id: clip.id,
-                                assignment: event.target.value as ClipAssignment,
-                                expected_assignment: clip.assignment,
-                              } });
-                            }}
-                          >
-                            {Object.entries(assignments).map(([value, label]) => (
-                              <option key={value} value={value}>{label}</option>
-                            ))}
-                          </select>
-                          {clip.in_offer && <p id={"locked-" + clip.id} className="mt-1 text-xs text-muted-foreground">
-                            In einem Offer · Zuordnung gesperrt
-                          </p>}
-                        </td>
-                        <td className="p-3">
-                          {clip.offers.length ? <ul className="space-y-1">
-                            {clip.offers.map((offer) => <li key={offer.id}>{offer.title}</li>)}
-                          </ul> : <span className="text-muted-foreground">Kein Offer</span>}
-                        </td>
-                        <td className="whitespace-nowrap p-3">
-                          <time dateTime={clip.created_at}>{new Date(clip.created_at).toLocaleString("de-DE")}</time>
-                        </td>
-                        <td className="p-3">
-                          {clip.has_media && clip.review_item_id && clip.review_revision ? (
-                            <ReviewPreview key={clip.review_item_id + ":" + clip.review_revision}
-                              id={clip.review_item_id} revision={clip.review_revision} />
-                          ) : <span className="text-muted-foreground">Kein Review-Medium</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {query.data.clips.map((clip) => <article key={clip.id} className="space-y-4 rounded-2xl border bg-card p-5">
+                  <header className="flex flex-wrap items-center justify-between gap-2">
+                    <div><h3 className="text-xl font-semibold">{clip.clip_code}</h3>
+                      <p className="text-muted-foreground">{models[clip.model]}</p></div>
+                    <Badge variant="outline" className="px-3 py-2 text-sm">{assignments[clip.assignment]}</Badge>
+                  </header>
+                  {clip.has_media && clip.review_item_id && clip.review_revision ?
+                    <ReviewPreview key={clip.review_item_id + ":" + clip.review_revision}
+                      id={clip.review_item_id} revision={clip.review_revision} /> :
+                    <p className="rounded-xl bg-muted p-4 text-muted-foreground">Keine Videovorschau verknüpft.</p>}
+                  <fieldset disabled={disabled || clip.in_offer} className="space-y-2">
+                    <legend className="mb-2 font-medium">Wofür ist dieses Video?</legend>
+                    <div className="grid grid-cols-3 gap-2">
+                      {Object.entries(assignments).map(([value,label]) => <Button key={value}
+                        className="h-14 text-base" aria-pressed={clip.assignment === value}
+                        variant={clip.assignment === value ? "default" : "outline"}
+                        disabled={disabled || clip.in_offer || clip.assignment === value}
+                        onClick={() => { clearMessages(); changed.mutate({data: {
+                          clip_id: clip.id, assignment: value as ClipAssignment, expected_assignment: clip.assignment,
+                        }}); }}>{label}</Button>)}
+                    </div>
+                  </fieldset>
+                  {clip.in_offer && <p className="text-sm text-muted-foreground">Zum Ändern zuerst aus den Bundles entfernen.</p>}
+                  {clip.offers.length > 0 && <div><p className="font-medium">In diesen Bundles:</p>
+                    <ul>{clip.offers.map(offer => <li key={offer.id}>{offer.title}</li>)}</ul></div>}
+                  <details className="text-sm text-muted-foreground"><summary className="cursor-pointer py-2">Videodetails</summary>
+                    Hinzugefügt: <time dateTime={clip.created_at}>{new Date(clip.created_at).toLocaleString("de-DE")}</time>
+                  </details>
+                </article>)}
               </div>
             )}
             <Pager page={clipPage} count={query.data.clip_count} disabled={disabled} onChange={setClipPage} />
-          </section>
+          </section>}
 
-          <section aria-labelledby="catalogue-promote-heading" className="space-y-4 rounded-xl border bg-card p-4">
-            <h2 id="catalogue-promote-heading" className="text-lg font-semibold">Freigegebenes Review übernehmen</h2>
+          {view === "add" && <section aria-labelledby="catalogue-promote-heading" className="space-y-4 rounded-xl border bg-card p-4">
+            <h2 id="catalogue-promote-heading" className="text-2xl font-semibold">Video hinzufügen</h2>
             <p className="text-sm text-muted-foreground">
-              Nur freigegebene Reviews ohne Clip-ID werden angezeigt. Neue Clips starten als Unassigned.
+              Wähle ein freigegebenes Video und gib ihm eine feste Nummer.
             </p>
             {query.data.reviews.length === 0 ? (
               <p>{reviewPage === 0 ? "Keine freigegebenen Reviews ohne Clip vorhanden." : "Keine Reviews auf dieser Seite."}</p>
@@ -274,37 +258,38 @@ function ContentCatalogue() {
                 clearMessages();
                 promoted.mutate({ data: { review_item_id: selected.id, clip_code: code.trim() } });
               }}>
-                <label htmlFor="catalogue-review">Review</label>
+                <label htmlFor="catalogue-review" className="text-lg font-semibold">1. Video auswählen</label>
                 <select id="catalogue-review" className="w-full rounded border bg-background p-2"
                   value={selected?.id ?? ""} disabled={disabled}
                   onChange={(event) => { setReviewId(event.target.value); setCode(""); clearMessages(); }}>
-                  <option value="">Review auswählen …</option>
+                  <option value="">Video auswählen …</option>
                   {query.data.reviews.map((item) => (
-                    <option key={item.id} value={item.id}>{models[item.model]} · {item.title} · {item.id.slice(0, 8)}</option>
+                    <option key={item.id} value={item.id}>{models[item.model]} · {item.title}</option>
                   ))}
                 </select>
                 {selected && <Link className="text-sm underline" to="/content-review" search={{ item: selected.id }}>
-                  Ausgewähltes Review ansehen
+                  Video vor dem Hinzufügen prüfen ↗
                 </Link>}
-                <label htmlFor="catalogue-code">Permanente Clip-ID</label>
+                <label htmlFor="catalogue-code" className="text-lg font-semibold">2. Video-Nummer eingeben</label>
                 <Input id="catalogue-code" value={code} placeholder={prefix + "-V020"}
                   disabled={disabled || !selected} required pattern={prefix + "-V[0-9]{3,}"} autoComplete="off"
                   aria-describedby="catalogue-code-help" onChange={(event) => setCode(event.target.value)} />
                 <p id="catalogue-code-help" className="text-xs text-muted-foreground">
-                  {prefix}-V gefolgt von mindestens drei Ziffern. Die Clip-ID lässt sich später nicht ändern.
+                  Zum Beispiel {prefix}-V020. Jede Nummer darf nur einmal vergeben werden und bleibt fest.
                 </p>
-                <Button className="justify-self-start" type="submit" disabled={disabled || !validCode}>
-                  {promoted.isPending ? "Wird übernommen …" : "In Bibliothek übernehmen"}
+                <Button className="h-16 w-full text-lg" type="submit" disabled={disabled || !validCode}>
+                  {promoted.isPending ? "Wird übernommen …" : "Video speichern"}
                 </Button>
               </form>
             )}
             <Pager page={reviewPage} count={query.data.review_count} disabled={disabled} onChange={(page) => {
               setReviewPage(page); setReviewId(""); setCode("");
             }} />
-          </section>
+            <Button variant="outline" className="w-full" disabled={busy} onClick={() => setView("videos")}>Zurück zu meinen Videos</Button>
+          </section>}
         </>
       )}
-      <CatalogueOffers userId={user.id} />
+      {view === "bundles" && <CatalogueOffers userId={user.id} />}
     </div>
   );
 }

@@ -19,7 +19,7 @@ export function CatalogueOffers({ userId }: { userId: string }) {
     queryKey: [...key, "offers", page],
     queryFn: async () => {
       const result = await catalogueOffersFn({ data: { action: "list", page } });
-      if (!result) throw new Error("Offers konnten nicht geladen werden.");
+      if (!result) throw new Error("Bundles konnten nicht geladen werden.");
       return result;
     },
     retry: false,
@@ -31,10 +31,10 @@ export function CatalogueOffers({ userId }: { userId: string }) {
     onSuccess: (_, variables) => {
       const action = variables.data;
       if (action.action === "create") {
-        setTitle(""); setPage(0); setNotice("Offer erstellt.");
+        setTitle(""); setPage(0); setNotice("Bundle erstellt.");
       } else if (action.action === "add") {
         setCodes(current => ({ ...current, [action.offer_id]: "" }));
-        setNotice("Clip im Offer gespeichert.");
+        setNotice("Clip im Bundle gespeichert.");
       } else setNotice("Clip entfernt. Seine Zuordnung bleibt PPV.");
     },
     onSettled: () => cache.invalidateQueries({ queryKey: key }),
@@ -47,12 +47,11 @@ export function CatalogueOffers({ userId }: { userId: string }) {
 
   return (
     <section aria-labelledby="catalogue-offers-heading" className="space-y-4">
-      <h2 id="catalogue-offers-heading" className="text-lg font-semibold">Offers / Bundles</h2>
+      <h2 id="catalogue-offers-heading" className="text-2xl font-semibold">Meine Bundles</h2>
       <p className="text-sm text-muted-foreground">
-        Clips eines Charakters zusammenstellen. Wall-Clips sind ausgeschlossen.
-        Das Erstellen oder Bearbeiten veröffentlicht nichts.
+        Ein Bundle ist ein Paket aus mehreren PPV-Videos. Wall-Videos bleiben getrennt.
       </p>
-      {query.isPending && <p role="status">Offers werden geladen …</p>}
+      {query.isPending && <p role="status">Bundles werden geladen …</p>}
       {query.isError && <div role="alert" className="rounded border border-destructive p-3">
         <p>{query.error.message}</p>
         <Button variant="outline" onClick={() => void query.refetch()}>Erneut versuchen</Button>
@@ -65,26 +64,26 @@ export function CatalogueOffers({ userId }: { userId: string }) {
           if (!disabled && title.trim()) run({ action: "create", title: title.trim(), model });
         }}>
         <div className="space-y-2">
-          <label htmlFor="offer-title">Neuer Offer-Titel</label>
+          <label htmlFor="offer-title">1. Wie heißt das Bundle?</label>
           <Input id="offer-title" value={title} onChange={e => setTitle(e.target.value)}
             required maxLength={160} disabled={disabled} placeholder="z. B. Kiikii · Set 01" />
         </div>
         <div className="space-y-2">
-          <label htmlFor="offer-model">Charakter</label>
+          <label htmlFor="offer-model">2. Für wen?</label>
           <select id="offer-model" value={model} disabled={disabled}
             className="block w-full rounded border bg-background p-2"
             onChange={e => setModel(e.target.value as CatalogueModel)}>
             {Object.entries(models).map(([id,label]) => <option key={id} value={id}>{label}</option>)}
           </select>
         </div>
-        <Button type="submit" className="justify-self-start" disabled={disabled || !title.trim()}>
-          Offer erstellen
+        <Button type="submit" className="h-16 text-lg sm:col-span-2" disabled={disabled || !title.trim()}>
+          Bundle erstellen
         </Button>
       </form>
 
       {query.data && <>
         {query.data.offers.length === 0 && <p className="text-muted-foreground">
-          {page === 0 ? "Noch keine Offers vorhanden." : "Keine Offers auf dieser Seite."}
+          {page === 0 ? "Noch keine Bundles vorhanden." : "Keine Bundles auf dieser Seite."}
         </p>}
         <div className="grid gap-4">
           {query.data.offers.map(offer => {
@@ -93,12 +92,12 @@ export function CatalogueOffers({ userId }: { userId: string }) {
             const valid = new RegExp("^" + prefix + "-V[0-9]{3,}$").test(code.trim());
             return <article key={offer.id} className="space-y-3 rounded-xl border bg-card p-4">
               <header>
-                <h3 className="font-semibold">{offer.title}</h3>
+                <h3 className="text-xl font-semibold">{offer.title}</h3>
                 <p className="text-sm text-muted-foreground">
                   {models[offer.model]} · {offer.clips.length} Clips
                 </p>
               </header>
-              {offer.clips.length === 0 ? <p className="text-sm">Dieses Offer ist noch leer.</p> :
+              {offer.clips.length === 0 ? <p className="text-sm">Dieses Bundle ist noch leer.</p> :
                 <ul className="divide-y">
                   {offer.clips.map(clip => <li key={clip.id} className="flex items-center justify-between gap-3 py-2">
                     <span className="font-mono text-sm">{clip.clip_code}</span>
@@ -123,9 +122,7 @@ export function CatalogueOffers({ userId }: { userId: string }) {
                   <Button type="submit" disabled={disabled || !valid}>Hinzufügen</Button>
                 </div>
                 <p id={"offer-help-" + offer.id} className="text-xs text-muted-foreground">
-                  PPV oder Unassigned. Unassigned wird beim Hinzufügen auf PPV gesetzt.
-                  Entfernen behält PPV bei; danach kannst du die Zuordnung in der Bibliothek ändern,
-                  sofern der Clip in keinem weiteren Offer liegt.
+                  Gib die Nummer aus „Meine Videos“ ein. Das Video wird für PPV reserviert. Wall-Videos können hier nicht hinzugefügt werden.
                 </p>
               </form>
             </article>;
@@ -133,7 +130,7 @@ export function CatalogueOffers({ userId }: { userId: string }) {
         </div>
         {(query.data.total > 50 || page > 0) && <div className="flex items-center gap-3">
           <Button variant="outline" disabled={disabled || page === 0} onClick={() => setPage(page-1)}>Zurück</Button>
-          <span className="text-sm">Seite {page+1} · {query.data.total} Offers</span>
+          <span className="text-sm">Seite {page+1} · {query.data.total} Bundles</span>
           <Button variant="outline" disabled={disabled || (page+1)*50 >= query.data.total}
             onClick={() => setPage(page+1)}>Weiter</Button>
         </div>}
