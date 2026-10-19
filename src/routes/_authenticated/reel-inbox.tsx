@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { reelInboxFn } from "@/lib/reel-inbox.functions";
 import { stages, type InboxSnapshot } from "@/lib/reel-inbox";
 import { Button } from "@/components/ui/button";
+import { CopyVideoButton } from "@/components/copy-video-button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ReelInboxDm } from "@/components/reel-inbox-dm";
@@ -185,6 +186,7 @@ function ReelInbox() {
               </p>
             )}
             <div className="flex flex-wrap gap-2">
+              <CopyVideoButton reference={item.canonical_url} />
               {item.status === "ready" &&
                 stages.map((stage) => (
                   <Button

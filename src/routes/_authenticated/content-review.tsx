@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChannelAlerts } from "@/components/channel-alerts";
 import { ModelPublish } from "@/components/model-publish";
 import { ModelPipeline } from "@/components/model-pipeline";
+import { CopyVideoButton } from "@/components/copy-video-button";
+import { reviewVideoReference } from "@/lib/video-source";
 
 export const Route = createFileRoute("/_authenticated/content-review")({
   validateSearch: z.object({ item: z.string().uuid().optional().catch(undefined) }),
@@ -239,6 +241,9 @@ function ReviewCard({
           preload="metadata"
           src={url}
         />
+      )}
+      {item.status !== "uploading" && (
+        <CopyVideoButton reference={reviewVideoReference(item.id, item.revision)} />
       )}
       {item.status === "uploading" ? (
         <Button

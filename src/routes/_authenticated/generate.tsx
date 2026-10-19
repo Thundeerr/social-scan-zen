@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { GenerationHistory } from "@/components/generation-history";
 import { supabase } from "@/integrations/supabase/client";
 import { generationSubmitFn } from "@/lib/generation.functions";
+import { contentReviewFn } from "@/lib/content-review.functions";
+import { downloadSourceVideo, parseVideoSource } from "@/lib/video-source";
 import { MAX_SOURCE_BYTES, type GenerationResult } from "@/lib/generation";
 import { canonicalReel } from "@/lib/reel-inbox";
 import { Button } from "@/components/ui/button";
@@ -10,6 +13,7 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/generate")({ component: GeneratePage });
 function GeneratePage() {
+  const cache = useQueryClient();
   const [model, setModel] = useState<"kiikii" | "tuuva" | null>(null);
   const [source, setSource] = useState<"link" | "file">("link");
   const [url, setUrl] = useState("");
@@ -22,6 +26,8 @@ function GeneratePage() {
   const [progress, setProgress] = useState("");
   const [check, setCheck] = useState<{ key: string; result?: GenerationResult; error?: string }>();
   const [retryCheck, setRetryCheck] = useState(0);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
   const key = JSON.stringify([source, url, uploadId, model]);
   let reel: ReturnType<typeof canonicalReel> | undefined;
   try {
@@ -49,7 +55,7 @@ function GeneratePage() {
     let cancelled = false;
     setConfirmed(false);
     setCheck(undefined);
-    if (!hasSource) return;
+    if (!hasSource || (source === "link" && !reel)) return;
     const timer = setTimeout(async () => {
       try {
         let result: GenerationResult;
@@ -121,6 +127,8 @@ function GeneratePage() {
       });
     },
     onSuccess: (result) => {
+      if (result.id && !result.duplicate_warning)
+        void cache.invalidateQueries({ queryKey: ["generation-history"] });
       if (result.duplicate_warning) {
         setCheck({ key, result });
         setConfirmed(false);
@@ -144,6 +152,51 @@ function GeneratePage() {
     setUrl("");
     resetUpload();
   };
+  const chooseText = (text: string) => {
+    setUrl(text);
+    setFile(undefined);
+    setSource("link");
+    resetUpload();
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    setImportError("");
+    setImporting(false);
+    if (source !== "link" || !url.trim()) return;
+    const timer = setTimeout(async () => {
+      try {
+        const parsed = parseVideoSource(url);
+        if (parsed.kind === "instagram") return;
+        setImporting(true);
+        let mediaUrl: string;
+        if (parsed.kind === "review") {
+          const result = await contentReviewFn({
+            data: { action: "preview", id: parsed.id, revision: parsed.revision },
+          });
+          if (!result.url) throw Error("Dieses Video ist nicht verfügbar.");
+          mediaUrl = result.url;
+        } else mediaUrl = parsed.url;
+        if (controller.signal.aborted) return;
+        const downloaded = await downloadSourceVideo(mediaUrl, controller.signal);
+        if (!controller.signal.aborted) chooseFile(downloaded);
+      } catch (error) {
+        if (!controller.signal.aborted)
+          setImportError(
+            error instanceof TypeError
+              ? "Video konnte nicht geladen werden. Der Anbieter muss direkten Download erlauben. Alternativ Datei hochladen."
+              : error instanceof Error
+                ? error.message
+                : "Video konnte nicht geladen werden.",
+          );
+      } finally {
+        if (!controller.signal.aborted) setImporting(false);
+      }
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [url, source]);
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 md:p-6">
       <h1 className="text-3xl font-bold">Video erstellen</h1>
@@ -157,17 +210,26 @@ function GeneratePage() {
         <fieldset disabled={submit.isPending} className="space-y-3">
           <legend className="sr-only">Ausgangsvideo</legend>
           <label
+            tabIndex={0}
+            aria-label="Video ablegen oder mit Strg+V einfügen"
+            onPaste={(e) => {
+              if (submit.isPending) return;
+              e.preventDefault();
+              if (e.clipboardData.files.length) chooseFile(e.clipboardData.files[0]);
+              else chooseText(e.clipboardData.getData("text/plain"));
+            }}
             className="flex min-h-44 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-primary/5 p-6 text-center focus-within:ring-4 focus-within:ring-primary/30"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
               if (!submit.isPending && e.dataTransfer.files.length)
                 chooseFile(e.dataTransfer.files[0]);
+              else if (!submit.isPending) chooseText(e.dataTransfer.getData("text/plain"));
             }}
           >
             <span className="text-2xl font-bold">{file ? file.name : "Video hier ablegen"}</span>
             <span className="text-sm text-muted-foreground">
-              oder Datei auswählen · MP4 bis 40 MB
+              Datei auswählen oder Strg+V · MP4 bis 40 MB
             </span>
             <input
               className="sr-only"
@@ -177,18 +239,25 @@ function GeneratePage() {
             />
           </label>
           <Input
-            aria-label="Instagram-Link"
+            aria-label="Video oder Link einfügen"
             className="h-14"
-            type="url"
+            type="text"
             value={url}
-            placeholder="Oder Instagram-Link einfügen"
+            placeholder="Kopiertes Video oder Link einfügen"
             onChange={(e) => {
-              setUrl(e.target.value);
-              setFile(undefined);
-              setSource("link");
-              resetUpload();
+              chooseText(e.target.value);
             }}
           />
+          {importing && (
+            <p role="status" className="text-sm">
+              Video wird geladen …
+            </p>
+          )}
+          {importError && (
+            <p role="alert" className="text-sm text-destructive">
+              {importError}
+            </p>
+          )}
           {source === "file" && preview && (
             <video
               className="mx-auto max-h-56 w-full rounded-xl bg-black"
@@ -251,7 +320,8 @@ function GeneratePage() {
                 reset();
               }}
             >
-              {promptId === value ? "✓ " : ""}{index === 0 ? "Normal" : "Alternative"}
+              {promptId === value ? "✓ " : ""}
+              {index === 0 ? "Normal" : "Alternative"}
             </Button>
           ))}
         </fieldset>
@@ -316,6 +386,7 @@ function GeneratePage() {
           </Link>
         </div>
       )}
+      <GenerationHistory />
     </div>
   );
 }
