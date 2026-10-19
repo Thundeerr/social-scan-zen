@@ -84,3 +84,50 @@ Tests cover two revisions for each source, repeated review transitions, duplicat
 attempt rejection, initial re-submission and paused claims, on fresh and
 production-revision schemas. These are local database tests, not paid generation
 or live Telegram tests.
+
+## Submission safeguards (local, not yet deployed)
+
+Apply 20261019142046_generation_submission_safeguards.sql after the revision
+migration before deploying the updated app. No worker changes are needed.
+Keep the existing worker stopped and pipeline enabled=false throughout.
+
+The read-only preflight checks this owner's jobs across both characters in the
+last 30 days, matching a canonical Instagram shortcode or SHA-256 file hash.
+It returns at most ten recent matches. Final submission repeats the check under
+the owner's settings-row lock, using the stored upload bytes' hash. A duplicate
+returns a warning without inserting a job until the user explicitly confirms.
+The underlying intake RPC is no longer directly executable by service_role;
+only the guarded server RPC may call it. RLS and source/revision constraints stay.
+
+Confirmed repeat links for the same character reopen the existing initial job;
+they do not force a new paid attempt. A separately uploaded duplicate file may
+create another job after confirmation. The same upload request ID remains
+idempotent. Source/model changes clear confirmation; failed checks block submit.
+
+Uploads preview locally using a revocable object URL; selecting a file does not
+upload it. Link previews use the canonical Instagram embed. Private posts,
+tracking protection or unavailable embeds may prevent playback; the UI provides
+an original-link fallback and suggests uploading the file instead. There is no
+server-side scraping or paid preview request. The optional short description is
+for the submission preview only; it is not a persistent catalogue title.
+
+Testing:
+- node tests/generation-submission-db.mjs
+- node tests/generation-submission-db.mjs --production-revisions
+- node node_modules/vitest/vitest.mjs run src/lib/generation.server.test.ts
+- node node_modules/typescript/bin/tsc --noEmit
+- npm run build
+
+Use a disposable database/storage project for write tests. With its worker
+stopped and pipeline paused, queue a small MP4 once. Reload, select the same file
+(also try another filename and another character): a warning appears, and the
+submit button requires the confirmation checkbox. Changing source or character
+clears that checkbox. Submit after confirming and verify a queued job only.
+Repeat using an Instagram link with and without query parameters. Confirming a
+same-character link returns the original job ID. Verify preview, title and model
+selection before submission. Verify failed preflight cannot be submitted.
+
+On paused production after an approved deployment, previewing/selecting an
+existing source performs only a read-only check. Do not click Video erstellen
+for a verification that must create no jobs. Do not enable generation, start
+the worker or use production fixtures to test confirmed duplicate creation.

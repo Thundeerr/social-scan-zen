@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const db=new PGlite(), owner=crypto.randomUUID(), other=crypto.randomUUID(), hash="a".repeat(64);
 const migration=name=>readFile(new URL("../supabase/migrations/"+name,import.meta.url),"utf8");
-const submit=async(action,data,user=owner)=>(await db.query("select generation_submit($1,$2,$3) r",[user,action,data])).rows[0].r;
+const submit=async(action,data,user=owner)=>(await db.query("select generation_submit($1,$2,$3) r",[user,action,{duplicate_confirmed:true,...data}])).rows[0].r;
 try {
   await db.exec(
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select null::uuid$$;grant usage on schema auth to authenticated;create table user_roles(user_id uuid,role text);grant select on user_roles to service_role;create schema storage;create table storage.buckets(id text,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);`,
@@ -15,6 +15,7 @@ try {
     "20261011114403_model_pipeline_queue.sql",
     "20261018163645_generation_submission.sql",
     "20261018173534_generation_source_revisions.sql",
+    "20261019142046_generation_submission_safeguards.sql",
   ]) {
     if(file === "20261018163645_generation_submission.sql" && process.argv.includes("--production-revisions")) {
       // Reproduce production's pre-existing revision columns, indexes and triggers.
@@ -53,6 +54,40 @@ try {
   assert.equal((await submit("upload",{id,model:"tuuva",sha256:hash})).id,uploaded.id);
   await assert.rejects(()=>submit("upload",{id,model:"tuuva",sha256:"b".repeat(64)}),/Upload changed/);
   assert.equal((await db.query("select count(*)::int n from model_pipeline_jobs")).rows[0].n,3);
+  // Read-only preflight and atomic final guard catch duplicate sources across models.
+  const check=async(data,user=owner)=>(await db.query("select generation_source_check($1,$2) r",[user,data])).rows[0].r;
+  const countJobs=async()=>(await db.query("select count(*)::int n from model_pipeline_jobs")).rows[0].n;
+  const before=await countJobs();
+  const linkCheck=await check({kind:"link",shortcode:link.shortcode});
+  assert.equal(linkCheck.duplicates.length,2);
+  assert.equal(linkCheck.enabled,false);
+  assert.equal((await check({kind:"file",sha256:hash})).duplicates[0].id,uploaded.id);
+  assert.equal(await countJobs(),before);
+  await assert.rejects(()=>check({kind:"file",sha256:"invalid"}),/Invalid hash/);
+  await assert.rejects(()=>check({kind:"file",sha256:hash},other),/Owner required/);
+  const warnedLink=await submit("link",{...link,duplicate_confirmed:false});
+  assert.equal(warnedLink.duplicate_warning,true);assert.equal(warnedLink.id,"");
+  const nextId=crypto.randomUUID();
+  await submit("prepare",{id:nextId,model:"kiikii"});
+  const warnedFile=await submit("upload",{id:nextId,model:"kiikii",sha256:hash,duplicate_confirmed:false});
+  assert.equal(warnedFile.duplicate_warning,true);assert.equal(await countJobs(),before);
+  const allowed=await submit("upload",{id:nextId,model:"kiikii",sha256:hash,duplicate_confirmed:true});
+  assert(allowed.id);assert.notEqual(allowed.id,uploaded.id);
+  assert.equal((await submit("upload",{id:nextId,model:"kiikii",sha256:hash,duplicate_confirmed:true})).id,allowed.id);
+  await db.query("delete from model_pipeline_jobs where id=$1",[allowed.id]);
+  // Old submissions are outside the warning window; other owners' history is private.
+  await db.query("update model_pipeline_jobs set created_at=now()-interval '31 days' where id=$1",[uploaded.id]);
+  assert.equal((await check({kind:"file",sha256:hash})).duplicates.length,0);
+  await db.query("update model_pipeline_jobs set created_at=now() where id=$1",[uploaded.id]);
+  await db.exec("reset role");
+  await db.query("update user_roles set role='owner' where user_id=$1",[other]);
+  await db.query("insert into model_pipeline_settings(user_id) values($1)",[other]);
+  await db.exec("set role service_role");
+  assert.equal((await check({kind:"file",sha256:hash},other)).duplicates.length,0);
+  await db.exec("reset role");
+  await db.query("update user_roles set role='cofounder' where user_id=$1",[other]);
+  await db.exec("set role service_role");
+  await assert.rejects(()=>db.query("select generation_submit_core($1,'link',$2)",[owner,link]),e=>e.code==='42501');
   // Only the pre-existing worker command can claim and reserve. Pause still works.
   const call=async(action,data={})=>(await db.query("select model_pipeline_command($1,null,$2,$3) r",[action,data,hash])).rows[0].r;
   await db.query("update model_pipeline_settings set worker_hash=$2 where user_id=$1",[owner,hash]);
@@ -114,6 +149,6 @@ try {
   await assert.rejects(()=>db.query("insert into model_pipeline_jobs(user_id,model) values($1,'tuuva')",[owner]),e=>e.code==='23514');
   const linked=await row(linkOriginal.id);
   await assert.rejects(()=>db.query("insert into model_pipeline_jobs(user_id,model,inbox_id,source_upload_id,source_sha256,attempt) values($1,'tuuva',$2,$3,$4,9)",[owner,linked.inbox_id,id,hash]),e=>e.code==='23514');
-  for(const role of ["anon","authenticated"]){await db.exec("set role "+role);await assert.rejects(()=>submit("link",link),e=>e.code==="42501");}
+  for(const role of ["anon","authenticated"]){await db.exec("set role "+role);await assert.rejects(()=>submit("link",link),e=>e.code==="42501");await assert.rejects(()=>check({kind:"file",sha256:hash}),e=>e.code==="42501");}
   console.log(`Generation submission passed: owner, model, deduplication, upload binding, pause, worker claim/reserve/review, two revisions per source, repeated callbacks and initial re-submission (${process.argv.includes("--production-revisions") ? "production upgrade" : "fresh database"}).`);
 } finally {await db.close();}
