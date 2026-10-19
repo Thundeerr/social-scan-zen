@@ -251,7 +251,7 @@ function GeneratePage() {
                 reset();
               }}
             >
-              {promptId === value ? "✓ " : ""}Prompt {index + 1}
+              {promptId === value ? "✓ " : ""}{index === 0 ? "Normal" : "Alternative"}
             </Button>
           ))}
         </fieldset>
