@@ -32,6 +32,7 @@ export async function submitGeneration(
       model: action.model,
       ...canonicalReel(action.url),
       duplicate_confirmed: action.duplicate_confirmed,
+      prompt_id: action.prompt_id,
     });
   const upload = await command(user, "prepare", action);
   if (!upload.path) throw Error("Upload nicht gefunden.");

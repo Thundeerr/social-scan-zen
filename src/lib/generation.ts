@@ -9,6 +9,7 @@ export const generationAction = z.discriminatedUnion("action", [
       action: z.literal("link"),
       model: z.enum(["kiikii", "tuuva"]),
       url: z.string().trim().min(1).max(2048),
+      prompt_id: z.enum(["prompt_1", "prompt_2"]),
       duplicate_confirmed: z.boolean().default(false),
     })
     .strict(),
@@ -24,6 +25,7 @@ export const generationAction = z.discriminatedUnion("action", [
       action: z.literal("upload"),
       model: z.enum(["kiikii", "tuuva"]),
       id: z.string().uuid(),
+      prompt_id: z.enum(["prompt_1", "prompt_2"]),
       duplicate_confirmed: z.boolean().default(false),
     })
     .strict(),

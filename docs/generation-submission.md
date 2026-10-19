@@ -4,7 +4,7 @@ Local implementation; no production migration, deployment or provider request wa
 
 Route: /generate (“Video erstellen” in desktop and mobile navigation).
 Choose an Instagram Reel/post link or upload an MP4 (40 MB maximum), choose Kiikii
-or Tuuva, and submit. There are no additional modes or flags.
+or Tuuva, choose Prompt 1 or Prompt 2, and submit.
 Only Instagram URLs are supported, using the existing canonicalReel allowlist.
 
 ## Pipeline
@@ -112,6 +112,7 @@ server-side scraping or paid preview request. The optional short description is
 for the submission preview only; it is not a persistent catalogue title.
 
 Testing:
+
 - node tests/generation-submission-db.mjs
 - node tests/generation-submission-db.mjs --production-revisions
 - node node_modules/vitest/vitest.mjs run src/lib/generation.server.test.ts
@@ -131,3 +132,48 @@ On paused production after an approved deployment, previewing/selecting an
 existing source performs only a read-only check. Do not click Video erstellen
 for a verification that must create no jobs. Do not enable generation, start
 the worker or use production fixtures to test confirmed duplicate creation.
+
+## Minimal prompt selection (local, not deployed)
+
+The unapplied migration `20261019144846_generation_reference_prompt.sql` now stores
+`prompt_id` (`prompt_1` or `prompt_2`) rather than free text. No prompt texts are
+supplied by this change. UI: file drop zone or Instagram link, compact model choice,
+two prompt buttons, one submit button. Preview and duplicate confirmation remain.
+
+`reference_profile` references the model entry in the existing worker-owned
+`/references/models.json`. Existing image hashes are checked. The worker resolves
+`models[model].prompts[prompt_id]`; the operator must configure these entries before
+processing new jobs. Missing/blank entries or invalid identifiers stop with `setup`
+before media upload or paid provider submission. The identifier is NOT sent as
+literal prompt text or as an unsupported WaveSpeed field. The configured text goes
+in the existing `prompt` field. Legacy jobs with NULL prompt_id use the old default.
+Duplicate submissions preserve the existing job and prompt identifier; revisions
+inherit it and the reference profile. Owner isolation and RLS are unchanged.
+
+The reference pointer is not a frozen snapshot: changing models.json changes what
+later executions resolve. No reference files or mappings were changed.
+
+### Offline verification
+
+```sh
+node tests/generation-submission-db.mjs
+node tests/generation-submission-db.mjs --production-revisions
+node node_modules/vitest/vitest.mjs run src/lib/generation.server.test.ts
+python -m unittest discover -s cloud/model-worker -p test_worker.py
+node node_modules/typescript/bin/tsc --noEmit
+npm run build
+```
+
+DB tests use disposable PGlite databases. Worker media uploads are mocked; there
+are no provider calls. For a manual local-only check, keep the pipeline paused and
+worker stopped, submit one source, then inspect:
+
+```sql
+select id, model, inbox_id, source_upload_id, reference_profile, prompt_id
+from public.model_pipeline_jobs order by created_at desc limit 5;
+```
+
+Exactly one source column must be populated. reference_profile must equal model,
+and prompt_id must match the chosen button. Verify both source types, both models,
+both identifiers, retries and revisions. Do not create production test jobs.
+Deploy migration, app and worker together only after a separate deployment decision.

@@ -23,10 +23,19 @@ class StopJob(Exception):
     pass
 
 def generation_prompt(config, job):
+    prompt_id = job.get("prompt_id")
+    if prompt_id is None:
+        base = config["prompt"]  # Compatibility for jobs created before prompt selection.
+    else:
+        if prompt_id not in ("prompt_1", "prompt_2"):
+            raise StopJob("setup")
+        base = config.get("prompts", {}).get(prompt_id)
+        if not isinstance(base, str) or not base.strip():
+            raise StopJob("setup")
     feedback = job.get("revision_notes", "").strip()
     if not feedback:
-        return config["prompt"]
-    return (config["prompt"] + "\n\nREVISION REQUEST: Recreate from the ORIGINAL source video. "
+        return base
+    return (base + "\n\nREVISION REQUEST: Recreate from the ORIGINAL source video. "
         "Apply the following reviewer corrections; preserve everything not mentioned. "
         "Maintain temporal consistency across every frame.\n" + feedback +
         "\nFor clothing consistency corrections, preserve the exact original source outfit, "
@@ -111,6 +120,20 @@ def profile(model):
         raise StopJob("setup")
     return result, files
 
+def job_profile(job):
+    # Older jobs without the new column retain their existing model profile.
+    key = job.get("reference_profile", job["model"])
+    if key != job["model"] or key not in ("kiikii", "tuuva"):
+        raise StopJob("setup")
+    return profile(key)
+
+def generation_request(config, job, source, refs, info):
+    return {"prompt": generation_prompt(config, job),
+        "video": upload(source, "video/mp4"),
+        "reference_images": [upload(p, "image/png" if p.suffix == ".png" else "image/jpeg") for p in refs],
+        "resolution": "720p", "duration": math.ceil(info["duration"]),
+        "generate_audio": False, "enable_prompt_expansion": False}
+
 def wave_download(url, path):
     u = urllib.parse.urlsplit(url)
     # Verified provider output host; fail closed if provider changes its CDN.
@@ -173,8 +196,8 @@ def tick():
     job=state["job"]
     if str(uuid.UUID(job["id"]))!=job["id"]:raise StopJob("validation")
     folder=ROOT/job["id"];folder.mkdir(exist_ok=True)
-    config,refs=profile(job["model"])
     try:
+        config,refs=job_profile(job)
         remote=api("get",job)
         if remote["state"] in ("blocked","budget_wait"):
             state["remote_state"]=remote["state"];archive(state);return
@@ -214,7 +237,7 @@ def tick():
         info=prepare_source(source)
         if not 0.5<=info["width"]/info["height"]<=0.65:raise StopJob("validation")
         # Uploads precede reservation so expensive side effects happen immediately afterwards.
-        request_body={"prompt":generation_prompt(config,job),"video":upload(source,"video/mp4"),"reference_images":[upload(p,"image/png" if p.suffix==".png" else "image/jpeg") for p in refs],"resolution":"720p","duration":math.ceil(info["duration"]),"generate_audio":False,"enable_prompt_expansion":False}
+        request_body=generation_request(config,job,source,refs,info)
         reservation=api("reserve",job,seconds=info["duration"])
         if reservation.get("budget_wait"):
             state["budget_wait"]=True;archive(state);return

@@ -14,6 +14,24 @@ import { generationAction } from "./generation";
 
 beforeEach(() => vi.resetAllMocks());
 describe("generation safeguards", () => {
+  it("passes a validated prompt for the chosen model and rejects client reference overrides", async () => {
+    mocks.rpc.mockResolvedValue({ data: { id: "job" } });
+    const action = generationAction.parse({
+      action: "link",
+      model: "kiikii",
+      prompt_id: "prompt_1",
+      url: "https://instagram.com/reel/Source123/",
+    });
+    await submitGeneration("owner", action);
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "generation_submit",
+      expect.objectContaining({
+        p_data: expect.objectContaining({ model: "kiikii", prompt_id: "prompt_1" }),
+      }),
+    );
+    expect(() => generationAction.parse({ ...action, reference_profile: "tuuva" })).toThrow();
+    expect(() => generationAction.parse({ ...action, prompt_id: "unknown" })).toThrow();
+  });
   it("normalizes Instagram links before read-only preflight", async () => {
     mocks.rpc.mockResolvedValue({ data: { id: "", duplicates: [] } });
     await submitGeneration("owner", {
@@ -51,6 +69,7 @@ describe("generation safeguards", () => {
       model: "tuuva",
       id: "upload",
       duplicate_confirmed: false,
+      prompt_id: "prompt_1",
     });
     expect(result.duplicate_warning).toBe(true);
     expect(mocks.rpc).toHaveBeenLastCalledWith("generation_submit", {
@@ -61,6 +80,7 @@ describe("generation safeguards", () => {
         model: "tuuva",
         id: "upload",
         duplicate_confirmed: false,
+        prompt_id: "prompt_1",
         sha256: createHash("sha256").update(bytes).digest("hex"),
       },
     });
@@ -70,12 +90,14 @@ describe("generation safeguards", () => {
       generationAction.parse({
         action: "link",
         model: "kiikii",
+        prompt_id: "prompt_1",
         url: "https://instagram.com/reel/Source123/",
       }).action,
     ).toBe("link");
     const parsed = generationAction.parse({
       action: "link",
       model: "kiikii",
+      prompt_id: "prompt_1",
       url: "https://instagram.com/reel/Source123/",
     });
     if (parsed.action === "link") expect(parsed.duplicate_confirmed).toBe(false);

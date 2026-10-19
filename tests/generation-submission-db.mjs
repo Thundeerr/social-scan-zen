@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const db=new PGlite(), owner=crypto.randomUUID(), other=crypto.randomUUID(), hash="a".repeat(64);
 const migration=name=>readFile(new URL("../supabase/migrations/"+name,import.meta.url),"utf8");
-const submit=async(action,data,user=owner)=>(await db.query("select generation_submit($1,$2,$3) r",[user,action,{duplicate_confirmed:true,...data}])).rows[0].r;
+const submit=async(action,data,user=owner)=>(await db.query("select generation_submit($1,$2,$3) r",[user,action,{duplicate_confirmed:true,prompt_id:"prompt_1",...data}])).rows[0].r;
 try {
   await db.exec(
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select null::uuid$$;grant usage on schema auth to authenticated;create table user_roles(user_id uuid,role text);grant select on user_roles to service_role;create schema storage;create table storage.buckets(id text,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);`,
@@ -16,6 +16,7 @@ try {
     "20261018163645_generation_submission.sql",
     "20261018173534_generation_source_revisions.sql",
     "20261019142046_generation_submission_safeguards.sql",
+    "20261019144846_generation_reference_prompt.sql",
   ]) {
     if(file === "20261018163645_generation_submission.sql" && process.argv.includes("--production-revisions")) {
       // Reproduce production's pre-existing revision columns, indexes and triggers.
@@ -36,10 +37,17 @@ try {
   );
 
   await db.exec("set role service_role");
-  const link={model:"kiikii",shortcode:"Sample123",url:"https://www.instagram.com/reel/Sample123/"};
+  const link={model:"kiikii",shortcode:"Sample123",url:"https://www.instagram.com/reel/Sample123/",prompt_id:"prompt_1"};
   const first=await submit("link",link);
   assert.equal(first.state,"queued");assert.equal(first.enabled,false);
   assert.equal((await submit("link",link)).id,first.id);
+  const inputs=async(id)=>(await db.query("select reference_profile,prompt_id from model_pipeline_jobs where id=$1",[id])).rows[0];
+  assert.deepEqual(await inputs(first.id),{reference_profile:"kiikii",prompt_id:link.prompt_id});
+  await submit("link",{...link,prompt_id:"prompt_2"});
+  assert.equal((await inputs(first.id)).prompt_id,link.prompt_id);
+  await assert.rejects(()=>submit("link",{...link,prompt_id:"unknown"}),/Invalid prompt/);
+  await assert.rejects(()=>submit("link",{...link,prompt_id:null}),/Invalid prompt/);
+  await assert.rejects(()=>db.query("update model_pipeline_jobs set reference_profile='tuuva' where id=$1",[first.id]),e=>e.code==='23514');
   const second=await submit("link",{...link,model:"tuuva"});assert.notEqual(first.id,second.id);
   await assert.rejects(()=>submit("link",link,other),/Owner required/);
   await assert.rejects(()=>submit("link",{...link,url:"https://localhost/private"}),/Invalid Reel/);
@@ -50,7 +58,8 @@ try {
   assert.equal((await submit("prepare",{id,model:"tuuva"})).id,id);
   await assert.rejects(()=>submit("prepare",{id,model:"kiikii"}),/Upload conflict/);
   await assert.rejects(()=>submit("upload",{id:crypto.randomUUID(),model:"tuuva",sha256:hash}),/not found/);
-  const uploaded=await submit("upload",{id,model:"tuuva",sha256:hash});
+  const uploaded=await submit("upload",{id,model:"tuuva",sha256:hash,prompt_id:"prompt_2"});
+  assert.deepEqual(await inputs(uploaded.id),{reference_profile:"tuuva",prompt_id:"prompt_2"});
   assert.equal((await submit("upload",{id,model:"tuuva",sha256:hash})).id,uploaded.id);
   await assert.rejects(()=>submit("upload",{id,model:"tuuva",sha256:"b".repeat(64)}),/Upload changed/);
   assert.equal((await db.query("select count(*)::int n from model_pipeline_jobs")).rows[0].n,3);
@@ -96,6 +105,7 @@ try {
   await db.query("update model_pipeline_settings set enabled=true where user_id=$1",[owner]);
   const job=await call("claim");assert.equal(job.id,uploaded.id);assert.equal(job.source_upload_id,id);
   assert.equal(job.model,"tuuva");assert.equal(job.source_sha256,hash);
+  assert.equal(job.reference_profile,"tuuva");assert.equal(job.prompt_id,"prompt_2");
   const ref={id:job.id,lease:job.lease};
   await call("reserve",{...ref,seconds:4});
   await call("submitted",{...ref,provider_id:"a".repeat(32)});
@@ -129,6 +139,8 @@ try {
       assert.equal(child.inbox_id,original.inbox_id);
       assert.equal(child.source_upload_id,original.source_upload_id);
       assert.equal(child.source_sha256,original.source_sha256);
+      assert.equal(child.reference_profile,original.reference_profile);
+      assert.equal(child.prompt_id,original.prompt_id);
       assert.equal(child.state,"queued");assert.equal(child.provider_id,null);
       assert.equal(child.revision_caption,"Updated caption");
       assert(child.revision_notes.includes("Correction 1"));
