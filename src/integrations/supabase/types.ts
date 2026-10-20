@@ -228,6 +228,164 @@ export type Database = {
           },
         ]
       }
+      catalogue_clip_recipients: {
+        Row: {
+          clip_id: string
+          model: string
+          receipt_kind: string
+          received_at: string | null
+          recipient_key: string
+          recorded_at: string
+          user_id: string
+        }
+        Insert: {
+          clip_id: string
+          model: string
+          receipt_kind: string
+          received_at?: string | null
+          recipient_key: string
+          recorded_at?: string
+          user_id: string
+        }
+        Update: {
+          clip_id?: string
+          model?: string
+          receipt_kind?: string
+          received_at?: string | null
+          recipient_key?: string
+          recorded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogue_clip_recipients_clip_id_user_id_model_fkey"
+            columns: ["clip_id", "user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "catalogue_clips"
+            referencedColumns: ["id", "user_id", "model"]
+          },
+        ]
+      }
+      catalogue_clips: {
+        Row: {
+          assignment: string
+          clip_code: string
+          created_at: string
+          desktop_source: Json | null
+          id: string
+          model: string
+          pipeline_job_id: string | null
+          review_item_id: string | null
+          user_id: string
+        }
+        Insert: {
+          assignment?: string
+          clip_code: string
+          created_at?: string
+          desktop_source?: Json | null
+          id?: string
+          model: string
+          pipeline_job_id?: string | null
+          review_item_id?: string | null
+          user_id: string
+        }
+        Update: {
+          assignment?: string
+          clip_code?: string
+          created_at?: string
+          desktop_source?: Json | null
+          id?: string
+          model?: string
+          pipeline_job_id?: string | null
+          review_item_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogue_clips_pipeline_job_id_user_id_model_fkey"
+            columns: ["pipeline_job_id", "user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_jobs"
+            referencedColumns: ["id", "user_id", "model"]
+          },
+          {
+            foreignKeyName: "catalogue_clips_review_item_id_user_id_model_fkey"
+            columns: ["review_item_id", "user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "content_review_items"
+            referencedColumns: ["id", "user_id", "model"]
+          },
+        ]
+      }
+      catalogue_offer_clips: {
+        Row: {
+          assignment: string
+          clip_id: string
+          model: string
+          offer_id: string
+          user_id: string
+        }
+        Insert: {
+          assignment?: string
+          clip_id: string
+          model: string
+          offer_id: string
+          user_id: string
+        }
+        Update: {
+          assignment?: string
+          clip_id?: string
+          model?: string
+          offer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogue_offer_clips_clip_id_user_id_model_assignment_fkey"
+            columns: ["clip_id", "user_id", "model", "assignment"]
+            isOneToOne: false
+            referencedRelation: "catalogue_clips"
+            referencedColumns: ["id", "user_id", "model", "assignment"]
+          },
+          {
+            foreignKeyName: "catalogue_offer_clips_offer_id_user_id_model_fkey"
+            columns: ["offer_id", "user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "catalogue_offers"
+            referencedColumns: ["id", "user_id", "model"]
+          },
+        ]
+      }
+      catalogue_offers: {
+        Row: {
+          created_at: string
+          desktop_key: string | null
+          desktop_source: Json | null
+          id: string
+          model: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          desktop_key?: string | null
+          desktop_source?: Json | null
+          id?: string
+          model: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          desktop_key?: string | null
+          desktop_source?: Json | null
+          id?: string
+          model?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_events: {
         Row: {
           content_post_id: string
@@ -262,7 +420,6 @@ export type Database = {
       }
       content_posts: {
         Row: {
-          destination: string
           alt_text: string
           approved_at: string | null
           approved_by: string | null
@@ -272,6 +429,7 @@ export type Database = {
           content_type: string
           cover_storage_path: string | null
           created_at: string
+          destination: string
           first_comment: string
           highlight_enabled: boolean
           highlight_name: string
@@ -290,6 +448,7 @@ export type Database = {
           primary_media_storage_paths: string[]
           publish_attempts: number
           publish_lease_until: string | null
+          publish_mode: string
           publish_started_at: string | null
           published_at: string | null
           quality_report: Json
@@ -302,12 +461,12 @@ export type Database = {
           story_link_url: string
           story_publish_mode: string
           story_storage_path: string | null
+          target_ig_user_id: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          destination?: string
           alt_text?: string
           approved_at?: string | null
           approved_by?: string | null
@@ -317,6 +476,7 @@ export type Database = {
           content_type?: string
           cover_storage_path?: string | null
           created_at?: string
+          destination?: string
           first_comment?: string
           highlight_enabled?: boolean
           highlight_name?: string
@@ -335,6 +495,7 @@ export type Database = {
           primary_media_storage_paths?: string[]
           publish_attempts?: number
           publish_lease_until?: string | null
+          publish_mode?: string
           publish_started_at?: string | null
           published_at?: string | null
           quality_report?: Json
@@ -347,12 +508,12 @@ export type Database = {
           story_link_url?: string
           story_publish_mode?: string
           story_storage_path?: string | null
+          target_ig_user_id?: string | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          destination?: string
           alt_text?: string
           approved_at?: string | null
           approved_by?: string | null
@@ -362,6 +523,7 @@ export type Database = {
           content_type?: string
           cover_storage_path?: string | null
           created_at?: string
+          destination?: string
           first_comment?: string
           highlight_enabled?: boolean
           highlight_name?: string
@@ -380,6 +542,7 @@ export type Database = {
           primary_media_storage_paths?: string[]
           publish_attempts?: number
           publish_lease_until?: string | null
+          publish_mode?: string
           publish_started_at?: string | null
           published_at?: string | null
           quality_report?: Json
@@ -392,6 +555,7 @@ export type Database = {
           story_link_url?: string
           story_publish_mode?: string
           story_storage_path?: string | null
+          target_ig_user_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -412,6 +576,7 @@ export type Database = {
           platform_container_id: string | null
           platform_media_id: string | null
           published_at: string | null
+          published_ig_user_id: string | null
           status: string
           updated_at: string
         }
@@ -428,6 +593,7 @@ export type Database = {
           platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
+          published_ig_user_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -444,6 +610,7 @@ export type Database = {
           platform_container_id?: string | null
           platform_media_id?: string | null
           published_at?: string | null
+          published_ig_user_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -452,6 +619,106 @@ export type Database = {
             foreignKeyName: "content_publications_content_post_id_fkey"
             columns: ["content_post_id"]
             isOneToOne: false
+            referencedRelation: "content_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_review_events: {
+        Row: {
+          action: string
+          created_at: string
+          id: number
+          item_id: string
+          revision: number
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: never
+          item_id: string
+          revision: number
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: never
+          item_id?: string
+          revision?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_review_events_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "content_review_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_review_items: {
+        Row: {
+          bytes: number | null
+          caption: string
+          created_at: string
+          id: string
+          media_path: string
+          model: string
+          note: string
+          notification: string
+          publish_post_id: string | null
+          reviewed_at: string | null
+          revision: number
+          sha256: string | null
+          status: string
+          telegram_message_id: number | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          bytes?: number | null
+          caption?: string
+          created_at?: string
+          id?: string
+          media_path: string
+          model: string
+          note?: string
+          notification?: string
+          publish_post_id?: string | null
+          reviewed_at?: string | null
+          revision?: number
+          sha256?: string | null
+          status?: string
+          telegram_message_id?: number | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          bytes?: number | null
+          caption?: string
+          created_at?: string
+          id?: string
+          media_path?: string
+          model?: string
+          note?: string
+          notification?: string
+          publish_post_id?: string | null
+          reviewed_at?: string | null
+          revision?: number
+          sha256?: string | null
+          status?: string
+          telegram_message_id?: number | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_review_items_publish_post_id_fkey"
+            columns: ["publish_post_id"]
+            isOneToOne: true
             referencedRelation: "content_posts"
             referencedColumns: ["id"]
           },
@@ -742,11 +1009,43 @@ export type Database = {
           },
         ]
       }
+      generation_uploads: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          model: string
+          path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_uploads_user_id_model_fkey"
+            columns: ["user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_profiles"
+            referencedColumns: ["user_id", "model"]
+          },
+        ]
+      }
       ig_connections: {
         Row: {
-          destination: string
           api_base_url: string
           created_at: string
+          destination: string
           granted_scopes: string[]
           id: string
           ig_user_id: string
@@ -762,9 +1061,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          destination?: string
           api_base_url?: string
           created_at?: string
+          destination?: string
           granted_scopes?: string[]
           id?: string
           ig_user_id: string
@@ -780,9 +1079,9 @@ export type Database = {
           user_id: string
         }
         Update: {
-          destination?: string
           api_base_url?: string
           created_at?: string
+          destination?: string
           granted_scopes?: string[]
           id?: string
           ig_user_id?: string
@@ -801,31 +1100,373 @@ export type Database = {
       }
       ig_oauth_states: {
         Row: {
-          destination: string
           consumed_at: string | null
           created_at: string
+          destination: string
           expires_at: string
           redirect_uri: string
           state: string
           user_id: string
         }
         Insert: {
-          destination?: string
           consumed_at?: string | null
           created_at?: string
+          destination?: string
           expires_at: string
           redirect_uri: string
           state: string
           user_id: string
         }
         Update: {
-          destination?: string
           consumed_at?: string | null
           created_at?: string
+          destination?: string
           expires_at?: string
           redirect_uri?: string
           state?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      model_alert_channels: {
+        Row: {
+          bot_ready: boolean
+          chat_id: string
+          checked_at: string | null
+          enabled: boolean
+          enabled_since: string
+          ig_user_id: string | null
+          ig_username: string | null
+          model: string
+          user_id: string
+        }
+        Insert: {
+          bot_ready?: boolean
+          chat_id: string
+          checked_at?: string | null
+          enabled?: boolean
+          enabled_since?: string
+          ig_user_id?: string | null
+          ig_username?: string | null
+          model: string
+          user_id: string
+        }
+        Update: {
+          bot_ready?: boolean
+          chat_id?: string
+          checked_at?: string | null
+          enabled?: boolean
+          enabled_since?: string
+          ig_user_id?: string | null
+          ig_username?: string | null
+          model?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      model_alert_worker_health: {
+        Row: {
+          last_tick: string | null
+          singleton: boolean
+        }
+        Insert: {
+          last_tick?: string | null
+          singleton?: boolean
+        }
+        Update: {
+          last_tick?: string | null
+          singleton?: boolean
+        }
+        Relationships: []
+      }
+      model_channel_alerts: {
+        Row: {
+          chat_id: string
+          created_at: string
+          delete_after: string | null
+          delete_attempts: number
+          error_code: string | null
+          id: string
+          lease: string | null
+          lease_until: string | null
+          message_id: number | null
+          model: string
+          permalink: string
+          publication_id: string
+          retry_at: string | null
+          send_day: string | null
+          sent_at: string | null
+          state: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string
+          delete_after?: string | null
+          delete_attempts?: number
+          error_code?: string | null
+          id?: string
+          lease?: string | null
+          lease_until?: string | null
+          message_id?: number | null
+          model: string
+          permalink: string
+          publication_id: string
+          retry_at?: string | null
+          send_day?: string | null
+          sent_at?: string | null
+          state?: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          delete_after?: string | null
+          delete_attempts?: number
+          error_code?: string | null
+          id?: string
+          lease?: string | null
+          lease_until?: string | null
+          message_id?: number | null
+          model?: string
+          permalink?: string
+          publication_id?: string
+          retry_at?: string | null
+          send_day?: string | null
+          sent_at?: string | null
+          state?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_channel_alerts_model_fkey"
+            columns: ["model"]
+            isOneToOne: false
+            referencedRelation: "model_alert_channels"
+            referencedColumns: ["model"]
+          },
+          {
+            foreignKeyName: "model_channel_alerts_publication_id_fkey"
+            columns: ["publication_id"]
+            isOneToOne: true
+            referencedRelation: "content_publications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      model_pipeline_external_spend: {
+        Row: {
+          cents: number
+          day: string
+          reference: string
+          user_id: string
+        }
+        Insert: {
+          cents: number
+          day: string
+          reference: string
+          user_id: string
+        }
+        Update: {
+          cents?: number
+          day?: string
+          reference?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_pipeline_external_spend_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_settings"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      model_pipeline_jobs: {
+        Row: {
+          attempt: number
+          created_at: string
+          duration: number | null
+          id: string
+          inbox_id: string | null
+          issue: string | null
+          lease: string | null
+          lease_until: string | null
+          model: string
+          parent_job_id: string | null
+          prompt_id: string | null
+          provider_id: string | null
+          reference_profile: string
+          reserved_cents: number
+          reserved_day: string | null
+          review_id: string | null
+          revision_caption: string | null
+          revision_notes: string
+          revision_of_review_id: string | null
+          source_sha256: string | null
+          source_upload_id: string | null
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          duration?: number | null
+          id?: string
+          inbox_id?: string | null
+          issue?: string | null
+          lease?: string | null
+          lease_until?: string | null
+          model: string
+          parent_job_id?: string | null
+          prompt_id?: string | null
+          provider_id?: string | null
+          reference_profile: string
+          reserved_cents?: number
+          reserved_day?: string | null
+          review_id?: string | null
+          revision_caption?: string | null
+          revision_notes?: string
+          revision_of_review_id?: string | null
+          source_sha256?: string | null
+          source_upload_id?: string | null
+          state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          duration?: number | null
+          id?: string
+          inbox_id?: string | null
+          issue?: string | null
+          lease?: string | null
+          lease_until?: string | null
+          model?: string
+          parent_job_id?: string | null
+          prompt_id?: string | null
+          provider_id?: string | null
+          reference_profile?: string
+          reserved_cents?: number
+          reserved_day?: string | null
+          review_id?: string | null
+          revision_caption?: string | null
+          revision_notes?: string
+          revision_of_review_id?: string | null
+          source_sha256?: string | null
+          source_upload_id?: string | null
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_pipeline_jobs_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_pipeline_jobs_parent_job_id_fkey"
+            columns: ["parent_job_id"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_pipeline_jobs_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "content_review_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_pipeline_jobs_revision_of_review_id_fkey"
+            columns: ["revision_of_review_id"]
+            isOneToOne: true
+            referencedRelation: "content_review_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "model_pipeline_jobs_source_upload_id_user_id_model_fkey"
+            columns: ["source_upload_id", "user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "generation_uploads"
+            referencedColumns: ["id", "user_id", "model"]
+          },
+          {
+            foreignKeyName: "model_pipeline_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_settings"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "model_pipeline_jobs_user_id_model_fkey"
+            columns: ["user_id", "model"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_profiles"
+            referencedColumns: ["user_id", "model"]
+          },
+        ]
+      }
+      model_pipeline_profiles: {
+        Row: {
+          intake_after: string
+          model: string
+          sender_username: string | null
+          user_id: string
+        }
+        Insert: {
+          intake_after?: string
+          model: string
+          sender_username?: string | null
+          user_id: string
+        }
+        Update: {
+          intake_after?: string
+          model?: string
+          sender_username?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_pipeline_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "model_pipeline_settings"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      model_pipeline_settings: {
+        Row: {
+          daily_cents: number
+          enabled: boolean
+          last_seen_at: string | null
+          resolution: string
+          user_id: string
+          worker_hash: string | null
+        }
+        Insert: {
+          daily_cents?: number
+          enabled?: boolean
+          last_seen_at?: string | null
+          resolution?: string
+          user_id: string
+          worker_hash?: string | null
+        }
+        Update: {
+          daily_cents?: number
+          enabled?: boolean
+          last_seen_at?: string | null
+          resolution?: string
+          user_id?: string
+          worker_hash?: string | null
         }
         Relationships: []
       }
@@ -1336,6 +1977,213 @@ export type Database = {
           },
         ]
       }
+      reel_inbox_devices: {
+        Row: {
+          expires_at: string
+          instance_id: string | null
+          last_seen_at: string | null
+          revoked: boolean
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          expires_at?: string
+          instance_id?: string | null
+          last_seen_at?: string | null
+          revoked?: boolean
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          expires_at?: string
+          instance_id?: string | null
+          last_seen_at?: string | null
+          revoked?: boolean
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reel_inbox_dm_receipts: {
+        Row: {
+          diagnostics: Json | null
+          link_count: number
+          message_hash: string
+          received_at: string
+          sender: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          diagnostics?: Json | null
+          link_count: number
+          message_hash: string
+          received_at?: string
+          sender: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          diagnostics?: Json | null
+          link_count?: number
+          message_hash?: string
+          received_at?: string
+          sender?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reel_inbox_dm_receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_dm_sources"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      reel_inbox_dm_senders: {
+        Row: {
+          sender_id: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          sender_id: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          sender_id?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reel_inbox_dm_senders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_dm_sources"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      reel_inbox_dm_sources: {
+        Row: {
+          enabled: boolean
+          last_received_at: string | null
+          receiver_id: string
+          user_id: string
+        }
+        Insert: {
+          enabled?: boolean
+          last_received_at?: string | null
+          receiver_id: string
+          user_id: string
+        }
+        Update: {
+          enabled?: boolean
+          last_received_at?: string | null
+          receiver_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reel_inbox_items: {
+        Row: {
+          attempts: number
+          available_at: string
+          canonical_url: string
+          confirmed_stage: string | null
+          created_at: string
+          desired_stage: string
+          error_code: string | null
+          id: string
+          is_test: boolean
+          lease_id: string | null
+          lease_until: string | null
+          receipt: Json | null
+          shortcode: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          canonical_url: string
+          confirmed_stage?: string | null
+          created_at?: string
+          desired_stage?: string
+          error_code?: string | null
+          id?: string
+          is_test?: boolean
+          lease_id?: string | null
+          lease_until?: string | null
+          receipt?: Json | null
+          shortcode: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          canonical_url?: string
+          confirmed_stage?: string | null
+          created_at?: string
+          desired_stage?: string
+          error_code?: string | null
+          id?: string
+          is_test?: boolean
+          lease_id?: string | null
+          lease_until?: string | null
+          receipt?: Json | null
+          shortcode?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      review_card_sync: {
+        Row: {
+          applied: number
+          claimed_version: number | null
+          item_id: string
+          lease: string | null
+          lease_until: string | null
+          retry_at: string
+          wanted: number
+        }
+        Insert: {
+          applied?: number
+          claimed_version?: number | null
+          item_id: string
+          lease?: string | null
+          lease_until?: string | null
+          retry_at?: string
+          wanted?: number
+        }
+        Update: {
+          applied?: number
+          claimed_version?: number | null
+          item_id?: string
+          lease?: string | null
+          lease_until?: string | null
+          retry_at?: string
+          wanted?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_card_sync_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "content_review_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scanner_runs: {
         Row: {
           account_id: string | null
@@ -1659,6 +2507,28 @@ export type Database = {
     Functions: {
       approve_content_batch: { Args: { _batch_key: string }; Returns: number }
       can_access_asset: { Args: { _asset_id: string }; Returns: boolean }
+      catalogue_offer_command: {
+        Args: { p_action: string; p_data?: Json; p_user: string }
+        Returns: Json
+      }
+      catalogue_snapshot:
+        | {
+            Args: {
+              p_clip_page?: number
+              p_review_page?: number
+              p_user: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_clip_page: number
+              p_filters: Json
+              p_review_page: number
+              p_user: string
+            }
+            Returns: Json
+          }
       claim_due_content_post: {
         Args: { _content_post_id?: string; _user_id?: string }
         Returns: string
@@ -1695,6 +2565,22 @@ export type Database = {
         Args: { _channel: string; _content_post_id: string }
         Returns: undefined
       }
+      content_review_command: {
+        Args: { p_action: string; p_payload?: Json; p_user: string }
+        Returns: Json
+      }
+      generation_source_check: {
+        Args: { p_data: Json; p_user: string }
+        Returns: Json
+      }
+      generation_submit: {
+        Args: { p_action: string; p_data: Json; p_user: string }
+        Returns: Json
+      }
+      generation_submit_core: {
+        Args: { p_action: string; p_data: Json; p_user: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1702,18 +2588,91 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_catalogue_desktop: {
+        Args: {
+          p_offers: Json
+          p_preview?: boolean
+          p_user: string
+          p_videos: Json
+        }
+        Returns: Json
+      }
       is_operator: { Args: { _user_id: string }; Returns: boolean }
       is_workspace_owner: { Args: { _user_id: string }; Returns: boolean }
+      model_alert_command: {
+        Args: { p_action: string; p_data?: Json; p_user?: string }
+        Returns: Json
+      }
+      model_pipeline_command: {
+        Args: {
+          p_action: string
+          p_data?: Json
+          p_user?: string
+          p_worker_hash?: string
+        }
+        Returns: Json
+      }
+      model_publish_command: {
+        Args: { p_action: string; p_data: Json; p_user: string }
+        Returns: Json
+      }
+      model_publish_immediate_command: {
+        Args: { p_action: string; p_data: Json; p_user: string }
+        Returns: Json
+      }
       owns_monitor_account: { Args: { _account_id: string }; Returns: boolean }
       owns_or_is_admin: { Args: { _owner: string }; Returns: boolean }
+      promote_review_item_to_clip: {
+        Args: {
+          p_clip_code: string
+          p_pipeline_job_id?: string
+          p_review_item_id: string
+          p_user: string
+        }
+        Returns: Json
+      }
       provider_budget_usage: {
         Args: { _end: string; _start: string }
         Returns: Json
       }
       purge_ig_oauth_states: { Args: never; Returns: undefined }
+      reel_inbox_command: {
+        Args: {
+          p_action: string
+          p_device_hash?: string
+          p_payload: Json
+          p_user: string
+        }
+        Returns: Json
+      }
+      reel_inbox_dm_ingest: {
+        Args: {
+          p_hash: string
+          p_links: Json
+          p_receiver: string
+          p_sender: string
+          p_username: string
+        }
+        Returns: Json
+      }
+      reel_inbox_dm_ingest_v2: {
+        Args: {
+          p_diagnostics: Json
+          p_hash: string
+          p_links: Json
+          p_receiver: string
+          p_sender: string
+          p_username: string
+        }
+        Returns: Json
+      }
       release_content_publish_lease: {
         Args: { _content_post_id: string }
         Returns: undefined
+      }
+      review_card_sync_command: {
+        Args: { p_action: string; p_data?: Json; p_user: string }
+        Returns: Json
       }
       review_content_post: {
         Args: { _content_post_id: string; _decision: string; _note?: string }
@@ -1722,6 +2681,15 @@ export type Database = {
       schedule_content_post: {
         Args: { _content_post_id: string; _scheduled_for: string }
         Returns: undefined
+      }
+      set_catalogue_clip_assignment: {
+        Args: {
+          p_assignment: string
+          p_clip_id: string
+          p_expected_assignment: string
+          p_user: string
+        }
+        Returns: Json
       }
       verify_publisher_cron_secret: {
         Args: { _candidate: string }
@@ -1766,12 +2734,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1795,11 +2763,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1820,11 +2788,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1845,11 +2813,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1862,11 +2830,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

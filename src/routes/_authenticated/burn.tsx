@@ -24,7 +24,9 @@ export const Route = createFileRoute("/_authenticated/burn")({
       <div className="p-6">
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           <div className="font-medium">Burn rate console unavailable</div>
-          <div className="mt-1 text-xs text-destructive/80">{error.message}</div>
+          <div className="mt-1 text-xs text-destructive/80">
+            {error instanceof Error ? error.message : String(error)}
+          </div>
           <button
             className="mt-3 rounded-md border border-destructive/40 px-3 py-1 text-xs"
             onClick={() => {
