@@ -5,7 +5,10 @@ import { buildReelContainerFields, applyModelReelMode } from "../_shared/instagr
 import {
   buildCarouselContainerFields,
   buildImageContainerFields,
+  applyPostLocation,
 } from "../_shared/instagram-feed.ts";
+
+const postLocationId = () => Deno.env.get("INSTAGRAM_DEFAULT_LOCATION_ID") ?? "";
 
 const GRAPH_TIMEOUT_MS = 20_000;
 const SIGNED_URL_SECONDS = 12 * 60 * 60;
@@ -215,6 +218,7 @@ async function processVideoPublication(input: {
       }
     }
     if (input.modelPublishMode) applyModelReelMode(body, input.modelPublishMode);
+    if (channel === "reel") Object.assign(body, applyPostLocation({}, postLocationId()));
     const created = await graphRequest(apiBaseUrl, `${input.igUserId}/media`, token, "POST", body);
     if (typeof created.id !== "string")
       throw new Error(`Instagram did not return a ${channel} container`);
@@ -355,12 +359,15 @@ async function processImagePublication(input: {
       `${input.igUserId}/media`,
       input.token,
       "POST",
-      buildImageContainerFields({
-        imageUrl,
-        altText: input.altText,
-        caption: input.asStory ? "" : input.caption,
-        mediaType: input.asStory ? "STORIES" : undefined,
-      }),
+      (() => {
+        const fields = buildImageContainerFields({
+          imageUrl,
+          altText: input.altText,
+          caption: input.asStory ? "" : input.caption,
+          mediaType: input.asStory ? "STORIES" : undefined,
+        });
+        return input.asStory ? fields : applyPostLocation(fields, postLocationId());
+      })(),
     );
     if (typeof created.id !== "string") {
       throw new Error(`Instagram did not return an ${label} container`);
@@ -435,7 +442,10 @@ async function processCarouselPublication(input: {
       `${input.igUserId}/media`,
       input.token,
       "POST",
-      buildCarouselContainerFields({ children: childIds, caption: input.caption }),
+      applyPostLocation(
+        buildCarouselContainerFields({ children: childIds, caption: input.caption }),
+        postLocationId(),
+      ),
     );
     if (typeof parent.id !== "string") {
       throw new Error("Instagram did not return a carousel container");
