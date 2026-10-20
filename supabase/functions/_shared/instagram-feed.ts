@@ -32,3 +32,14 @@ export function buildCarouselContainerFields(input: {
     caption: input.caption,
   };
 }
+
+/** Tags a feed post, Reel or carousel parent with a location (Facebook Page ID). Instagram does not support this on Stories or carousel children. */
+export function applyPostLocation<T extends Record<string, unknown>>(
+  body: T,
+  locationId?: string | null,
+): T & { location_id?: string } {
+  const id = (locationId ?? "").trim();
+  if (!id) return body;
+  if (!/^\d+$/.test(id)) throw new Error("Instagram location id must be numeric");
+  return { ...body, location_id: id };
+}
