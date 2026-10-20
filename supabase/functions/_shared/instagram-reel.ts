@@ -14,7 +14,7 @@ export function buildReelContainerFields(input: {
 
 export function applyModelReelMode(body: Record<string, string | boolean | number>, mode: string) {
   if (mode !== "normal" && mode !== "trial") throw new Error("Invalid model publishing mode");
-  body.is_ai_generated = true;
+  body.is_ai_generated = false;
   if (mode === "trial") {
     delete body.share_to_feed;
     body.trial_params = JSON.stringify({ graduation_strategy: "MANUAL" });
