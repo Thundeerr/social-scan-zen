@@ -68,7 +68,9 @@ export async function businessReport(user: string, now = new Date()) {
     `MONAT ${local.day.slice(0, 7)} · Budget ${usd(budget)}`,
     `Kiikii: Fixkosten ${usd(costs.fixed)} + Aufladungen ${usd(costs.topups)} = ${usd(costs.cashPlan)}`,
     `Geteilt / noch zuzuordnen: Fixkosten ${usd(costs.sharedFixed)} + Aufladungen ${usd(costs.sharedTopups)}`,
-    `Erfasster Kiikii-Verbrauch: ${usd(costs.usage)} (unvollständig; zusätzlich NICHT auf Aufladungen addiert)`,
+    costs.usage > 0
+      ? `Erfasster Kiikii-Verbrauch: ${usd(costs.usage)} (unvollständig; nicht zusätzlich auf Aufladungen addiert)`
+      : 'Tatsächlicher Kiikii-Verbrauch: noch nicht erfasst, nicht 0 $.',
     `Job-Reservierungen: ${usd(live.reserved_month_cents)} (Schätzung, keine Rechnung)`,
     `Grobe Monatsprojektion nur Kiikii-Zahlungen: ${usd(forecast)}; Aufladungen sind unregelmäßig.`,
     "Budgetbild unvollständig: gemeinsame Kosten und fehlende Buchungen sind nicht zugeordnet. Kein automatischer Stopp.",
