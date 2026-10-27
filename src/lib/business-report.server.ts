@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { channelAlertTelegramCall } from "./messaging/telegram-transport";
@@ -7,7 +6,6 @@ import {
   monthlyCosts,
   forecastCash,
   budgetLevel,
-  isStatusCommand,
   usd,
   type CostEntry,
   type MetricSnapshot,
@@ -15,11 +13,6 @@ import {
 const db = () => supabaseAdmin as SupabaseClient;
 const owner = () => process.env.CONTENT_REVIEW_OWNER_ID ?? "e4ee414f-fbb6-4f82-b5fc-22d74ed6b3cc";
 const chat = () => process.env.CONTENT_REVIEW_TELEGRAM_CHAT_ID ?? "8556103033";
-const endpoint = "https://instascanner.app/api/public/business-report/webhook";
-const secret = () =>
-  createHash("sha256")
-    .update(`business-report:${process.env.CONTENT_REVIEW_BOT_TOKEN}`)
-    .digest("hex");
 function checked<T>(r: { data: T; error: unknown }): T {
   if (r.error) throw new Error("Berichtsdaten momentan nicht erreichbar.");
   return r.data;
@@ -57,38 +50,43 @@ export async function businessReport(user: string, now = new Date()) {
     costs = monthlyCosts(entries, local.day),
     budget = settings?.monthly_budget_cents ?? 40000;
   const forecast = forecastCash(costs.fixed, costs.topups, local.day);
+  const fv = latest.find((s) => s.source === "Fanvue");
+  const ig = latest.find((s) => s.source === "Instagram");
+  const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
+    snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
   const text = [
-    `KIIKII · ${local.day} · ${local.time} Uhr (Berlin)`,
-    `Heute bis jetzt: ${live.jobs_today} Jobs angelegt · ${live.published_today} veröffentlicht`,
-    `${live.review_pending} zur Prüfung · ${live.scheduled} Posts geplant`,
+    "🦇 KIIKII HQ // MIDNAS NIGHT SHIFT",
+    `${local.day} · ${local.time} Uhr · Berlin`,
+    "",
+    "⚡ WAS LÄUFT?",
+    `${live.published_today} heute veröffentlicht · ${live.scheduled} eingeplant`,
+    `${live.review_pending} warten auf dein Okay. ${live.jobs_today} neue Jobs heute.`,
     live.last_scheduled
-      ? `Vorlauf bis ${berlinTime(new Date(live.last_scheduled)).day} ${berlinTime(new Date(live.last_scheduled)).time} Uhr`
-      : "Kein bestätigter Vorlauf in der Review-Pipeline.",
+      ? `Vorlauf bis ${berlinTime(new Date(live.last_scheduled)).day}, ${berlinTime(new Date(live.last_scheduled)).time} Uhr.`
+      : "Noch kein bestätigter Vorlauf. Die Queue braucht Nachschub.",
     "",
-    `MONAT ${local.day.slice(0, 7)} · Budget ${usd(budget)}`,
-    `Kiikii: Fixkosten ${usd(costs.fixed)} + Aufladungen ${usd(costs.topups)} = ${usd(costs.cashPlan)}`,
-    `Geteilt / noch zuzuordnen: Fixkosten ${usd(costs.sharedFixed)} + Aufladungen ${usd(costs.sharedTopups)}`,
-    costs.usage > 0
-      ? `Erfasster Kiikii-Verbrauch: ${usd(costs.usage)} (unvollständig; nicht zusätzlich auf Aufladungen addiert)`
-      : 'Tatsächlicher Kiikii-Verbrauch: noch nicht erfasst, nicht 0 $.',
-    `Job-Reservierungen: ${usd(live.reserved_month_cents)} (Schätzung, keine Rechnung)`,
-    `Grobe Monatsprojektion nur Kiikii-Zahlungen: ${usd(forecast)}; Aufladungen sind unregelmäßig.`,
-    "Budgetbild unvollständig: gemeinsame Kosten und fehlende Buchungen sind nicht zugeordnet. Kein automatischer Stopp.",
+    "💸 CREDITS CHECK · " + local.day.slice(0, 7),
+    `Kiikii zugeordnet: ${usd(costs.cashPlan)} / ${usd(budget)} Monatsrahmen`,
+    `Davon ${usd(costs.fixed)} fix + ${usd(costs.topups)} aufgeladen.`,
+    `Noch aufzuteilen: ${usd(costs.sharedFixed + costs.sharedTopups)} gemeinsame Kosten.`,
+    "Aufladung ≠ Verbrauch. Der tatsächliche Kiikii-Verbrauch ist noch unvollständig erfasst.",
+    `Job-Reservierungen: ${usd(live.reserved_month_cents)} – Schätzung, keine Rechnung.`,
+    "Warnungen statt Autostopp. Noch kein grünes Licht: Die Kosten-Zuordnung fehlt.",
     "",
-    "LETZTE EXTERNE ZAHLEN (keine automatischen Tageswerte)",
-    ...latest.map(
-      (s) =>
-        `${s.source} · ${s.period_start} bis ${s.period_end}\nStand ${berlinTime(new Date(s.observed_at)).day}: ${Object.entries(
-          s.values,
-        )
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(" · ")}\n${s.note}`,
-    ),
-    ...["Fanvue", "Closer", "Instagram", "Link.me", "Tapclick"]
-      .filter((s) => !latest.some((x) => x.source === s))
-      .map((s) => `${s}: Daten fehlen.`),
+    "📡 LETZTE BESTÄTIGTE SIGNALE · NICHT LIVE",
+    fv
+      ? `Fanvue · ${fv.period_start} bis ${fv.period_end}:\n${value(fv, "Neue Subs")} neue Subs · ${value(fv, "Subs gesamt")} gesamt\n${value(fv, "Netto vor Betriebskosten USD")} $ netto vor Betriebskosten. Kein Gewinn.`
+      : "Fanvue: Daten fehlen.",
+    ig
+      ? `Instagram: ${value(ig, "Follower gesamt")} Follower · Stand ${berlinTime(new Date(ig.observed_at)).day}.`
+      : "Instagram: Daten fehlen.",
+    "Fanvue-/IG-Zahlen werden hier noch nicht automatisch aktualisiert.",
+    "Closer-Conversions sind keine bestätigten bezahlten Subs. Tapclick fehlt.",
+    "Kosten pro neuem Follower / zahlendem Sub: noch unbekannt.",
     "",
-    "Kosten pro neuem Follower / zahlendem Sub: noch nicht belastbar (gleicher Zeitraum und Kosten-Zuordnung fehlen).",
+    "🎯 NÄCHSTER MOVE",
+    "Datenleitungen anschließen + gemeinsame Kosten aufteilen. Weniger Screenshots, mehr Durchblick.",
+    "Unten auf Status Kiikii tippen für alle Zahlen und Zeiträume.",
   ].join("\n");
   return {
     text,
@@ -112,6 +110,16 @@ export async function sendBusinessReport(user: string, key: string, text: string
     chat_id: chat(),
     text,
     disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "Status Kiikii",
+            web_app: { url: "https://instascanner.app/telegram-review?view=business" },
+          },
+        ],
+      ],
+    },
   });
   const message = result.result as { message_id?: number; chat?: { id?: number } } | undefined;
   const ok =
@@ -169,53 +177,4 @@ export async function businessTick(request: Request) {
       { status: 503, headers },
     );
   }
-}
-export async function businessWebhook(request: Request) {
-  const given = request.headers.get("x-telegram-bot-api-secret-token") ?? "";
-  if (
-    !process.env.CONTENT_REVIEW_BOT_TOKEN ||
-    !/^[a-f0-9]{64}$/.test(given) ||
-    !timingSafeEqual(Buffer.from(given), Buffer.from(secret()))
-  )
-    return new Response("Unauthorized", { status: 401 });
-  if (Number(request.headers.get("content-length") ?? 0) > 16000)
-    return new Response("", { status: 413 });
-  let raw = "";
-  const reader = request.body?.getReader();
-  if (!reader) return new Response("", { status: 400 });
-  let bytes = 0;
-  const decoder = new TextDecoder();
-  while (true) {
-    const p = await reader.read();
-    if (p.done) break;
-    bytes += p.value.length;
-    if (bytes > 16000) {
-      await reader.cancel();
-      return new Response("", { status: 413 });
-    }
-    raw += decoder.decode(p.value, { stream: true });
-  }
-  try {
-    const update = JSON.parse(raw),
-      m = update.message;
-    if (
-      !Number.isSafeInteger(update.update_id) ||
-      m?.chat?.type !== "private" ||
-      String(m?.chat?.id) !== chat() ||
-      String(m?.from?.id) !== chat() ||
-      !isStatusCommand(m?.text ?? "")
-    )
-      return Response.json({ ok: true });
-    const report = await businessReport(owner());
-    await sendBusinessReport(owner(), `update:${update.update_id}`, report.text);
-    return Response.json({ ok: true });
-  } catch {
-    return new Response("", { status: 503 });
-  }
-}
-// Explicit operator action only. Never replace another existing webhook or drop pending updates.
-export async function connectBusinessBot(user: string) {
-  if (user !== owner()) throw new Error("Nur der eingerichtete Betreiber darf den Bot verbinden.");
-  const { configureBusinessWebhook } = await import("./messaging/telegram-transport");
-  return configureBusinessWebhook(endpoint, secret());
 }

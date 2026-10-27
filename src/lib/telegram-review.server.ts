@@ -8,7 +8,7 @@ import { pipelineOperator } from "./model-pipeline.server";
 
 const envelope = z.object({
   initData: z.string().max(12000),
-  area: z.enum(["review", "publish", "pipeline"]),
+  area: z.enum(["review", "publish", "pipeline", "business"]),
   action: z.unknown(),
 });
 const headers = {
@@ -59,6 +59,13 @@ export async function telegramReviewRequest(request: Request) {
         401,
       );
     const owner = process.env.CONTENT_REVIEW_OWNER_ID ?? "e4ee414f-fbb6-4f82-b5fc-22d74ed6b3cc";
+    if (body.area === "business") {
+      if (!z.object({ action: z.literal("status") }).strict().safeParse(body.action).success)
+        return reply({}, 400);
+      const { businessReport } = await import("./business-report.server");
+      const report = await businessReport(owner);
+      return reply({ text: report.text });
+    }
     if (body.area === "pipeline") {
       const action = z
         .object({ action: z.enum(["status", "pause", "enable"]) })

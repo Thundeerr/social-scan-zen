@@ -60,6 +60,3 @@ export function forecastCash(fixed: number, topups: number, day: string) {
   const [year, month, date] = day.split("-").map(Number);
   return fixed + Math.round((topups / date) * new Date(Date.UTC(year, month, 0)).getUTCDate());
 }
-export function isStatusCommand(text: string) {
-  return /^(?:status\s+kiikii|\/status(?:@[a-z0-9_]+)?(?:\s+kiikii)?)$/i.test(text.trim());
-}

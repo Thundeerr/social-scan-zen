@@ -4,7 +4,6 @@ import {
   monthlyCosts,
   budgetLevel,
   forecastCash,
-  isStatusCommand,
   type CostEntry,
 } from "./business-report";
 describe("business reporting", () => {
@@ -59,10 +58,5 @@ describe("business reporting", () => {
     expect(budgetLevel(38000, 40000)).toBe(95);
     expect(budgetLevel(45000, 40000)).toBe(100);
     expect(forecastCash(9000, 1000, "2026-10-10")).toBe(12100);
-  });
-  it("accepts only read-only status commands", () => {
-    expect(isStatusCommand("Status Kiikii")).toBe(true);
-    expect(isStatusCommand("/status")).toBe(true);
-    expect(isStatusCommand("enable pipeline")).toBe(false);
   });
 });

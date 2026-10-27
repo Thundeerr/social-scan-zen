@@ -1,6 +1,6 @@
 # Kiikii reporting
 
-`/business` shows a read-only overview; `An mein Telegram` sends a report through the existing private review bot. `Status Kiikii` or `/status` works after the operator connects the status webhook. Setup refuses to replace any different webhook and preserves pending updates. Review mini-app actions remain unchanged.
+`/business` shows a read-only overview; `An mein Telegram` sends a report through the existing private review bot. Each report has a `Status Kiikii` button opening the authenticated existing Telegram mini-app, which also has its own status button. No text command or new webhook is installed: the bot already has an active receiver, which must remain untouched. Review actions remain unchanged.
 
 The minute tick `/api/public/business-report/tick` authenticates with the existing publisher cron secret. Settings default disabled. Once enabled it sends the first report at/after 20:00 Europe/Berlin each day, including that day's live data to the actual send time. Keys prevent repeated daily reports and threshold alerts. Delivery errors are marked uncertain, never automatically retried, because Telegram sendMessage has no idempotency key. Check business_report_deliveries before any manual resend.
 

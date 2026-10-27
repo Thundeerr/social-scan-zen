@@ -1,9 +1,10 @@
 import { createHmac } from "node:crypto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { verifyReviewLaunch } from "./telegram-review-auth.server";
-const mocks = vi.hoisted(() => ({ review: vi.fn(), publish: vi.fn() }));
+const mocks = vi.hoisted(() => ({ review: vi.fn(), publish: vi.fn(), business: vi.fn() }));
 vi.mock("./content-review.server", () => ({ reviewCommand: mocks.review }));
 vi.mock("./model-publishing.server", () => ({ modelPublishing: mocks.publish }));
+vi.mock("./business-report.server", () => ({ businessReport: mocks.business }));
 import { telegramReviewRequest } from "./telegram-review.server";
 const token = "8905298936:test-only",
   owner = "8556103033";
@@ -64,6 +65,16 @@ describe("Telegram owner authentication", () => {
       headers: { origin, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+  it("serves business status only to the signed owner and rejects mutations", async () => {
+    mocks.business.mockResolvedValue({text:"private report"});
+    const payload={area:"business",action:{action:"status"}};
+    expect((await telegramReviewRequest(req({...payload,initData:sign(123)}))).status).toBe(401);
+    expect(mocks.business).not.toHaveBeenCalled();
+    const response=await telegramReviewRequest(req({...payload,initData:sign()}));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({text:"private report"});
+    expect((await telegramReviewRequest(req({area:"business",initData:sign(),action:{action:"send"}}))).status).toBe(400);
+  });
   it("does not trust a Telegram id or database owner in client parameters", async () => {
     expect(
       (
