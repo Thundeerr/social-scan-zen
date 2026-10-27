@@ -276,10 +276,17 @@ export async function syncFanvue(user: string, manual = false, now = new Date())
     return { skipped: true };
   const id = await lease(user);
   try {
+    const current = await metadata(user);
+    if (
+      !current?.connected ||
+      current.needs_reconnect ||
+      (current.last_attempt_at && Date.now() - Date.parse(current.last_attempt_at) < 600000)
+    )
+      return { skipped: true };
     await update(user, id, { last_attempt_at: new Date().toISOString() });
     let s = await secret(user);
     // A crashed/lost single-use refresh must never be replayed.
-    if (m.refresh_pending)
+    if (current.refresh_pending)
       throw new Error("Token-Erneuerung unbestätigt. Bitte Fanvue neu verbinden.");
     if (!s.accessToken || !s.refreshToken) throw new Error("Bitte Fanvue neu verbinden.");
     if (!s.expiresAt || s.expiresAt < Date.now() + 300000) {
@@ -316,20 +323,18 @@ export async function syncFanvue(user: string, manual = false, now = new Date())
     if (Number.isSafeInteger(profile.fanCounts?.followersCount))
       values["Follower gesamt"] = profile.fanCounts.followersCount;
     check(
-      await db()
-        .from("business_metric_snapshots")
-        .upsert(
-          {
-            user_id: user,
-            source: "Fanvue API",
-            period_start: month,
-            period_end: day,
-            observed_at: end,
-            values,
-            note: "Offizielle API · @kiikiixoxo · Monat bis Abrufzeit, Europe/Berlin. Netto inklusive gebuchter Rückerstattungen/Chargebacks/Korrekturen, vor Betriebskosten. Abo-Zahlungen sind keine Anzahl neuer Personen. Subs/Follower sind der aktuelle Bestand. App-Käufe nicht als Einnahmen gezählt.",
-          },
-          { onConflict: "user_id,source,period_start,period_end" },
-        ),
+      await db().from("business_metric_snapshots").upsert(
+        {
+          user_id: user,
+          source: "Fanvue API",
+          period_start: month,
+          period_end: day,
+          observed_at: end,
+          values,
+          note: "Offizielle API · @kiikiixoxo · Monat bis Abrufzeit, Europe/Berlin. Netto inklusive gebuchter Rückerstattungen/Chargebacks/Korrekturen, vor Betriebskosten. Abo-Zahlungen sind keine Anzahl neuer Personen. Subs/Follower sind der aktuelle Bestand. App-Käufe nicht als Einnahmen gezählt.",
+        },
+        { onConflict: "user_id,source,period_start,period_end" },
+      ),
     );
     await update(user, id, { last_synced_at: end, last_error: null });
     return { synced: true };
