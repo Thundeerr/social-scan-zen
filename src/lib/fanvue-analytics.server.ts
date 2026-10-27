@@ -127,7 +127,12 @@ export async function exchangeFanvue(s: Secrets, params: Record<string, string>)
     },
     body: new URLSearchParams(params),
   });
-  if (!res.ok) throw new Error("Fanvue-Anmeldung fehlgeschlagen. Bitte neu verbinden.");
+  if (!res.ok) {
+    const failure = await res.json().catch(() => ({}));
+    if (failure.error === 'invalid_client') throw new Error('Fanvue lehnt die App-Zugangsdaten ab (invalid_client). Client Secret prüfen.');
+    if (failure.error === 'invalid_grant') throw new Error('Fanvue hat den Anmeldecode abgelehnt (invalid_grant). Bitte neu verbinden.');
+    throw new Error(`Fanvue-Tokenaustausch fehlgeschlagen (HTTP ${res.status}).`);
+  }
   const t = await res.json();
   const scopes = typeof t.scope === "string" ? t.scope.split(" ") : [];
   if (
@@ -199,6 +204,7 @@ export async function completeFanvue(state: string, browser: string, code: strin
   if (!row) throw new Error("Anmeldung ungültig, abgelaufen oder bereits verwendet.");
   owner(row.user_id);
   const id = await lease(row.user_id);
+  let stage = 'Tokenaustausch';
   try {
     const s = await exchangeFanvue(await secret(row.user_id), {
       grant_type: "authorization_code",
@@ -206,8 +212,10 @@ export async function completeFanvue(state: string, browser: string, code: strin
       redirect_uri: FANVUE_CALLBACK,
       code_verifier: row.verifier,
     });
+    stage = 'Kontoprüfung';
     const profile = await fanvueGet(s.accessToken!, "/users/me");
     verifyProfile(profile);
+    stage = 'Verschlüsselte Speicherung';
     await save(row.user_id, { ...s, uuid: profile.uuid }, id);
     await update(row.user_id, id, {
       handle: profile.handle,
@@ -217,6 +225,17 @@ export async function completeFanvue(state: string, browser: string, code: strin
       last_error: null,
       last_attempt_at: null,
     });
+  } catch (error) {
+    const safeMessages = [
+      'Fanvue lehnt die App-Zugangsdaten ab (invalid_client). Client Secret prüfen.',
+      'Fanvue hat den Anmeldecode abgelehnt (invalid_grant). Bitte neu verbinden.',
+      'Fanvue hat die benötigten Leserechte oder Tokens nicht geliefert.',
+      'Bitte den Fanvue-Creator @kiikiixoxo verbinden. Es wurden keine fremden Zahlen übernommen.',
+    ];
+    const message = error instanceof Error && safeMessages.includes(error.message)
+      ? error.message : `${stage} fehlgeschlagen. Bitte Verbindung prüfen.`;
+    await update(row.user_id,id,{last_error:message});
+    throw new Error(message);
   } finally {
     await release(row.user_id, id);
   }
