@@ -4,6 +4,11 @@ import { canonicalReel } from "./reel-inbox";
 export const DM_RECEIVER = "followerstarteam";
 export const DM_SENDERS = ["kiikii.bat", "thundeerr999"] as const;
 export const DM_WEBHOOK = "https://instascanner.app/api/public/instagram/inbox-webhook";
+// Only the sender's accompanying text selects a model, never the shared caption or URL.
+export function dmModel(text = ""): "kiikii" | "tuuva" {
+  const note = text.replace(/https?:\/\/\S+/gi, " ");
+  return /(^|[^\p{L}\p{N}_])tuuva(?=$|[^\p{L}\p{N}_])/iu.test(note) ? "tuuva" : "kiikii";
+}
 const id = z.string().regex(/^[0-9]{1,40}$/);
 const message = z.object({
   sender: z.object({ id }),
@@ -97,6 +102,7 @@ export function dmEvents(body: unknown) {
           receiver: entry.id,
           sender: event.data.sender.id,
           mid: data.mid,
+          model: dmModel(data.text),
           links: [...links.values()],
           diagnostics: {
             attachment_count: attachments.length,

@@ -28,8 +28,8 @@ export function ReelInboxDm({ userId }: { userId: string }) {
         @kiikii.bat oder @thundeerr999 → direkt an @followerstarteam senden.
       </p>
       <p className="text-sm text-muted-foreground">
-        Freigegebene Reel-Links werden online gespeichert, auch wenn dein PC aus ist. Der PC lädt
-        sie später in „Neu“. Andere Absender werden nicht übernommen. Keine automatischen Antworten.
+        Ohne Zusatz → Kiikii. Für Tuuva schreibe „Tuuva“ direkt beim Teilen dazu. Bitte nicht als
+        separate Nachricht danach. Die Reels werden nur gesammelt – keine automatische Generierung.
       </p>
       <p role="status" className="text-sm">
         {query.isError
@@ -56,10 +56,38 @@ export function ReelInboxDm({ userId }: { userId: string }) {
         <p key={index} className="text-sm">
           @{r.sender} · {new Date(r.received_at).toLocaleString("de-DE")} ·{" "}
           {r.status === "queued"
-            ? `${r.link_count} Reel-Link(s) an die Inbox übergeben`
+            ? `${r.link_count} Reel-Link(s) gespeichert${r.model ? ` · ${r.model === "tuuva" ? "Tuuva" : "Kiikii"}` : ""}`
             : `${dmReceiptExplanation(r.diagnostics)} Bitte ersatzweise den kopierten Reel-Link als Text senden.`}
         </p>
       ))}
+      {!!status?.collected?.length && (
+        <div className="space-y-2">
+          <h3 className="font-medium">Gesammelte Reels</h3>
+          {status.collected.map((item, index) => {
+            const reel = Array.isArray(item.reel_inbox_items)
+              ? item.reel_inbox_items[0]
+              : item.reel_inbox_items;
+            if (!reel) return null;
+            return (
+              <div
+                key={`${item.model}-${reel.shortcode}-${index}`}
+                className="flex flex-wrap items-center gap-3 rounded-lg border p-3"
+              >
+                <strong>{item.model === "tuuva" ? "Tuuva" : "Kiikii"}</strong>
+                <a href={reel.canonical_url} target="_blank" rel="noreferrer" className="underline">
+                  Vorlage ansehen
+                </a>
+                <Button
+                  variant="outline"
+                  onClick={() => navigator.clipboard.writeText(reel.canonical_url)}
+                >
+                  Link kopieren
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button
           disabled={!status?.readyToConnect || mutation.isPending}

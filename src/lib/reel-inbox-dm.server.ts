@@ -120,13 +120,21 @@ export async function dmOperator(user: string, action: "status" | "enable" | "di
   const receipts = checked(
     await db
       .from("reel_inbox_dm_receipts")
-      .select("sender,status,link_count,received_at,diagnostics")
+      .select("sender,status,link_count,received_at,diagnostics,model")
       .eq("user_id", user)
       .order("received_at", { ascending: false })
       .limit(10),
   );
   const senders = checked(
     await db.from("reel_inbox_dm_senders").select("username").eq("user_id", user),
+  );
+  const collected = checked(
+    await db
+      .from("reel_inbox_dm_candidates")
+      .select("model,created_at,reel_inbox_items(canonical_url,shortcode)")
+      .eq("user_id", user)
+      .order("created_at", { ascending: false })
+      .limit(100),
   );
   return {
     readyToConnect: Boolean(usable(c) && secret()),
@@ -135,6 +143,7 @@ export async function dmOperator(user: string, action: "status" | "enable" | "di
     expiresAt: c?.token_expires_at ?? null,
     senders: senders?.map((s) => s.username) ?? [],
     receipts: receipts ?? [],
+    collected: collected ?? [],
   };
 }
 
@@ -179,13 +188,14 @@ export async function ingestDm(body: unknown) {
       if (!names.has(username)) continue;
     }
     checked(
-      await db.rpc("reel_inbox_dm_ingest_v2", {
+      await db.rpc("reel_inbox_dm_ingest_v3", {
         p_receiver: event.receiver,
         p_sender: event.sender,
         p_username: username,
         p_hash: createHash("sha256").update(event.mid).digest("hex"),
         p_links: event.links,
         p_diagnostics: event.diagnostics,
+        p_model: event.model,
       }),
     );
   }

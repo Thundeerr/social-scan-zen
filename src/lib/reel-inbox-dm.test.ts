@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import { dmEvents } from "./reel-inbox-dm";
+import { dmEvents, dmModel } from "./reel-inbox-dm";
 const mock = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: mock }));
 import { dmWebhook, ingestDm, verifyToken } from "./reel-inbox-dm.server";
@@ -42,6 +42,31 @@ beforeEach(() => {
   mock.rpc.mockResolvedValue({ data: { ok: true }, error: null });
 });
 describe("DM parsing", () => {
+  it.each([undefined, "", "nice reel", "tuuvas", "https://www.instagram.com/tuuva/reel/ABCDE/"])(
+    "defaults to Kiikii for %s",
+    (text) => {
+      expect(dmModel(text)).toBe("kiikii");
+    },
+  );
+  it.each(["Tuuva", "für TUUVA bitte", "Tuuva: " + link, "@tuuva 😄"])(
+    "recognizes the accompanying model note %s",
+    (text) => {
+      expect(dmModel(text)).toBe("tuuva");
+    },
+  );
+  it("does not use the original caption to select a model", () => {
+    expect(
+      dmEvents(
+        payload(
+          event({
+            text: undefined,
+            attachments: [{ type: "share", payload: { permalink: link, title: "Tuuva" } }],
+          }),
+        ),
+      )[0].model,
+    ).toBe("kiikii");
+    expect(dmEvents(payload(event({ text: "Tuuva " + link })))[0].model).toBe("tuuva");
+  });
   it.each(["share", "ig_reel", "reel", "ig_post", "post"])(
     "extracts a permalink from a %s card without text",
     (type) => {
@@ -201,9 +226,10 @@ describe("DM authentication and durable intake", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(mock.rpc).toHaveBeenCalledOnce();
     expect(mock.rpc).toHaveBeenCalledWith(
-      "reel_inbox_dm_ingest_v2",
+      "reel_inbox_dm_ingest_v3",
       expect.objectContaining({
         p_diagnostics: expect.objectContaining({ outcome: "link_found" }),
+        p_model: "kiikii",
       }),
     );
   });
