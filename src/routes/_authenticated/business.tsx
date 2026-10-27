@@ -4,6 +4,7 @@ import { Radio, RefreshCw, Send, AlertTriangle, ArrowUpRight, Wallet, Zap } from
 import { businessReportFn } from "@/lib/business-report.functions";
 import { berlinTime, usd } from "@/lib/business-report";
 import { Button } from "@/components/ui/button";
+import { FanvueAnalyticsConnection } from "@/components/FanvueAnalyticsConnection";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
   new Intl.DateTimeFormat("de-DE", {
@@ -54,7 +55,9 @@ function Business() {
     onSuccess: (r) => cache.setQueryData(key, r),
   });
   const r = query.data,
-    fanvue = r?.snapshots.find((s) => s.source === "Fanvue"),
+    fanvue =
+      r?.snapshots.find((s) => s.source === "Fanvue API") ??
+      r?.snapshots.find((s) => s.source === "Fanvue"),
     instagram = r?.snapshots.find((s) => s.source === "Instagram");
   const shared = r ? r.costs.sharedFixed + r.costs.sharedTopups : 0,
     progress = r ? Math.min(100, Math.round((r.costs.cashPlan / r.budget) * 100)) : 0;
@@ -130,6 +133,7 @@ function Business() {
             Signal angekommen. Dein Bericht ist in Telegram. ✓
           </p>
         )}
+        <FanvueAnalyticsConnection userId={user.id} />
         {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
         {r && (
           <>
@@ -278,16 +282,19 @@ function Business() {
                   Fans & Einnahmen
                 </h2>
                 <span className="font-mono text-xs text-amber-200">
-                  LETZTE BESTÄTIGTE WERTE · NICHT LIVE
+                  LETZTE BESTÄTIGTE WERTE · ZEITSTEMPEL BEACHTEN
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric
-                  label="Neue Fanvue-Subs"
-                  value={number(fanvue?.values["Neue Subs"])}
+                  label="Fanvue-Subs gesamt"
+                  value={number(fanvue?.values["Subs gesamt"])}
                   detail={
                     fanvue
-                      ? date(fanvue.period_start) + " – " + date(fanvue.period_end)
+                      ? "Stand " +
+                        new Date(fanvue.observed_at).toLocaleString("de-DE", {
+                          timeZone: "Europe/Berlin",
+                        })
                       : "Daten fehlen"
                   }
                 />
@@ -298,7 +305,11 @@ function Business() {
                       ? "—"
                       : usd(fanvue.values["Netto vor Betriebskosten USD"] * 100)
                   }
-                  detail="Vor Betriebskosten · kein Gewinn"
+                  detail={
+                    fanvue
+                      ? `${date(fanvue.period_start)} – ${date(fanvue.period_end)} · vor Betriebskosten`
+                      : "Daten fehlen"
+                  }
                   pink
                 />
                 <Metric
@@ -322,7 +333,9 @@ function Business() {
                         {date(s.observed_at)} ·{" "}
                         {s.observed_at.slice(0, 10) < r.at.day
                           ? "älterer Stand"
-                          : "manuell erfasst"}
+                          : s.source === "Fanvue API"
+                            ? "API-Abruf"
+                            : "manuell erfasst"}
                       </span>
                     </summary>
                     <div className="mt-3 text-sm leading-relaxed text-slate-300">
@@ -353,8 +366,8 @@ function Business() {
                   Überblick.
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
-                  Fanvue, Closer und Link-Zahlen werden hier noch nicht automatisch erneuert.
-                  Tapclick fehlt. Der tägliche Bericht ersetzt diese Anschlüsse nicht.
+                  Fanvue wird nach der Verbindung täglich aus der API abgeglichen. Closer und
+                  Link-Zahlen sind weiterhin manuell. Tapclick fehlt.
                 </p>
               </div>
             </aside>

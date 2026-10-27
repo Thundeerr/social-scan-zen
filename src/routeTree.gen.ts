@@ -42,6 +42,7 @@ import { Route as ApiPublicInstagramInboxWebhookRouteImport } from './routes/api
 import { Route as ApiPublicInstagramCallbackRouteImport } from './routes/api/public/instagram/callback'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
 import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
+import { Route as ApiPublicFanvueCallbackRouteImport } from './routes/api/public/fanvue/callback'
 import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron/dispatch'
 import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
 import { Route as ApiPublicBusinessReportTickRouteImport } from './routes/api/public/business-report/tick'
@@ -219,6 +220,11 @@ const ApiPublicHooksDiscoveryTickRoute =
     path: '/api/public/hooks/discovery-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicFanvueCallbackRoute = ApiPublicFanvueCallbackRouteImport.update({
+  id: '/api/public/fanvue/callback',
+  path: '/api/public/fanvue/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCronDispatchRoute = ApiPublicCronDispatchRouteImport.update({
   id: '/api/public/cron/dispatch',
   path: '/api/public/cron/dispatch',
@@ -266,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
+  '/api/public/fanvue/callback': typeof ApiPublicFanvueCallbackRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
@@ -303,6 +310,7 @@ export interface FileRoutesByTo {
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
+  '/api/public/fanvue/callback': typeof ApiPublicFanvueCallbackRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
@@ -342,6 +350,7 @@ export interface FileRoutesById {
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
+  '/api/public/fanvue/callback': typeof ApiPublicFanvueCallbackRoute
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
@@ -381,6 +390,7 @@ export interface FileRouteTypes {
     | '/api/public/business-report/tick'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
+    | '/api/public/fanvue/callback'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
@@ -418,6 +428,7 @@ export interface FileRouteTypes {
     | '/api/public/business-report/tick'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
+    | '/api/public/fanvue/callback'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
@@ -456,6 +467,7 @@ export interface FileRouteTypes {
     | '/api/public/business-report/tick'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
+    | '/api/public/fanvue/callback'
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
@@ -475,6 +487,7 @@ export interface RootRouteChildren {
   ApiPublicBusinessReportTickRoute: typeof ApiPublicBusinessReportTickRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
   ApiPublicCronDispatchRoute: typeof ApiPublicCronDispatchRoute
+  ApiPublicFanvueCallbackRoute: typeof ApiPublicFanvueCallbackRoute
   ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicInstagramCallbackRoute: typeof ApiPublicInstagramCallbackRoute
@@ -716,6 +729,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksDiscoveryTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/fanvue/callback': {
+      id: '/api/public/fanvue/callback'
+      path: '/api/public/fanvue/callback'
+      fullPath: '/api/public/fanvue/callback'
+      preLoaderRoute: typeof ApiPublicFanvueCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/dispatch': {
       id: '/api/public/cron/dispatch'
       path: '/api/public/cron/dispatch'
@@ -812,6 +832,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBusinessReportTickRoute: ApiPublicBusinessReportTickRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
   ApiPublicCronDispatchRoute: ApiPublicCronDispatchRoute,
+  ApiPublicFanvueCallbackRoute: ApiPublicFanvueCallbackRoute,
   ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicInstagramCallbackRoute: ApiPublicInstagramCallbackRoute,

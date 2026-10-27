@@ -50,7 +50,8 @@ export async function businessReport(user: string, now = new Date()) {
     costs = monthlyCosts(entries, local.day),
     budget = settings?.monthly_budget_cents ?? 40000;
   const forecast = forecastCash(costs.fixed, costs.topups, local.day);
-  const fv = latest.find((s) => s.source === "Fanvue");
+  const fv =
+    latest.find((s) => s.source === "Fanvue API") ?? latest.find((s) => s.source === "Fanvue");
   const ig = latest.find((s) => s.source === "Instagram");
   const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
     snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
@@ -73,14 +74,14 @@ export async function businessReport(user: string, now = new Date()) {
     `Job-Reservierungen: ${usd(live.reserved_month_cents)} – Schätzung, keine Rechnung.`,
     "Warnungen statt Autostopp. Noch kein grünes Licht: Die Kosten-Zuordnung fehlt.",
     "",
-    "📡 LETZTE BESTÄTIGTE SIGNALE · NICHT LIVE",
+    "📡 LETZTE BESTÄTIGTE SIGNALE",
     fv
-      ? `Fanvue · ${fv.period_start} bis ${fv.period_end}:\n${value(fv, "Neue Subs")} neue Subs · ${value(fv, "Subs gesamt")} gesamt\n${value(fv, "Netto vor Betriebskosten USD")} $ netto vor Betriebskosten. Kein Gewinn.`
+      ? `Fanvue · ${fv.period_start} bis ${fv.period_end}:\n${value(fv, "Subs gesamt")} Subs gesamt\n${value(fv, "Netto vor Betriebskosten USD")} $ netto vor Betriebskosten. Kein Gewinn.\n${fv.source === "Fanvue API" ? "API-Abruf" : "Manuell erfasst"}: ${berlinTime(new Date(fv.observed_at)).day} ${berlinTime(new Date(fv.observed_at)).time} Uhr.`
       : "Fanvue: Daten fehlen.",
     ig
       ? `Instagram: ${value(ig, "Follower gesamt")} Follower · Stand ${berlinTime(new Date(ig.observed_at)).day}.`
       : "Instagram: Daten fehlen.",
-    "Fanvue-/IG-Zahlen werden hier noch nicht automatisch aktualisiert.",
+    "Fanvue nach Verbindung täglich per API. IG weiterhin manuell; Zeitstempel beachten.",
     "Closer-Conversions sind keine bestätigten bezahlten Subs. Tapclick fehlt.",
     "Kosten pro neuem Follower / zahlendem Sub: noch unbekannt.",
     "",
@@ -143,6 +144,23 @@ export async function businessTick(request: Request) {
   if (verified.error || verified.data !== true)
     return new Response("Unauthorized", { status: 401, headers });
   try {
+    const settings = checked(
+      await db()
+        .from("business_report_settings")
+        .select("enabled")
+        .eq("user_id", owner())
+        .maybeSingle(),
+    );
+    if (!settings?.enabled) return Response.json({ paused: true }, { headers });
+    const local = berlinTime();
+    if (local.hour >= 19 && (local.hour >= 20 || Number(local.time.slice(3)) >= 55)) {
+      const { syncFanvue } = await import("./fanvue-analytics.server");
+      try {
+        await syncFanvue(owner());
+      } catch {
+        /* Last good values retain their timestamp; UI shows sync error. */
+      }
+    }
     const report = await businessReport(owner());
     if (!report.enabled) return Response.json({ paused: true }, { headers });
     const month = report.at.day.slice(0, 7),
