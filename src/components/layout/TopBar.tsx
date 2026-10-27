@@ -30,14 +30,11 @@ export function TopBar() {
 
   const onChange = (value: string) => {
     setGlobalQuery(value);
-    if (value && pathname !== "/assets" && pathname !== "/") {
-      navigate({ to: "/assets", search: { day: "all", status: "all" }, replace: true });
-    }
   };
 
-  const onFocus = () => {
-    // send the user to a view that shows results
-    if (pathname !== "/assets" && pathname !== "/") {
+  const submitSearch = () => {
+    // Focus and password-manager autofill must never leave an unrelated form.
+    if (q.trim() && pathname !== "/assets" && pathname !== "/") {
       navigate({ to: "/assets", search: { day: "all", status: "all" }, replace: true });
     }
   };
@@ -50,10 +47,21 @@ export function TopBar() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             id="global-search"
+            type="search"
+            name="asset-search-query"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            aria-label="Assets suchen – mit Enter öffnen"
             value={q}
             onChange={(e) => onChange(e.target.value)}
-            onFocus={onFocus}
-            placeholder="Search accounts, assets, captions…    /"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submitSearch();
+              }
+            }}
+            placeholder="Search accounts, assets, captions… ↵"
             className="w-full h-9 rounded-lg bg-muted/60 border border-transparent focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 pl-9 pr-24 text-sm placeholder:text-muted-foreground"
           />
           {q ? (

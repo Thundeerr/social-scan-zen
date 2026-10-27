@@ -60,7 +60,9 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
           <input
             id="fanvue-secret"
             type="password"
-            autoComplete="off"
+              autoComplete="new-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
             className="w-full rounded-lg border border-white/20 bg-black/40 p-3"
