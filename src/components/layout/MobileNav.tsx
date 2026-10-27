@@ -29,6 +29,7 @@ const items = [
   { to: "/reel-inbox", label: "Reel Inbox", icon: Clapperboard },
   { to: "/content-review", label: "Content Review", icon: Clapperboard },
   { to: "/catalogue", label: "Content Catalogue", icon: Images },
+  { to: "/business", label: "Zahlen & Kosten", icon: Images },
   { to: "/generate", label: "Video erstellen", icon: Clapperboard },
   { to: "/scanner", label: "Scanner", icon: Radar },
   { to: "/publisher", label: "Content Publisher", icon: Clapperboard },

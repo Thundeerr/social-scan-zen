@@ -50,6 +50,7 @@ const groups: NavGroup[] = [
       { to: "/content-review", label: "Content Review", icon: Clapperboard, hint: null },
       { to: "/catalogue", label: "Content Catalogue", icon: Images, hint: null },
       { to: "/generate", label: "Video erstellen", icon: Clapperboard, hint: null },
+      { to: "/business", label: "Zahlen & Kosten", icon: Gauge, hint: null },
     ],
   },
   {

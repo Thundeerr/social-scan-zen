@@ -111,6 +111,45 @@ export function activeTelegramProvider(): Provider {
   return getProvider();
 }
 
+/** Reporting setup: preserve any other webhook and all pending updates. */
+export async function configureBusinessWebhook(url: string, secret: string) {
+  const token = process.env.CONTENT_REVIEW_BOT_TOKEN;
+  if (
+    !token?.startsWith("8905298936:") ||
+    url !== "https://instascanner.app/api/public/business-report/webhook" ||
+    !/^[a-f0-9]{64}$/.test(secret)
+  )
+    throw new Error("Bot-Konfiguration fehlt.");
+  const call = async (method: string, body: unknown) => {
+    const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error("Bot-Verbindung nicht bestätigt.");
+    return data.result;
+  };
+  try {
+    const current = await call("getWebhookInfo", {});
+    if (current.url && current.url !== url)
+      throw new Error("Ein anderer Bot-Empfänger ist aktiv. Er wurde nicht verändert.");
+    await call("setWebhook", {
+      url,
+      secret_token: secret,
+      allowed_updates: ["message"],
+      drop_pending_updates: false,
+    });
+    const confirmed = await call("getWebhookInfo", {});
+    if (confirmed.url !== url) throw new Error("Webhook nicht bestätigt.");
+    return { connected: true };
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Ein anderer")) throw e;
+    throw new Error("Bot-Verbindung nicht bestätigt.");
+  }
+}
+
 /** Dedicated review bot, never falls back to the scanner bot or modifies webhooks. */
 export async function contentReviewTelegramCall(
   body: Record<string, unknown>,
