@@ -10,11 +10,14 @@ export const businessReportFn = createServerFn({ method: "POST" })
       throw new Error("Bitte erneut anmelden.");
     const api = await import("./business-report.server");
     const report = await api.businessReport(context.userId);
-    if (data.action === "send")
-      await api.sendBusinessReport(
+    if (data.action === "send") {
+      const receipt = await api.sendBusinessReport(
         context.userId,
         `manual:${Math.floor(Date.now() / 60000)}`,
         report.text,
       );
+      if (receipt.duplicate)
+        throw new Error("In dieser Minute bereits angefordert. Bitte Telegram prüfen; es wurde kein zweiter Bericht gesendet.");
+    }
     return report;
   });
