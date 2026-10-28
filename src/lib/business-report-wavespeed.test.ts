@@ -67,6 +67,23 @@ vi.mock("@/integrations/supabase/client.server", () => ({
                     observed_at: "2026-10-28T16:52:28Z",
                     values: { "Subs gesamt": 27, "Netto vor Betriebskosten USD": 717.61 },
                   },
+                  ...[
+                    {
+                      source: "Closer Verbrauch (UI)",
+                      values: {
+                        "Berechnete Gespräche": 376,
+                        "Preis pro Gespräch USD": 0.08,
+                        Restgespräche: 199,
+                      },
+                    },
+                    { source: "Closer Zahlungen (Revolut)", values: { "Bezahlt EUR": 93.42 } },
+                    { source: "ECB Wechselkurs", values: { "USD pro EUR": 1.1133 } },
+                  ].map((s) => ({
+                    ...s,
+                    period_start: "2026-10-01",
+                    period_end: "2026-10-28",
+                    observed_at: "2026-10-28T18:00:00Z",
+                  })),
                 ];
       const chain: any = {
         select: () => chain,
@@ -94,6 +111,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 it("daily report includes actual costs and fits Telegram without sending", async () => {
   const { businessReport } = await import("./business-report.server");
   const r = await businessReport("operator", new Date("2026-10-28T19:00:00Z"));
+  expect(r.text).toContain("376 berechnet = 30.08 USD");
   expect(r.text.length).toBeLessThanOrEqual(4000);
   expect(r.text).toContain("267.78 $");
   expect(r.text).toContain("89.80 $");
