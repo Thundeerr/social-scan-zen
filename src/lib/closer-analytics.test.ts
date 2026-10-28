@@ -15,6 +15,22 @@ const payload = () => ({
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("Closer analytics", () => {
+  it("rejects false account-filter zeros when the platform has activity", async () => {
+    const empty = payload();
+    empty.rows = empty.rows.map((r) => ({
+      ...r,
+      values: [r.name === "Conversations raw" ? "0" : "-"],
+    }));
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(empty))
+      .mockResolvedValueOnce(Response.json(payload()));
+    vi.stubGlobal("fetch", f);
+    await expect(fetchCloserAnalytics("secret", "2026-10-21", "2026-10-27")).rejects.toThrow(
+      "Kontofilter unbestätigt",
+    );
+    expect(new URL(f.mock.calls[1][0]).searchParams.has("viewingAccountID")).toBe(false);
+  });
   it("extracts counts, never percentages or denominator; missing is not zero", () => {
     const p = parseCloserAnalytics(payload());
     expect(p["Gespräche gesamt"]).toBe(1234);

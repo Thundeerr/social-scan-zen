@@ -62,12 +62,33 @@ export async function fetchCloserAnalytics(token: string, start: string, end: st
   } catch {
     throw new Error("Unbekanntes Closer-Zahlenformat.");
   }
-  return parseCloserAnalytics(data);
+  const values = parseCloserAnalytics(data);
+  if (values["Gespräche gesamt"] === 0) {
+    // CupidBot returns a successful zero table for unknown account filters.
+    // Do not label that as verified Kiikii data while other activity exists.
+    url.searchParams.delete("viewingAccountID");
+    url.searchParams.delete("app");
+    let totalResponse: Response;
+    try {
+      totalResponse = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20000) });
+    } catch {
+      throw new Error(
+        "Closer-Kontofilter konnte nicht bestätigt werden. Alte Zahlen bleiben erhalten.",
+      );
+    }
+    if (!totalResponse.ok) throw new Error("Closer-Kontofilter konnte nicht bestätigt werden.");
+    const totals = parseCloserAnalytics(await totalResponse.json().catch(() => null));
+    if (totals["Gespräche gesamt"] > 0)
+      throw new Error(
+        "Closer-Token gültig, aber Kiikii-Kontofilter unbestätigt. Gesamtstatistik vorhanden; keine Nullwerte übernommen.",
+      );
+  }
+  return values;
 }
 export async function syncCloser(user: string, manual = false, now = new Date()) {
   owner(user);
   const s = await metadata(user);
-  if (!s) return { skipped: true };
+  if (!s || (!manual && !s.verified)) return { skipped: true };
   if (
     !manual &&
     s.last_synced_at &&
@@ -94,20 +115,18 @@ export async function syncCloser(user: string, manual = false, now = new Date())
       .slice(0, 10);
     const values = await fetchCloserAnalytics(token, start, end);
     check(
-      await db()
-        .from("business_metric_snapshots")
-        .upsert(
-          {
-            user_id: user,
-            source: "Closer API",
-            period_start: start,
-            period_end: end,
-            observed_at: now.toISOString(),
-            values,
-            note: "CupidBot · @kiikii.bat · sieben abgeschlossene Kalendertage, Europe/Berlin. Accountfilter 17841416918437774. Conversions sind Anbieter-Meldungen, keine bestätigten bezahlten Fanvue-Abos. Conversions können zeitversetzt eintreffen; berechnete Gespräche sind keine Dollarbeträge.",
-          },
-          { onConflict: "user_id,source,period_start,period_end" },
-        ),
+      await db().from("business_metric_snapshots").upsert(
+        {
+          user_id: user,
+          source: "Closer API",
+          period_start: start,
+          period_end: end,
+          observed_at: now.toISOString(),
+          values,
+          note: "CupidBot · @kiikii.bat · sieben abgeschlossene Kalendertage, Europe/Berlin. Accountfilter 17841416918437774. Conversions sind Anbieter-Meldungen, keine bestätigten bezahlten Fanvue-Abos. Conversions können zeitversetzt eintreffen; berechnete Gespräche sind keine Dollarbeträge.",
+        },
+        { onConflict: "user_id,source,period_start,period_end" },
+      ),
     );
     check(
       await db()
@@ -122,7 +141,7 @@ export async function syncCloser(user: string, manual = false, now = new Date())
     check(
       await db()
         .from("closer_analytics_connections")
-        .update({ last_error: message })
+        .update({ last_error: message, verified: false })
         .eq("user_id", user),
     );
     throw new Error(message);

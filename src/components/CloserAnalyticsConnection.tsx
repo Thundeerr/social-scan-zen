@@ -37,7 +37,7 @@ export function CloserAnalyticsConnection({ userId }: { userId: string }) {
           {q.error?.message ?? m.error?.message ?? s?.error}
         </p>
       )}
-      {s && (!s.configured || !s.verified || s.error) && (
+      {s && (!s.configured || s.error?.includes("HTTP 401") || s.error?.includes("HTTP 403")) && (
         <div className="space-y-3">
           <p className="text-sm text-slate-300">
             CupidBot → Profile → Account → <strong>Access token</strong>. Hier einfügen, nicht den
