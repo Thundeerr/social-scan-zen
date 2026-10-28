@@ -5,6 +5,8 @@ import { berlinTime } from "@/lib/business-report";
 import { generationRunRate } from "@/lib/wavespeed-analytics";
 const dollars = (v: number) =>
   v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 4 }) + " $";
+const estimate = (v: number) =>
+  v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " $";
 export function WaveSpeedAnalytics({ userId }: { userId: string }) {
   const cache = useQueryClient(),
     key = ["wavespeed-analytics", userId];
@@ -71,7 +73,7 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
                 Content-Output · Monatsplanung
               </h3>
               <p className="text-3xl font-semibold">
-                {dollars(projection.total)}{" "}
+                {estimate(projection.total)}{" "}
                 <span className="text-base font-normal text-slate-300">
                   / 30 Tage · gesamtes Konto
                 </span>
@@ -85,7 +87,7 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
                   <p key={String(label)}>
                     {label}
                     <strong className="block text-xl text-cyan-200">
-                      {dollars(Number(value))}
+                      {estimate(Number(value))}
                     </strong>
                   </p>
                 ))}

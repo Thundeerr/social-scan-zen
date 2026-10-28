@@ -217,7 +217,7 @@ function Business() {
                   pink
                 />
                 <Metric
-                  label="Noch aufzuteilen"
+                  label="Gemeinsame Aufladungen"
                   value={usd(shared)}
                   detail="Gemeinsame USD-Aufladungen; keine Verbrauchskosten"
                   pink
