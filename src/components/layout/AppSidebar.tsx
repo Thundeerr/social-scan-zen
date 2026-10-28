@@ -126,8 +126,8 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="hidden md:flex sticky top-0 h-screen w-60 shrink-0 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
+    <aside className="hidden md:flex sticky top-0 h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
+      <div className="flex items-center gap-3 px-5 h-16 border-b border-sidebar-border">
         <BrandMark />
         <div className="flex min-w-0 flex-col leading-tight">
           <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
@@ -139,17 +139,17 @@ export function AppSidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
+      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
         {groups.map((group) => {
           const expanded = open[group.id] ?? group.defaultOpen;
           const hasActive = group.items.some((i) => i.to === activeTo);
           return (
-            <div key={group.id} className="space-y-0.5">
+            <div key={group.id} className="space-y-1">
               <button
                 type="button"
                 onClick={() => toggle(group.id)}
                 aria-expanded={expanded}
-                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:text-sidebar-foreground"
+                className="flex w-full items-center gap-2 min-h-11 rounded-lg px-3 py-2 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-sidebar-foreground"
               >
                 <ChevronRight
                   className={cn(
@@ -168,10 +168,11 @@ export function AppSidebar() {
                     <Link
                       key={to}
                       to={to}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                        "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                         active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground ring-1 ring-inset ring-primary/25"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                       )}
                     >

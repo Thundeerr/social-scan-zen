@@ -49,13 +49,13 @@ export function MobileNav() {
         <button
           type="button"
           aria-label="Open navigation"
-          className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-md border border-border/60 bg-card/60 text-foreground/90 hover:bg-card"
+          className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-md border border-border/60 bg-card/60 text-foreground/90 hover:bg-card"
         >
           <Menu className="h-4 w-4" />
         </button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-        <SheetHeader className="px-4 h-14 border-b border-sidebar-border flex-row items-center gap-3 space-y-0">
+      <SheetContent side="left" className="w-72 overflow-y-auto p-0 bg-sidebar border-sidebar-border">
+        <SheetHeader className="px-5 h-16 border-b border-sidebar-border flex-row items-center gap-3 space-y-0">
           <BrandMark />
           <div className="flex min-w-0 flex-col leading-tight text-left">
             <SheetTitle className="text-sm font-semibold tracking-tight text-sidebar-foreground">
@@ -67,7 +67,7 @@ export function MobileNav() {
           </div>
         </SheetHeader>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <nav className="flex-1 px-4 py-6 space-y-1">
           <div className="px-2 pb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Workspace
           </div>
@@ -77,9 +77,10 @@ export function MobileNav() {
               <Link
                 key={to}
                 to={to}
+                aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+                  "flex min-h-12 items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   active
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",

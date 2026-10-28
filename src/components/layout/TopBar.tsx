@@ -40,7 +40,7 @@ export function TopBar() {
   };
 
   return (
-    <header className="h-14 shrink-0 border-b border-border bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
+    <header className="h-16 shrink-0 border-b border-border bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
       <div className="flex h-full items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <MobileNav />
         <div className="relative flex-1 min-w-0 max-w-md">
@@ -62,7 +62,7 @@ export function TopBar() {
               }
             }}
             placeholder="Search accounts, assets, captions… ↵"
-            className="w-full h-9 rounded-lg bg-muted/60 border border-transparent focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 pl-9 pr-24 text-sm placeholder:text-muted-foreground"
+            className="w-full h-11 rounded-lg bg-muted/60 border border-transparent focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 pl-9 pr-24 text-sm placeholder:text-muted-foreground"
           />
           {q ? (
             <button

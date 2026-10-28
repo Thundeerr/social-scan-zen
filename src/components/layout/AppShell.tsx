@@ -13,7 +13,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="relative flex min-h-screen w-full bg-background text-foreground">
-        <AnimatedCircuitBackground />
+        <div className="pointer-events-none absolute inset-0 opacity-25 motion-reduce:hidden" aria-hidden="true">
+          <AnimatedCircuitBackground />
+        </div>
         <div className="relative z-[1] flex w-full min-h-screen">
           <AppSidebar />
           <div className="flex-1 flex flex-col min-w-0">

@@ -27,7 +27,7 @@ function Metric({
   pink?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/25 p-5">
+    <div className="rounded-xl border border-white/10 bg-[#101321] p-6">
       <p className="text-xs font-medium uppercase tracking-widest text-slate-300">{label}</p>
       <p
         className={
@@ -69,11 +69,11 @@ function Business() {
           "radial-gradient(ellipse at 90% 0%,#c026d315,transparent 45%),radial-gradient(ellipse at 0% 30%,#06b6d410,transparent 40%)",
       }}
     >
-      <div className="mx-auto max-w-6xl space-y-6 p-4 pb-16 md:p-8">
+      <div className="mx-auto max-w-6xl space-y-8 p-4 pb-16 md:p-8">
         <header className="relative overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-[#101321] p-6 md:p-8">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-20"
+            className="pointer-events-none absolute inset-0 opacity-10"
             style={{
               backgroundImage:
                 "linear-gradient(#a855f720 1px,transparent 1px),linear-gradient(90deg,#a855f720 1px,transparent 1px)",
@@ -85,7 +85,7 @@ function Business() {
               <p className="mb-3 font-mono text-xs tracking-[.22em] text-fuchsia-300">
                 MIDNA // NIGHT SHIFT
               </p>
-              <h1 className="text-4xl font-black tracking-tight md:text-5xl">
+              <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
                 KIIKII<span className="text-fuchsia-400">.</span>{" "}
                 <span className="font-light text-slate-300">HQ</span>
               </h1>
@@ -111,7 +111,7 @@ function Business() {
               {query.isFetching ? "Hole den Status …" : "Zahlen aktualisieren"}
             </Button>
             <Button
-              className="h-14 bg-fuchsia-500 text-base font-semibold text-white shadow-[0_0_25px_#d946ef25] hover:bg-fuchsia-600"
+              className="h-14 bg-fuchsia-500 text-base font-semibold text-white hover:bg-fuchsia-600"
               onClick={() => action.mutate()}
               disabled={action.isPending || !r}
             >
