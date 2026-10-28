@@ -1,3 +1,4 @@
+import { profitEstimate } from "./business-profit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { channelAlertTelegramCall } from "./messaging/telegram-transport";
@@ -82,10 +83,16 @@ export async function businessReport(user: string, now = new Date()) {
   const generation = wr ? generationRunRate(wr) : null;
   const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
     snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
+  const profit = profitEstimate(latest, allocation, wr);
   const text = [
     "🦇 KIIKII HQ // MIDNAS NIGHT SHIFT",
     `${local.day} · ${local.time} Uhr · Berlin`,
     "",
+    ...(profit
+      ? [
+          `💜 Gewinn-Schätzung ${profit.start}–${profit.end}: ${profit.surplus.toFixed(2)} EUR übrig bei ${profit.costs.toFixed(2)} EUR Verbrauchskosten inkl. aktueller Monatsfixkosten. Ungeklärter Linkverbrauch fehlt. Mit sämtlichen Anbieteraufladungen statt Closer-Verbrauch: ${profit.cautiousSurplus.toFixed(2)} EUR. Closer: ${profit.charged} berechnet = ${profit.usageUsd.toFixed(2)} USD; ${profit.remaining} übrig. FX-Basis ${profit.fxDay}.`,
+        ]
+      : []),
     "⚡ WAS LÄUFT?",
     `${live.published_today} heute veröffentlicht · ${live.scheduled} eingeplant`,
     `${live.review_pending} warten auf dein Okay. ${live.jobs_today} neue Jobs heute.`,
@@ -99,7 +106,7 @@ export async function businessReport(user: string, now = new Date()) {
       : `Fixkosten bisher: ${usd(costs.fixed)}.`,
     `Monatsrahmen ${usd(budget)}. USD-Teilzahlungen ${usd(costs.topups)}; gemeinsame Aufladungen ${usd(costs.sharedTopups)}.`,
     hasAllocation
-      ? "EUR und USD bleiben getrennt. Budgetanzeige ohne Wechselkurs unvollständig."
+      ? "Die ältere USD-Zahlungsübersicht ist kein vollständiger Budgetstand."
       : "Kostenaufteilung fehlt noch.",
     "Aufladung ≠ Verbrauch. Zahlungen und Verbrauch werden nicht zusammengezählt.",
     wr
@@ -112,7 +119,7 @@ export async function businessReport(user: string, now = new Date()) {
       ? `30-Tage-Generierungsprognose: ${usd(generation.total * 100)} fürs Konto; davon Kiikii ${usd(generation.kiikii * 100)}, Tuuva ${usd(generation.tuuva * 100)}, offen ${usd(generation.unassigned * 100)}. Basis ${generation.days} Kalendertage inkl. laufendem Tag, kein Langzeitmittel.`
       : "",
     `Job-Reservierungen: ${usd(live.reserved_month_cents)} – Schätzung, keine Rechnung.`,
-    "Warnungen statt Autostopp. Noch kein grünes Licht: Die Kosten-Zuordnung fehlt.",
+    "Warnungen statt Autostopp. Ungeklärte Anbieterposten bleiben offen.",
     "",
     "📡 LETZTE BESTÄTIGTE SIGNALE",
     fv

@@ -9,6 +9,8 @@ import { InstagramAnalyticsConnection } from "@/components/InstagramAnalyticsCon
 import { CloserAnalyticsConnection } from "@/components/CloserAnalyticsConnection";
 import { WaveSpeedAnalytics } from "@/components/WaveSpeedAnalytics";
 import { BusinessCostAllocation } from "@/components/BusinessCostAllocation";
+import { BusinessProfit } from "@/components/BusinessProfit";
+import { profitEstimate } from "@/lib/business-profit";
 import { mixedMoney } from "@/lib/business-cost-allocation";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
@@ -140,6 +142,7 @@ function Business() {
             Signal angekommen. Dein Bericht ist in Telegram. ✓
           </p>
         )}
+        {r && <BusinessProfit value={profitEstimate(r.snapshots, r.allocation, r.wave?.report)} />}
         <FanvueAnalyticsConnection userId={user.id} />
         <InstagramAnalyticsConnection userId={user.id} />
         <CloserAnalyticsConnection userId={user.id} />
@@ -250,8 +253,9 @@ function Business() {
                 <div>
                   <p className="font-semibold">Noch kein grünes Licht fürs Budget.</p>
                   <p className="mt-1 text-sm leading-relaxed">
-                    Monatliche Fixkostenaufteilung: {mixedMoney(r.allocation.totals.kiikii)}. Ohne
-                    Wechselkurs ist ein vollständiger Vergleich mit dem Dollarbudget noch offen. Die
+                    Monatliche Fixkostenaufteilung: {mixedMoney(r.allocation.totals.kiikii)}. Die
+                    Gewinn-Schätzung oben verwendet einen datierten Wechselkurs. Diese ältere
+                    Zahlungsübersicht zeigt nur USD. Die
                     gemeinsame WaveSpeed-Aufladung ist keine zusätzliche Ausgabe neben dem
                     Verbrauch.
                   </p>
