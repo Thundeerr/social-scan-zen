@@ -6,6 +6,7 @@ import { berlinTime, usd } from "@/lib/business-report";
 import { Button } from "@/components/ui/button";
 import { FanvueAnalyticsConnection } from "@/components/FanvueAnalyticsConnection";
 import { InstagramAnalyticsConnection } from "@/components/InstagramAnalyticsConnection";
+import { CloserAnalyticsConnection } from "@/components/CloserAnalyticsConnection";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
   new Intl.DateTimeFormat("de-DE", {
@@ -138,6 +139,7 @@ function Business() {
         )}
         <FanvueAnalyticsConnection userId={user.id} />
         <InstagramAnalyticsConnection userId={user.id} />
+        <CloserAnalyticsConnection userId={user.id} />
         {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
         {r && (
           <>
@@ -374,7 +376,8 @@ function Business() {
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
                   Fanvue und Instagram werden nach der Verbindung täglich aus der API abgeglichen.
-                  Closer und Link-Zahlen sind weiterhin manuell. Tapclick fehlt.
+                  Closer nach Token-Eingabe ebenfalls automatisch. Link-Zahlen sind weiterhin
+                  manuell. Tapclick fehlt.
                 </p>
               </div>
             </aside>

@@ -55,6 +55,7 @@ export async function businessReport(user: string, now = new Date()) {
   const ig =
     latest.find((s) => s.source === "Instagram API") ??
     latest.find((s) => s.source === "Instagram");
+  const closer = latest.find((s) => s.source === "Closer API");
   const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
     snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
   const text = [
@@ -84,6 +85,9 @@ export async function businessReport(user: string, now = new Date()) {
       ? `Instagram: ${value(ig, "Follower gesamt")} Follower · Stand ${berlinTime(new Date(ig.observed_at)).day}.`
       : "Instagram: Daten fehlen.",
     "Fanvue und Instagram nach Verbindung täglich per API; Zeitstempel beachten.",
+    closer
+      ? `Closer · ${closer.period_start} bis ${closer.period_end}: ${value(closer, "Gespräche gesamt")} Gespräche → ${value(closer, "Link verschickt")} Links → ${value(closer, "Conversions (Closer, keine bestätigten Subs)")} gemeldete Conversions.`
+      : "Closer: noch kein API-Abruf.",
     "Closer-Conversions sind keine bestätigten bezahlten Subs. Tapclick fehlt.",
     "Kosten pro neuem Follower / zahlendem Sub: noch unbekannt.",
     "",
@@ -167,6 +171,12 @@ export async function businessTick(request: Request) {
         await syncInstagramAnalytics(owner());
       } catch {
         /* Analytics failure never blocks the report or publishing. */
+      }
+      const { syncCloser } = await import("./closer-analytics.server");
+      try {
+        await syncCloser(owner());
+      } catch {
+        /* Keep last timestamped evidence. */
       }
     }
     const report = await businessReport(owner());
