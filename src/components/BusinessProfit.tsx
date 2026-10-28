@@ -21,7 +21,7 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           ["Fanvue netto", p.revenue],
-          ["Kosten nach Verbrauch", p.costs],
+          ["Kosten inkl. bezahlter Abos", p.costs],
           ["Vorläufig übrig", p.surplus],
         ].map(([label, amount]) => (
           <div key={label} className="rounded-xl bg-white/5 p-5">
@@ -31,37 +31,37 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
         ))}
       </div>
       <p className="text-sm text-amber-200">
-        Ungeklärter Anbieter-/Linkverbrauch fehlt noch. Das ist kein endgültiger Gewinn.
+        Alle neun CupidBot-Zahlungen sind zugeordnet. Überschuss nach bezahlten Abos; keine
+        periodengerechte Buchhaltung.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-cyan-300/20 p-4">
           <h3 className="font-semibold">Closer: {p.charged} berechnete Gespräche</h3>
-          <p>
-            {p.usageUsd.toFixed(2)} $ verbraucht · {p.remaining ?? "unbekannt"} Gespräche übrig
-          </p>
+          <p>{p.remaining ?? "unbekannt"} von 500 Abo-Gesprächen übrig · Link: 100/100</p>
           <p className="mt-2 text-sm text-slate-400">
-            8 $ pro 100 Gespräche. Restguthaben ist keine neue Ausgabe. Manuell bestätigter Stand;
-            keine 1.001 Gespräche.
+            Tatsächlich bezahlt: 72 $ Instagram + 32 $ Link = 104 $. Der rechnerische Gesprächswert
+            von {p.usageUsd.toFixed(2)} $ ist keine Aborechnung und wird nicht zusätzlich berechnet.
           </p>
         </div>
         <div className="rounded-xl border border-fuchsia-300/20 p-4">
           <h3 className="font-semibold">Monat bei diesem Tempo: ca. {eur(p.monthly)}</h3>
           <p className="mt-2 text-sm text-slate-400">
-            Aktuelle Fixkosten + Generation + Closer-Verbrauch auf 30 Tage hochgerechnet. Kein
-            Langzeitmittel; ungeklärter Linkverbrauch fehlt.
+            Aktuelle Fixkosten + Generation auf 30 Tage + {p.monthlySubscriptionsUsd} $ monatliches
+            Abo-Mittel. Vier Abos: 24 $ monatlich und 24 $ wöchentlich (52 Wochen / 12 Monate). Kein
+            Langzeitmittel der Generation.
           </p>
         </div>
       </div>
       <details className="text-sm text-slate-300">
-        <summary className="cursor-pointer py-2">Rechnung & vorsichtige Alternative</summary>
+        <summary className="cursor-pointer py-2">Rechnung & vier laufende Abos</summary>
         <p>
           Aktuelle monatliche Fixkosten: {eur(p.fixed)} · Kiikii-Generation: {eur(p.generation)} ·
-          Closer-Verbrauch: {eur(p.usageUsd / p.rate)}.
+          Bezahlte CupidBot-Abos: {eur(p.paid)}.
         </p>
         <p className="mt-2">
-          Wenn wir stattdessen sämtliche Anbieteraufladungen ({eur(p.paid)}) abziehen: Kostenbasis{" "}
-          {eur(p.cautiousCosts)}, übrig {eur(p.cautiousSurplus)}. Darin steckt auch ungenutztes
-          Guthaben. Aufladungen und Verbrauch werden niemals addiert.
+          Link: 8 $ / Woche. Instagram: 8 $ / Monat + 16 $ / Monat + 16 $ / Woche. Diese Abos kosten
+          auch bei ungenutzten Gesprächen. Die letzte Wochenrechnung reicht bis 3. November; hier
+          vollständig als bezahlte Ausgabe berücksichtigt. Keine Abos gekündigt.
         </p>
         <p className="mt-2">
           Fixkosten nach heutiger Aufteilung für einen ganzen Monat angesetzt; keine historische

@@ -19,6 +19,7 @@ const snapshots = [
   }),
   snapshot("Closer Zahlungen (Revolut)", { "Bezahlt EUR": 93.42 }),
   snapshot("ECB Wechselkurs", { "USD pro EUR": 1.1133 }),
+  snapshot("CupidBot Abos (Portal)", { "Bezahlt EUR": 93.42, "Monatsmittel USD": 128 }),
 ];
 const plan = allocationPlan(
   [
@@ -46,10 +47,11 @@ const plan = allocationPlan(
   "2026-10-28",
 );
 const wave = { month: "2026-10", observed: "2026-10-28T18:00:00Z", kiikii: 252.6901 };
-it("uses charged conversations, never credits inferred from payments; avoids double counting", () => {
+it("uses actual subscription invoices, not nominal conversation usage; avoids double counting", () => {
   const p = profitEstimate(snapshots, plan, wave)!;
   expect(p.usageUsd).toBeCloseTo(30.08);
-  expect(p.surplus).toBeCloseTo(166.37, 2);
+  expect(p.surplus).toBeCloseTo(99.97, 2);
+  expect(p.monthly).toBeCloseTo(582.38, 2);
   expect(p.cautiousSurplus).toBeCloseTo(99.97, 2);
   expect(p.remaining).toBe(199);
 });

@@ -10,10 +10,12 @@ export function profitEstimate(
   const fv = find("Fanvue API"),
     closer = find("Closer Verbrauch (UI)"),
     payments = find("Closer Zahlungen (Revolut)"),
+    subscriptions = find("CupidBot Abos (Portal)"),
     fx = find("ECB Wechselkurs");
-  if (!fv || !closer || !payments || !fx || !wave || !allocation.entries.length) return null;
+  if (!fv || !closer || !payments || !subscriptions || !fx || !wave || !allocation.entries.length)
+    return null;
   const rate = fx.values["USD pro EUR"];
-  const samePeriod = [closer, payments].every(
+  const samePeriod = [closer, payments, subscriptions].every(
     (s) => s.period_start === fv.period_start && s.period_end === fv.period_end,
   );
   if (
@@ -34,6 +36,13 @@ export function profitEstimate(
     usageUsd = charged * price,
     revenue = revenueUsd / rate;
   const days = Number(fv.period_end.slice(-2));
+  const monthlySubscriptionsUsd = subscriptions.values["Monatsmittel USD"];
+  if (
+    !Number.isFinite(monthlySubscriptionsUsd) ||
+    monthlySubscriptionsUsd < 0 ||
+    subscriptions.values["Bezahlt EUR"] !== paid
+  )
+    return null;
   return {
     start: fv.period_start,
     end: fv.period_end,
@@ -46,10 +55,11 @@ export function profitEstimate(
     generation,
     paid,
     revenue,
-    costs: fixed + generation + usageUsd / rate,
-    surplus: revenue - fixed - generation - usageUsd / rate,
+    monthlySubscriptionsUsd,
+    costs: fixed + generation + paid,
+    surplus: revenue - fixed - generation - paid,
     cautiousCosts: fixed + generation + paid,
     cautiousSurplus: revenue - fixed - generation - paid,
-    monthly: fixed + ((generation + usageUsd / rate) / days) * 30,
+    monthly: fixed + (generation / days) * 30 + monthlySubscriptionsUsd / rate,
   };
 }

@@ -90,7 +90,7 @@ export async function businessReport(user: string, now = new Date()) {
     "",
     ...(profit
       ? [
-          `💜 Gewinn-Schätzung ${profit.start}–${profit.end}: ${profit.surplus.toFixed(2)} EUR übrig bei ${profit.costs.toFixed(2)} EUR Verbrauchskosten inkl. aktueller Monatsfixkosten. Ungeklärter Linkverbrauch fehlt. Mit sämtlichen Anbieteraufladungen statt Closer-Verbrauch: ${profit.cautiousSurplus.toFixed(2)} EUR. Closer: ${profit.charged} berechnet = ${profit.usageUsd.toFixed(2)} USD; ${profit.remaining} übrig. FX-Basis ${profit.fxDay}.`,
+          `💜 Überschuss-Schätzung ${profit.start}–${profit.end}: ${profit.surplus.toFixed(2)} EUR bei ${profit.costs.toFixed(2)} EUR Kosten inkl. aktueller Monatsfixkosten und bezahlter CupidBot-Abos. Alle9 Zahlungen zugeordnet:72USD Instagram+32USD Link. Laufend4Abos im Mittel128USD/Monat. ${profit.charged} Gespräche; ${profit.remaining} übrig. Keine periodengerechte Buchhaltung. FX ${profit.fxDay}.`,
         ]
       : []),
     "⚡ WAS LÄUFT?",

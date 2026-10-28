@@ -78,6 +78,10 @@ vi.mock("@/integrations/supabase/client.server", () => ({
                     },
                     { source: "Closer Zahlungen (Revolut)", values: { "Bezahlt EUR": 93.42 } },
                     { source: "ECB Wechselkurs", values: { "USD pro EUR": 1.1133 } },
+                    {
+                      source: "CupidBot Abos (Portal)",
+                      values: { "Bezahlt EUR": 93.42, "Monatsmittel USD": 128 },
+                    },
                   ].map((s) => ({
                     ...s,
                     period_start: "2026-10-01",
@@ -111,7 +115,7 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 it("daily report includes actual costs and fits Telegram without sending", async () => {
   const { businessReport } = await import("./business-report.server");
   const r = await businessReport("operator", new Date("2026-10-28T19:00:00Z"));
-  expect(r.text).toContain("376 berechnet = 30.08 USD");
+  expect(r.text).toContain("376 Gespräche");
   expect(r.text.length).toBeLessThanOrEqual(4000);
   expect(r.text).toContain("267.78 $");
   expect(r.text).toContain("89.80 $");
