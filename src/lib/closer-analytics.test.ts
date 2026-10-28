@@ -38,8 +38,8 @@ describe("Closer analytics", () => {
     const url = new URL(f.mock.calls[0][0]);
     expect(url.origin).toBe("https://x.cupidbotofm.ai");
     expect(url.searchParams.get("viewingAccountID")).toBe(CLOSER_ACCOUNT_ID);
-    expect(url.searchParams.get("app")).toBe("instagram");
-    expect(url.searchParams.get("viewingApps")).toBe("instagram");
+    expect(url.searchParams.get("app")).toBe("instagram_managed");
+    expect(url.searchParams.get("viewingApps")).toBe("instagram_managed");
     expect(url.searchParams.get("timezone")).toBe("Europe/Berlin");
     expect(url.searchParams.has("lastDays")).toBe(false);
   });

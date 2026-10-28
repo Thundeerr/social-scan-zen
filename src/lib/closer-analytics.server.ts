@@ -39,8 +39,8 @@ export async function fetchCloserAnalytics(token: string, start: string, end: st
   const url = new URL("https://x.cupidbotofm.ai/api/getAnalytics");
   url.search = new URLSearchParams({
     accessToken: token,
-    viewingApps: "instagram",
-    app: "instagram",
+    viewingApps: "instagram_managed",
+    app: "instagram_managed",
     viewingAccountID: CLOSER_ACCOUNT_ID,
     startDate: start,
     endDate: end,
