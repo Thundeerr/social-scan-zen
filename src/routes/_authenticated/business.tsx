@@ -8,6 +8,8 @@ import { FanvueAnalyticsConnection } from "@/components/FanvueAnalyticsConnectio
 import { InstagramAnalyticsConnection } from "@/components/InstagramAnalyticsConnection";
 import { CloserAnalyticsConnection } from "@/components/CloserAnalyticsConnection";
 import { WaveSpeedAnalytics } from "@/components/WaveSpeedAnalytics";
+import { BusinessCostAllocation } from "@/components/BusinessCostAllocation";
+import { mixedMoney } from "@/lib/business-cost-allocation";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
   new Intl.DateTimeFormat("de-DE", {
@@ -142,6 +144,7 @@ function Business() {
         <InstagramAnalyticsConnection userId={user.id} />
         <CloserAnalyticsConnection userId={user.id} />
         <WaveSpeedAnalytics userId={user.id} />
+        {r && <BusinessCostAllocation plan={r.allocation} />}
         {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
         {r && (
           <>
@@ -203,15 +206,20 @@ function Business() {
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric
-                  label="Kiikii zugeordnet"
+                  label="Kiikii · nur USD-Zahlungsplanung"
                   value={usd(r.costs.cashPlan)}
-                  detail={usd(r.costs.fixed) + " fix + " + usd(r.costs.topups) + " aufgeladen"}
+                  detail={
+                    usd(r.costs.fixed) +
+                    " USD-Fixanteil + " +
+                    usd(r.costs.topups) +
+                    " aufgeladen. EUR-Fixanteil separat oben."
+                  }
                   pink
                 />
                 <Metric
                   label="Noch aufzuteilen"
                   value={usd(shared)}
-                  detail="Gemeinsame Fixkosten & Aufladungen"
+                  detail="Gemeinsame USD-Aufladungen; keine Verbrauchskosten"
                   pink
                 />
                 <Metric
@@ -221,7 +229,7 @@ function Business() {
                 />
               </div>
               <div className="mt-5 flex justify-between gap-3 text-sm">
-                <span>Bekannter Kiikii-Anteil · kein vollständiger Verbrauch</span>
+                <span>Nur USD-Teilbetrag · EUR fehlen hier · kein vollständiger Budgetstand</span>
                 <strong>{progress}%</strong>
               </div>
               <div
@@ -242,34 +250,37 @@ function Business() {
                 <div>
                   <p className="font-semibold">Noch kein grünes Licht fürs Budget.</p>
                   <p className="mt-1 text-sm leading-relaxed">
-                    Zusammen sind {usd(r.costs.cashPlan + shared)} erfasst. Ein Teil gehört zu
-                    Kiikii und Tuuva gemeinsam. Erst zuordnen, dann wissen wir, was Kiikii wirklich
-                    kostet. Aufladung ≠ Verbrauch.
+                    Monatliche Fixkostenaufteilung: {mixedMoney(r.allocation.totals.kiikii)}. Ohne
+                    Wechselkurs ist ein vollständiger Vergleich mit dem Dollarbudget noch offen. Die
+                    gemeinsame WaveSpeed-Aufladung ist keine zusätzliche Ausgabe neben dem
+                    Verbrauch.
                   </p>
                 </div>
               </div>
               <details className="mt-4 text-sm text-slate-300">
                 <summary className="cursor-pointer py-2">Kosten genauer ansehen</summary>
                 <div className="mt-3 space-y-3">
-                  {r.entries.map((e) => (
-                    <div
-                      key={e.reference}
-                      className="flex justify-between gap-4 border-b border-white/10 pb-2"
-                    >
-                      <div>
-                        {e.label}
-                        <span className="block text-xs text-slate-400">
-                          {e.kind === "fixed"
-                            ? "monatlich"
-                            : e.kind === "topup"
-                              ? "Aufladung"
-                              : "Verbrauch"}{" "}
-                          · {e.scope === "shared" ? "geteilt" : e.scope} · ab {date(e.day)}
-                        </span>
+                  {r.entries
+                    .filter((e) => e.kind !== "fixed" || !r.allocation.entries.length)
+                    .map((e) => (
+                      <div
+                        key={e.reference}
+                        className="flex justify-between gap-4 border-b border-white/10 pb-2"
+                      >
+                        <div>
+                          {e.label}
+                          <span className="block text-xs text-slate-400">
+                            {e.kind === "fixed"
+                              ? "monatlich"
+                              : e.kind === "topup"
+                                ? "Aufladung"
+                                : "Verbrauch"}{" "}
+                            · {e.scope === "shared" ? "geteilt" : e.scope} · ab {date(e.day)}
+                          </span>
+                        </div>
+                        <span className="shrink-0">{usd(e.cents)}</span>
                       </div>
-                      <span className="shrink-0">{usd(e.cents)}</span>
-                    </div>
-                  ))}
+                    ))}
                   <p>
                     Job-Reservierungen: {usd(r.live.reserved_month_cents)}. Schätzungen, keine
                     Rechnungen; nicht zusätzlich auf Aufladungen gerechnet.

@@ -36,3 +36,26 @@ check timestamp and repeated-read idempotency. Never submit test predictions.
 Outstanding: CupidBot scoped account filter is awaiting vendor support; its automatic
 sync remains paused. Link.me/Tapclick remain manual, with timestamps, until supported
 access is verified. Credentials are never requested in chat.
+
+## Cost allocation and external task evidence (2026-10-28)
+
+`business_cost_allocations` holds versioned monthly allocations per owner and currency.
+It is a planning ledger, not a replacement for bank transactions. The latest effective
+version per reference is displayed; historic `business_cost_entries` are preserved.
+Once an allocation exists, old fixed USD estimates are excluded from current planning.
+EUR and USD are kept separate; USD budget percentages exclude EUR and are explicitly
+incomplete until an exchange-rate basis exists. No automatic generation stop is added.
+
+`wavespeed_task_attributions` records verified provider IDs from external manifests,
+with the evidence path and SHA-256. The collector and read-side status combine these
+with pipeline job mappings. Disagreement between models leaves a task unassigned.
+The server only returns aggregate totals, never the billing ledger or evidence paths.
+
+Monthly generation planning is explicitly a 30-day run rate: current calendar-month
+net charges divided by elapsed calendar days (including the partial current day),
+multiplied by 30. Both characters retain their observed workload; the remaining unknown
+amount is shown separately and included in the account total. This is not an average
+of completed months or a cost per approved video; images and revisions are included.
+
+Checks: `node tests/business-cost-allocation-db.mjs`, the allocation and WaveSpeed
+Vitest suites, `tsc --noEmit`, and the production build. No generation jobs required.

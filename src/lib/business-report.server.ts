@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { channelAlertTelegramCall } from "./messaging/telegram-transport";
 import { waveStatus } from "./wavespeed-analytics.server";
+import { allocationPlan, mixedMoney, type CostAllocation } from "./business-cost-allocation";
+import { generationRunRate } from "./wavespeed-analytics";
 import {
   berlinTime,
   monthlyCosts,
@@ -19,17 +21,24 @@ function checked<T>(r: { data: T; error: unknown }): T {
   return r.data;
 }
 export async function businessReport(user: string, now = new Date()) {
-  const [settingsResult, costResult, snapshotResult, liveResult] = await Promise.all([
-    db().from("business_report_settings").select("*").eq("user_id", user).maybeSingle(),
-    db().from("business_cost_entries").select("*").eq("user_id", user).order("day").limit(1000),
-    db()
-      .from("business_metric_snapshots")
-      .select("*")
-      .eq("user_id", user)
-      .order("observed_at", { ascending: false })
-      .limit(100),
-    db().rpc("business_live_status", { p_user: user }),
-  ]);
+  const [settingsResult, costResult, snapshotResult, liveResult, allocationResult] =
+    await Promise.all([
+      db().from("business_report_settings").select("*").eq("user_id", user).maybeSingle(),
+      db().from("business_cost_entries").select("*").eq("user_id", user).order("day").limit(1000),
+      db()
+        .from("business_metric_snapshots")
+        .select("*")
+        .eq("user_id", user)
+        .order("observed_at", { ascending: false })
+        .limit(100),
+      db().rpc("business_live_status", { p_user: user }),
+      db()
+        .from("business_cost_allocations")
+        .select("*")
+        .eq("user_id", user)
+        .order("effective_from")
+        .limit(1000),
+    ]);
   const settings = checked(settingsResult);
   const entries = checked(costResult) as CostEntry[];
   if (entries.length >= 1000)
@@ -47,9 +56,20 @@ export async function businessReport(user: string, now = new Date()) {
     published_today: number;
     reserved_month_cents: number;
   };
-  const local = berlinTime(now),
-    costs = monthlyCosts(entries, local.day),
+  const local = berlinTime(now);
+  const allocationRows = checked(allocationResult) as CostAllocation[];
+  if (allocationRows.length >= 1000) throw Error("Kostenaufteilung zu groß.");
+  const allocation = allocationPlan(allocationRows, local.day);
+  const hasAllocation = allocation.entries.length > 0;
+  const costs = monthlyCosts(
+      hasAllocation ? entries.filter((e) => e.kind !== "fixed") : entries,
+      local.day,
+    ),
     budget = settings?.monthly_budget_cents ?? 40000;
+  if (hasAllocation) {
+    costs.fixed = allocation.totals.kiikii.USD;
+    costs.cashPlan = costs.fixed + costs.topups;
+  }
   const forecast = forecastCash(costs.fixed, costs.topups, local.day);
   const fv =
     latest.find((s) => s.source === "Fanvue API") ?? latest.find((s) => s.source === "Fanvue");
@@ -59,6 +79,7 @@ export async function businessReport(user: string, now = new Date()) {
   const closer = latest.find((s) => s.source === "Closer API");
   const wave = await waveStatus(user);
   const wr = wave?.report;
+  const generation = wr ? generationRunRate(wr) : null;
   const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
     snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
   const text = [
@@ -73,15 +94,22 @@ export async function businessReport(user: string, now = new Date()) {
       : "Noch kein bestätigter Vorlauf. Die Queue braucht Nachschub.",
     "",
     "💸 CREDITS CHECK · " + local.day.slice(0, 7),
-    `Kiikii zugeordnet: ${usd(costs.cashPlan)} / ${usd(budget)} Monatsrahmen`,
-    `Davon ${usd(costs.fixed)} fix + ${usd(costs.topups)} aufgeladen.`,
-    `Noch aufzuteilen: ${usd(costs.sharedFixed + costs.sharedTopups)} gemeinsame Kosten.`,
+    hasAllocation
+      ? `Kiikii monatlich: ${mixedMoney(allocation.totals.kiikii)} fix. Tuuva nutzt dieselbe Infrastruktur; noch kein zusätzlicher Fixkostenanteil.`
+      : `Fixkosten bisher: ${usd(costs.fixed)}.`,
+    `Monatsrahmen ${usd(budget)}. USD-Teilzahlungen ${usd(costs.topups)}; gemeinsame Aufladungen ${usd(costs.sharedTopups)}.`,
+    hasAllocation
+      ? "EUR und USD bleiben getrennt. Budgetanzeige ohne Wechselkurs unvollständig."
+      : "Kostenaufteilung fehlt noch.",
     "Aufladung ≠ Verbrauch. Zahlungen und Verbrauch werden nicht zusammengezählt.",
     wr
       ? `WaveSpeed · ${wr.month} · Stand ${berlinTime(new Date(wr.observed)).day} ${berlinTime(new Date(wr.observed)).time}:\nGuthaben ${usd(wr.balance * 100)}${wr.balance < 5 ? " ⚠️ niedrig" : ""}\nVerbrauch ${usd(wr.net * 100)}: Kiikii ${usd(wr.kiikii * 100)}, Tuuva ${usd(wr.tuuva * 100)}, unzugeordnet ${usd(wr.unassigned * 100)}.\n${usd(wr.charged * 100)} abgebucht − ${usd(wr.refunded * 100)} erstattet.${wr.unknownTypes ? ` ${wr.unknownTypes} andere Buchungen nicht eingerechnet.` : ""}`
       : "WaveSpeed: bestätigte Abrechnung fehlt.",
     wave?.error
       ? "⚠️ WaveSpeed-Abruf gestört; angezeigte Werte sind der letzte bestätigte Stand."
+      : "",
+    generation
+      ? `30-Tage-Generierungsprognose: ${usd(generation.total * 100)} fürs Konto; davon Kiikii ${usd(generation.kiikii * 100)}, Tuuva ${usd(generation.tuuva * 100)}, offen ${usd(generation.unassigned * 100)}. Basis ${generation.days} Kalendertage inkl. laufendem Tag, kein Langzeitmittel.`
       : "",
     `Job-Reservierungen: ${usd(live.reserved_month_cents)} – Schätzung, keine Rechnung.`,
     "Warnungen statt Autostopp. Noch kein grünes Licht: Die Kosten-Zuordnung fehlt.",
@@ -114,6 +142,8 @@ export async function businessReport(user: string, now = new Date()) {
     forecast,
     enabled: settings?.enabled === true,
     wave,
+    allocation,
+    generation,
     at: local,
   };
 }
@@ -201,7 +231,7 @@ export async function businessTick(request: Request) {
         await sendBusinessReport(
           owner(),
           `usage-budget:${month}:${actualLevel}`,
-          `VERBRAUCH ${actualLevel}% · Kiikii\nFixkosten + zugeordneter WaveSpeed-Verbrauch: ${usd(actual)} / ${usd(report.budget)}.\nGemeinsame Kosten und andere variable Anbieter noch unvollständig. Aufladungen nicht addiert. Kein Autostopp.`,
+          `VERBRAUCH mindestens ${actualLevel}% · Kiikii\nUSD-Fixkosten + zugeordneter WaveSpeed-Verbrauch: ${usd(actual)} / ${usd(report.budget)}.\nZusätzlich EUR-Fixkosten: ${mixedMoney(report.allocation.totals.kiikii)} monatliche Gesamtaufteilung. Andere variable Anbieter und Zuordnung unvollständig. Aufladungen nicht addiert. Kein Autostopp.`,
         );
     }
     if (level)

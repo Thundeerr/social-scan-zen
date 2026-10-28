@@ -29,6 +29,11 @@ export function aggregateWave(
     }
   const totals = { kiikii: 0, tuuva: 0, unassigned: 0, charged: 0, refunded: 0, unknown: 0 };
   const daily: Record<string, number> = {};
+  const tasks = {
+    kiikii: new Set<string>(),
+    tuuva: new Set<string>(),
+    unassigned: new Set<string>(),
+  };
   const seen = new Map<string, string>();
   for (const r of payload.records) {
     const serialized = JSON.stringify(r);
@@ -50,7 +55,9 @@ export function aggregateWave(
     const signed = r.type === "refund" ? -amount : amount;
     const models = r.task ? assignment.get(r.task) : undefined;
     const model = models?.size === 1 ? [...models][0] : null;
-    totals[model === "kiikii" || model === "tuuva" ? model : "unassigned"] += signed;
+    const bucket = model === "kiikii" || model === "tuuva" ? model : "unassigned";
+    totals[bucket] += signed;
+    if (r.type === "deduct" && r.task) tasks[bucket].add(r.task);
     daily[day] = (daily[day] ?? 0) + signed;
   }
   return {
@@ -65,7 +72,26 @@ export function aggregateWave(
     net: (totals.charged - totals.refunded) / 1e6,
     unknownTypes: totals.unknown,
     recordCount: seen.size,
+    tasks: {
+      kiikii: tasks.kiikii.size,
+      tuuva: tasks.tuuva.size,
+      unassigned: tasks.unassigned.size,
+    },
     daily: Object.fromEntries(Object.entries(daily).map(([k, v]) => [k, v / 1e6])),
   };
 }
 export type WaveReport = ReturnType<typeof aggregateWave>;
+export function generationRunRate(report: WaveReport) {
+  // Calendar days include the partially observed current day. No assumption of equal character output.
+  const day = berlinTime(new Date(report.observed)).day;
+  if (!day.startsWith(report.month)) return null;
+  const days = Number(day.slice(8));
+  const factor = 30 / days;
+  return {
+    days,
+    kiikii: report.kiikii * factor,
+    tuuva: report.tuuva * factor,
+    unassigned: report.unassigned * factor,
+    total: report.net * factor,
+  };
+}

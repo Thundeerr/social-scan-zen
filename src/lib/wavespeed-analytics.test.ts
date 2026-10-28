@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { aggregateWave, wavePayload, type WavePayload } from "./wavespeed-analytics";
+import {
+  aggregateWave,
+  wavePayload,
+  generationRunRate,
+  type WavePayload,
+} from "./wavespeed-analytics";
 const base: WavePayload = {
   month: "2026-10",
   observed: "2026-10-28T19:00:00Z",
@@ -14,6 +19,30 @@ const record = (id: string, type = "deduct", usd = 1.3, task: string | null = "p
   at: "2026-10-25T18:00:00Z",
 });
 describe("WaveSpeed accounting", () => {
+  it("projects both unequal model workloads with unknown costs retained", () => {
+    const r = aggregateWave(
+      {
+        ...base,
+        records: [
+          record("k", "deduct", 28, "k"),
+          record("t", "deduct", 14, "t"),
+          record("u", "deduct", 56, "u"),
+        ],
+      },
+      [
+        { provider_id: "k", model: "kiikii" },
+        { provider_id: "t", model: "tuuva" },
+      ],
+    );
+    expect(generationRunRate(r)).toEqual({
+      days: 28,
+      kiikii: 30,
+      tuuva: 15,
+      unassigned: 60,
+      total: 105,
+    });
+    expect(generationRunRate({ ...r, observed: "2026-11-01T12:00:00Z" })).toBeNull();
+  });
   it("counts fractional cents and refunds, deduplicates IDs", () => {
     const r = aggregateWave(
       { ...base, records: [record("a"), record("a"), record("b", "refund", 0.1001)] },

@@ -14,18 +14,53 @@ export async function waveStatus(user: string) {
   const s = checked(
     await db()
       .from("wavespeed_analytics_state")
-      .select("last_synced_at,last_attempt_at,last_error,requested_at,report")
+      .select("last_synced_at,last_attempt_at,last_error,requested_at,report,ledger")
       .eq("user_id", user)
       .maybeSingle(),
   );
+  const original = s?.report as WaveReport | null;
+  const report =
+    original && s?.ledger
+      ? aggregateWave(
+          {
+            month: original.month,
+            observed: original.observed,
+            balance: original.balance,
+            records: s.ledger,
+          },
+          await waveAssignments(user),
+        )
+      : original;
   return s
     ? {
         lastSynced: s.last_synced_at,
         error: s.last_error,
         pending: !s.last_synced_at || s.requested_at > s.last_synced_at,
-        report: s.report as WaveReport | null,
+        report,
       }
     : null;
+}
+async function waveAssignments(user: string) {
+  const jobs: { provider_id: string | null; model: string }[] = [];
+  for (const table of ["model_pipeline_jobs", "wavespeed_task_attributions"]) {
+    for (let from = 0; from < 100000; from += 1000) {
+      const batch = checked(
+        await db()
+          .from(table)
+          .select("provider_id,model")
+          .eq("user_id", user)
+          .not("provider_id", "is", null)
+          .order("provider_id")
+          .order("model")
+          .range(from, from + 999),
+      );
+      if (!batch) throw Error("Auftragszuordnung nicht verfügbar.");
+      jobs.push(...batch);
+      if (batch.length < 1000) break;
+      if (from === 99000) throw Error("Too many mappings");
+    }
+  }
+  return jobs;
 }
 export async function requestWaveSync(user: string) {
   if (user !== OWNER) throw Error("Nur für den Betreiber verfügbar.");
@@ -112,22 +147,7 @@ export async function waveCollector(request: Request) {
       Math.abs(now.getTime() - Date.parse(payload.observed)) > 15 * 60000
     )
       return reply({}, 400);
-    const jobs: { provider_id: string | null; model: string }[] = [];
-    for (let from = 0; from < 100000; from += 1000) {
-      const batch = checked(
-        await db()
-          .from("model_pipeline_jobs")
-          .select("provider_id,model")
-          .eq("user_id", OWNER)
-          .not("provider_id", "is", null)
-          .order("id")
-          .range(from, from + 999),
-      );
-      if (!batch) throw Error("Auftragszuordnung nicht verfügbar.");
-      jobs.push(...batch);
-      if (batch.length < 1000) break;
-      if (from === 99000) throw Error("Too many jobs");
-    }
+    const jobs = await waveAssignments(OWNER);
     const report = aggregateWave(payload, jobs);
     checked(
       await db().from("wavespeed_monthly_reports").upsert(
