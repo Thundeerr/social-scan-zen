@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { channelAlertTelegramCall } from "./messaging/telegram-transport";
+import { waveStatus } from "./wavespeed-analytics.server";
 import {
   berlinTime,
   monthlyCosts,
@@ -56,6 +57,8 @@ export async function businessReport(user: string, now = new Date()) {
     latest.find((s) => s.source === "Instagram API") ??
     latest.find((s) => s.source === "Instagram");
   const closer = latest.find((s) => s.source === "Closer API");
+  const wave = await waveStatus(user);
+  const wr = wave?.report;
   const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
     snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
   const text = [
@@ -73,7 +76,13 @@ export async function businessReport(user: string, now = new Date()) {
     `Kiikii zugeordnet: ${usd(costs.cashPlan)} / ${usd(budget)} Monatsrahmen`,
     `Davon ${usd(costs.fixed)} fix + ${usd(costs.topups)} aufgeladen.`,
     `Noch aufzuteilen: ${usd(costs.sharedFixed + costs.sharedTopups)} gemeinsame Kosten.`,
-    "Aufladung ≠ Verbrauch. Der tatsächliche Kiikii-Verbrauch ist noch unvollständig erfasst.",
+    "Aufladung ≠ Verbrauch. Zahlungen und Verbrauch werden nicht zusammengezählt.",
+    wr
+      ? `WaveSpeed · ${wr.month} · Stand ${berlinTime(new Date(wr.observed)).day} ${berlinTime(new Date(wr.observed)).time}:\nGuthaben ${usd(wr.balance * 100)}${wr.balance < 5 ? " ⚠️ niedrig" : ""}\nVerbrauch ${usd(wr.net * 100)}: Kiikii ${usd(wr.kiikii * 100)}, Tuuva ${usd(wr.tuuva * 100)}, unzugeordnet ${usd(wr.unassigned * 100)}.\n${usd(wr.charged * 100)} abgebucht − ${usd(wr.refunded * 100)} erstattet.${wr.unknownTypes ? ` ${wr.unknownTypes} andere Buchungen nicht eingerechnet.` : ""}`
+      : "WaveSpeed: bestätigte Abrechnung fehlt.",
+    wave?.error
+      ? "⚠️ WaveSpeed-Abruf gestört; angezeigte Werte sind der letzte bestätigte Stand."
+      : "",
     `Job-Reservierungen: ${usd(live.reserved_month_cents)} – Schätzung, keine Rechnung.`,
     "Warnungen statt Autostopp. Noch kein grünes Licht: Die Kosten-Zuordnung fehlt.",
     "",
@@ -87,12 +96,12 @@ export async function businessReport(user: string, now = new Date()) {
     "Fanvue und Instagram nach Verbindung täglich per API; Zeitstempel beachten.",
     closer
       ? `Closer · ${closer.period_start} bis ${closer.period_end}: ${value(closer, "Gespräche gesamt")} Gespräche → ${value(closer, "Link verschickt")} Links → ${value(closer, "Conversions (Closer, keine bestätigten Subs)")} gemeldete Conversions.`
-      : "Closer: noch kein API-Abruf.",
+      : "Closer: Kontofilter beim Support in Klärung. Automatischer Abruf pausiert.",
     "Closer-Conversions sind keine bestätigten bezahlten Subs. Tapclick fehlt.",
     "Kosten pro neuem Follower / zahlendem Sub: noch unbekannt.",
     "",
     "🎯 NÄCHSTER MOVE",
-    "Datenleitungen anschließen + gemeinsame Kosten aufteilen. Weniger Screenshots, mehr Durchblick.",
+    "Unzugeordnete Kosten prüfen; Closer-Supportantwort und Link-Statistiken fehlen noch.",
     "Unten auf Status Kiikii tippen für alle Zahlen und Zeiträume.",
   ].join("\n");
   return {
@@ -104,6 +113,7 @@ export async function businessReport(user: string, now = new Date()) {
     budget,
     forecast,
     enabled: settings?.enabled === true,
+    wave,
     at: local,
   };
 }
@@ -183,6 +193,17 @@ export async function businessTick(request: Request) {
     if (!report.enabled) return Response.json({ paused: true }, { headers });
     const month = report.at.day.slice(0, 7),
       level = budgetLevel(report.costs.cashPlan, report.budget);
+    const waveReport = report.wave?.report;
+    if (waveReport?.month === month) {
+      const actual = report.costs.fixed + Math.round(waveReport.kiikii * 100);
+      const actualLevel = budgetLevel(actual, report.budget);
+      if (actualLevel)
+        await sendBusinessReport(
+          owner(),
+          `usage-budget:${month}:${actualLevel}`,
+          `VERBRAUCH ${actualLevel}% · Kiikii\nFixkosten + zugeordneter WaveSpeed-Verbrauch: ${usd(actual)} / ${usd(report.budget)}.\nGemeinsame Kosten und andere variable Anbieter noch unvollständig. Aufladungen nicht addiert. Kein Autostopp.`,
+        );
+    }
     if (level)
       await sendBusinessReport(
         owner(),

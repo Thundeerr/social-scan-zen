@@ -45,6 +45,7 @@ import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/pu
 import { Route as ApiPublicFanvueCallbackRouteImport } from './routes/api/public/fanvue/callback'
 import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron/dispatch'
 import { Route as ApiPublicCronCheckRouteImport } from './routes/api/public/cron/check'
+import { Route as ApiPublicBusinessReportWavespeedRouteImport } from './routes/api/public/business-report/wavespeed'
 import { Route as ApiPublicBusinessReportTickRouteImport } from './routes/api/public/business-report/tick'
 
 const TelegramReviewRoute = TelegramReviewRouteImport.update({
@@ -235,6 +236,12 @@ const ApiPublicCronCheckRoute = ApiPublicCronCheckRouteImport.update({
   path: '/api/public/cron/check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBusinessReportWavespeedRoute =
+  ApiPublicBusinessReportWavespeedRouteImport.update({
+    id: '/api/public/business-report/wavespeed',
+    path: '/api/public/business-report/wavespeed',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBusinessReportTickRoute =
   ApiPublicBusinessReportTickRouteImport.update({
     id: '/api/public/business-report/tick',
@@ -270,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
+  '/api/public/business-report/wavespeed': typeof ApiPublicBusinessReportWavespeedRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/fanvue/callback': typeof ApiPublicFanvueCallbackRoute
@@ -308,6 +316,7 @@ export interface FileRoutesByTo {
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor': typeof AuthenticatedMonitorIndexRoute
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
+  '/api/public/business-report/wavespeed': typeof ApiPublicBusinessReportWavespeedRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/fanvue/callback': typeof ApiPublicFanvueCallbackRoute
@@ -348,6 +357,7 @@ export interface FileRoutesById {
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
+  '/api/public/business-report/wavespeed': typeof ApiPublicBusinessReportWavespeedRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
   '/api/public/cron/dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/fanvue/callback': typeof ApiPublicFanvueCallbackRoute
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/api/reel-inbox/worker'
     | '/monitor/'
     | '/api/public/business-report/tick'
+    | '/api/public/business-report/wavespeed'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
     | '/api/public/fanvue/callback'
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/api/reel-inbox/worker'
     | '/monitor'
     | '/api/public/business-report/tick'
+    | '/api/public/business-report/wavespeed'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
     | '/api/public/fanvue/callback'
@@ -465,6 +477,7 @@ export interface FileRouteTypes {
     | '/api/reel-inbox/worker'
     | '/_authenticated/monitor/'
     | '/api/public/business-report/tick'
+    | '/api/public/business-report/wavespeed'
     | '/api/public/cron/check'
     | '/api/public/cron/dispatch'
     | '/api/public/fanvue/callback'
@@ -485,6 +498,7 @@ export interface RootRouteChildren {
   ApiModelPipelineWorkerRoute: typeof ApiModelPipelineWorkerRoute
   ApiReelInboxWorkerRoute: typeof ApiReelInboxWorkerRoute
   ApiPublicBusinessReportTickRoute: typeof ApiPublicBusinessReportTickRoute
+  ApiPublicBusinessReportWavespeedRoute: typeof ApiPublicBusinessReportWavespeedRoute
   ApiPublicCronCheckRoute: typeof ApiPublicCronCheckRoute
   ApiPublicCronDispatchRoute: typeof ApiPublicCronDispatchRoute
   ApiPublicFanvueCallbackRoute: typeof ApiPublicFanvueCallbackRoute
@@ -750,6 +764,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/business-report/wavespeed': {
+      id: '/api/public/business-report/wavespeed'
+      path: '/api/public/business-report/wavespeed'
+      fullPath: '/api/public/business-report/wavespeed'
+      preLoaderRoute: typeof ApiPublicBusinessReportWavespeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/business-report/tick': {
       id: '/api/public/business-report/tick'
       path: '/api/public/business-report/tick'
@@ -830,6 +851,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelPipelineWorkerRoute: ApiModelPipelineWorkerRoute,
   ApiReelInboxWorkerRoute: ApiReelInboxWorkerRoute,
   ApiPublicBusinessReportTickRoute: ApiPublicBusinessReportTickRoute,
+  ApiPublicBusinessReportWavespeedRoute: ApiPublicBusinessReportWavespeedRoute,
   ApiPublicCronCheckRoute: ApiPublicCronCheckRoute,
   ApiPublicCronDispatchRoute: ApiPublicCronDispatchRoute,
   ApiPublicFanvueCallbackRoute: ApiPublicFanvueCallbackRoute,

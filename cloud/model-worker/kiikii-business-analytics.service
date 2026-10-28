@@ -1,0 +1,14 @@
+[Unit]
+Description=Kiikii read-only WaveSpeed accounting
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/kiikii-pipeline/cloud/model-worker/business_analytics.py
+TimeoutStartSec=240
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true

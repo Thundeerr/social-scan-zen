@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FanvueAnalyticsConnection } from "@/components/FanvueAnalyticsConnection";
 import { InstagramAnalyticsConnection } from "@/components/InstagramAnalyticsConnection";
 import { CloserAnalyticsConnection } from "@/components/CloserAnalyticsConnection";
+import { WaveSpeedAnalytics } from "@/components/WaveSpeedAnalytics";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
   new Intl.DateTimeFormat("de-DE", {
@@ -140,6 +141,7 @@ function Business() {
         <FanvueAnalyticsConnection userId={user.id} />
         <InstagramAnalyticsConnection userId={user.id} />
         <CloserAnalyticsConnection userId={user.id} />
+        <WaveSpeedAnalytics userId={user.id} />
         {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
         {r && (
           <>
@@ -371,13 +373,14 @@ function Business() {
                   MIDNAS NÄCHSTER MOVE
                 </p>
                 <p className="mt-2">
-                  Die Datenleitungen anschließen. Weniger Screenshots zusammensuchen, mehr
-                  Überblick.
+                  Fanvue, Instagram und WaveSpeed zusammen im täglichen Bericht. Offene Lücken
+                  bleiben sichtbar.
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
                   Fanvue und Instagram werden nach der Verbindung täglich aus der API abgeglichen.
-                  Closer nach Token-Eingabe ebenfalls automatisch. Link-Zahlen sind weiterhin
-                  manuell. Tapclick fehlt.
+                  WaveSpeed liefert Guthaben und tatsächliche Abrechnungen. Beim Closer ist der
+                  Kontofilter noch in Klärung; bis zur Bestätigung bleibt sein Abruf pausiert.
+                  Link-Zahlen sind weiterhin manuell. Tapclick fehlt.
                 </p>
               </div>
             </aside>
