@@ -123,7 +123,8 @@ export async function exchangeFanvue(s: Secrets, params: Record<string, string>)
   try {
     res = await fetch("https://auth.fanvue.com/oauth2/token", {
     method: "POST",
-    redirect: "error",
+    // Workers supports manual, not error. Non-2xx responses below fail closed.
+    redirect: "manual",
     signal: AbortSignal.timeout(20000),
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -171,7 +172,7 @@ export async function fanvueGet(token: string, path: string, params: Record<stri
   const url = new URL("https://api.fanvue.com/v1" + path);
   url.search = new URLSearchParams(params).toString();
   const res = await fetch(url, {
-    redirect: "error",
+    redirect: "manual",
     signal: AbortSignal.timeout(20000),
     headers: { authorization: `Bearer ${token}`, "X-Fanvue-API-Version": "2025-06-26" },
   });

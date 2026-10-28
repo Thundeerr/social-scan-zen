@@ -69,6 +69,7 @@ describe("Fanvue analytics boundaries", () => {
     );
     expect(result.refreshToken).toBe("r");
     expect(f.mock.calls[0][1].headers.authorization).toMatch(/^Basic /);
+    expect(f.mock.calls[0][1].redirect).toBe("manual");
     expect(f.mock.calls[0][1].body.has("client_secret")).toBe(false);
     f.mockResolvedValue(
       Response.json({
@@ -97,5 +98,13 @@ describe("Fanvue analytics boundaries", () => {
     await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("Netzwerkverbindung");
     f.mockRejectedValue(new DOMException("SECRET", "TimeoutError"));
     await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("Zeitlimit");
+  });
+  it("rejects redirects on token and analytics requests without forwarding credentials", async () => {
+    const f = vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location: "https://untrusted.example" } }));
+    vi.stubGlobal("fetch", f);
+    await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("HTTP 302");
+    await expect(fanvueGet("token", "/users/me")).rejects.toThrow("HTTP 302");
+    expect(f).toHaveBeenCalledTimes(2);
+    for (const call of f.mock.calls) expect(call[1].redirect).toBe("manual");
   });
 });
