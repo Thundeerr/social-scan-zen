@@ -51,9 +51,20 @@ export async function fanvueStatus(user: string) {
 }
 export async function configureFanvue(user: string, clientSecret: string) {
   owner(user);
-  if (await metadata(user))
-    throw new Error("Zugang ist bereits gespeichert. Er wird nicht überschrieben.");
-  await save(user, { clientSecret });
+  const current = await metadata(user);
+  if (!current) {
+    await save(user, { clientSecret });
+  } else {
+    const id = await lease(user);
+    try {
+      if ((await metadata(user))?.connected)
+        throw new Error("Bitte die bestehende Fanvue-Verbindung zuerst trennen.");
+      await save(user, { clientSecret }, id);
+      await update(user, id, { last_error: null, needs_reconnect: false, refresh_pending: false });
+    } finally {
+      await release(user, id);
+    }
+  }
   return fanvueStatus(user);
 }
 export async function beginFanvue(user: string) {

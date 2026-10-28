@@ -48,10 +48,10 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
           {q.error?.message ?? mutation.error?.message ?? s?.error}
         </p>
       )}
-      {s && !s.configured && (
+      {s && (!s.configured || (!s.connected && s.error?.includes("invalid_client"))) && (
         <div className="space-y-3">
           <p className="text-sm">
-            Einmalig den Client Secret deiner App hier einfügen. Er wird verschlüsselt auf dem
+            Den aktuellen Client Secret deiner App hier einfügen. Er wird verschlüsselt auf dem
             Server gespeichert und danach nicht mehr angezeigt.
           </p>
           <label className="block text-sm" htmlFor="fanvue-secret">
@@ -72,7 +72,7 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
             disabled={mutation.isPending || secret.trim().length < 16}
             onClick={() => mutation.mutate("configure")}
           >
-            Zugang sicher speichern
+            {s.configured ? "Secret sicher ersetzen" : "Zugang sicher speichern"}
           </Button>
           <details className="text-sm text-slate-400">
             <summary>Einrichtung in Fanvue</summary>

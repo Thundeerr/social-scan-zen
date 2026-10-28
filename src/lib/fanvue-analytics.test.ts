@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { berlinMidnight, summarizeEarnings, type Earning } from "./fanvue-analytics";
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
-import { earningsPages, exchangeFanvue, fanvueGet, fanvueStatus } from "./fanvue-analytics.server";
+import { earningsPages, exchangeFanvue, fanvueGet, fanvueStatus, configureFanvue, FANVUE_OWNER } from "./fanvue-analytics.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 afterEach(() => vi.unstubAllGlobals());
 describe("Fanvue analytics boundaries", () => {
   it("uses Berlin midnight across the DST change", () => {
@@ -106,5 +107,21 @@ describe("Fanvue analytics boundaries", () => {
     await expect(fanvueGet("token", "/users/me")).rejects.toThrow("HTTP 302");
     expect(f).toHaveBeenCalledTimes(2);
     for (const call of f.mock.calls) expect(call[1].redirect).toBe("manual");
+  });
+  it("replaces a disconnected secret under a lease, but preserves a connected account", async () => {
+    const query: Record<string, any> = {};
+    for (const method of ["select", "eq", "lt", "update"]) query[method] = vi.fn(() => query);
+    query.maybeSingle = vi.fn().mockResolvedValue({ data: { connected: false, user_id: FANVUE_OWNER }, error: null });
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+    Object.assign(supabaseAdmin, { from: vi.fn(() => query), rpc });
+    await configureFanvue(FANVUE_OWNER, "replacement-secret");
+    expect(rpc).toHaveBeenCalledWith("fanvue_secret_put", {
+      p_user: FANVUE_OWNER, p_value: { clientSecret: "replacement-secret" }, p_lease: expect.any(String),
+    });
+    rpc.mockClear();
+    query.maybeSingle.mockResolvedValue({ data: { connected: true, user_id: FANVUE_OWNER }, error: null });
+    await expect(configureFanvue(FANVUE_OWNER, "other-secret")).rejects.toThrow("zuerst trennen");
+    await expect(configureFanvue("other-owner", "other-secret")).rejects.toThrow("Betreiber");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
