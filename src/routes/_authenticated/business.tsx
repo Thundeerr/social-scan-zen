@@ -5,6 +5,7 @@ import { businessReportFn } from "@/lib/business-report.functions";
 import { berlinTime, usd } from "@/lib/business-report";
 import { Button } from "@/components/ui/button";
 import { FanvueAnalyticsConnection } from "@/components/FanvueAnalyticsConnection";
+import { InstagramAnalyticsConnection } from "@/components/InstagramAnalyticsConnection";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
   new Intl.DateTimeFormat("de-DE", {
@@ -58,7 +59,9 @@ function Business() {
     fanvue =
       r?.snapshots.find((s) => s.source === "Fanvue API") ??
       r?.snapshots.find((s) => s.source === "Fanvue"),
-    instagram = r?.snapshots.find((s) => s.source === "Instagram");
+    instagram =
+      r?.snapshots.find((s) => s.source === "Instagram API") ??
+      r?.snapshots.find((s) => s.source === "Instagram");
   const shared = r ? r.costs.sharedFixed + r.costs.sharedTopups : 0,
     progress = r ? Math.min(100, Math.round((r.costs.cashPlan / r.budget) * 100)) : 0;
   return (
@@ -134,6 +137,7 @@ function Business() {
           </p>
         )}
         <FanvueAnalyticsConnection userId={user.id} />
+        <InstagramAnalyticsConnection userId={user.id} />
         {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
         {r && (
           <>
@@ -316,7 +320,10 @@ function Business() {
                   label="Instagram-Follower"
                   value={number(instagram?.values["Follower gesamt"])}
                   detail={
-                    instagram ? "Abgelesen am " + date(instagram.observed_at) : "Daten fehlen"
+                    instagram
+                      ? (instagram.source === "Instagram API" ? "API-Abruf am " : "Abgelesen am ") +
+                        date(instagram.observed_at)
+                      : "Daten fehlen"
                   }
                 />
               </div>
@@ -333,7 +340,7 @@ function Business() {
                         {date(s.observed_at)} ·{" "}
                         {s.observed_at.slice(0, 10) < r.at.day
                           ? "älterer Stand"
-                          : s.source === "Fanvue API"
+                          : s.source.endsWith(" API")
                             ? "API-Abruf"
                             : "manuell erfasst"}
                       </span>
@@ -366,8 +373,8 @@ function Business() {
                   Überblick.
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
-                  Fanvue wird nach der Verbindung täglich aus der API abgeglichen. Closer und
-                  Link-Zahlen sind weiterhin manuell. Tapclick fehlt.
+                  Fanvue und Instagram werden nach der Verbindung täglich aus der API abgeglichen.
+                  Closer und Link-Zahlen sind weiterhin manuell. Tapclick fehlt.
                 </p>
               </div>
             </aside>

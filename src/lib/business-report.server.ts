@@ -52,7 +52,9 @@ export async function businessReport(user: string, now = new Date()) {
   const forecast = forecastCash(costs.fixed, costs.topups, local.day);
   const fv =
     latest.find((s) => s.source === "Fanvue API") ?? latest.find((s) => s.source === "Fanvue");
-  const ig = latest.find((s) => s.source === "Instagram");
+  const ig =
+    latest.find((s) => s.source === "Instagram API") ??
+    latest.find((s) => s.source === "Instagram");
   const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
     snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
   const text = [
@@ -81,7 +83,7 @@ export async function businessReport(user: string, now = new Date()) {
     ig
       ? `Instagram: ${value(ig, "Follower gesamt")} Follower · Stand ${berlinTime(new Date(ig.observed_at)).day}.`
       : "Instagram: Daten fehlen.",
-    "Fanvue nach Verbindung täglich per API. IG weiterhin manuell; Zeitstempel beachten.",
+    "Fanvue und Instagram nach Verbindung täglich per API; Zeitstempel beachten.",
     "Closer-Conversions sind keine bestätigten bezahlten Subs. Tapclick fehlt.",
     "Kosten pro neuem Follower / zahlendem Sub: noch unbekannt.",
     "",
@@ -159,6 +161,12 @@ export async function businessTick(request: Request) {
         await syncFanvue(owner());
       } catch {
         /* Last good values retain their timestamp; UI shows sync error. */
+      }
+      const { syncInstagramAnalytics } = await import("./instagram-analytics.server");
+      try {
+        await syncInstagramAnalytics(owner());
+      } catch {
+        /* Analytics failure never blocks the report or publishing. */
       }
     }
     const report = await businessReport(owner());

@@ -8,10 +8,19 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildAuthorizeUrl, instagramOAuthCallbackUrl } from "./instagram-oauth";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { IG_INSIGHTS_SCOPE } from "./instagram-analytics";
+import { IG_SCOPES } from "./instagram-oauth";
 
 export const startInstagramOAuthFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(z.object({ destination: z.enum(["followerstar", "kiikii", "tuuva"]) }).optional())
+  .inputValidator(
+    z
+      .object({
+        destination: z.enum(["followerstar", "kiikii", "tuuva"]),
+        insights: z.boolean().optional(),
+      })
+      .optional(),
+  )
   .handler(async ({ context, data }) => {
     const { instagramAppCredentials, createOAuthState } = await import("./instagram-oauth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -33,7 +42,15 @@ export const startInstagramOAuthFn = createServerFn({ method: "POST" })
       data?.destination ?? "followerstar",
     );
 
-    return { authorizeUrl: buildAuthorizeUrl({ clientId, redirectUri, state }) };
+    // Analytics is optional; existing publishing connections keep their scopes.
+    return {
+      authorizeUrl: buildAuthorizeUrl({
+        clientId,
+        redirectUri,
+        state,
+        scopes: data?.insights ? [...IG_SCOPES, IG_INSIGHTS_SCOPE] : IG_SCOPES,
+      }),
+    };
   });
 
 export const disconnectInstagramFn = createServerFn({ method: "POST" })
