@@ -116,8 +116,12 @@ async function update(user: string, id: string, fields: Record<string, unknown>)
 async function release(user: string, id: string) {
   await update(user, id, { lease_until: new Date(0).toISOString(), lease_id: null });
 }
+class FanvueTokenError extends Error {}
+
 export async function exchangeFanvue(s: Secrets, params: Record<string, string>): Promise<Secrets> {
-  const res = await fetch("https://auth.fanvue.com/oauth2/token", {
+  let res: Response;
+  try {
+    res = await fetch("https://auth.fanvue.com/oauth2/token", {
     method: "POST",
     redirect: "error",
     signal: AbortSignal.timeout(20000),
@@ -126,12 +130,22 @@ export async function exchangeFanvue(s: Secrets, params: Record<string, string>)
       authorization: `Basic ${Buffer.from(`${FANVUE_CLIENT_ID}:${s.clientSecret}`).toString("base64")}`,
     },
     body: new URLSearchParams(params),
-  });
+    });
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "";
+    throw new FanvueTokenError(
+      name === "TimeoutError" || name === "AbortError"
+        ? "Fanvue-Tokenaustausch: Zeitlimit beim Verbindungsaufbau."
+        : "Fanvue-Tokenaustausch: Netzwerkverbindung zum Anbieter fehlgeschlagen.",
+    );
+  }
   if (!res.ok) {
     const failure = await res.json().catch(() => ({}));
     if (failure.error === 'invalid_client') throw new Error('Fanvue lehnt die App-Zugangsdaten ab (invalid_client). Client Secret prüfen.');
     if (failure.error === 'invalid_grant') throw new Error('Fanvue hat den Anmeldecode abgelehnt (invalid_grant). Bitte neu verbinden.');
-    throw new Error(`Fanvue-Tokenaustausch fehlgeschlagen (HTTP ${res.status}).`);
+    const allowedCodes = ["invalid_request", "unauthorized_client", "unsupported_grant_type", "invalid_scope", "server_error", "temporarily_unavailable"];
+    const code = allowedCodes.includes(failure.error) ? `, ${failure.error}` : "";
+    throw new FanvueTokenError(`Fanvue-Tokenaustausch fehlgeschlagen (HTTP ${res.status}${code}).`);
   }
   const t = await res.json();
   const scopes = typeof t.scope === "string" ? t.scope.split(" ") : [];
@@ -232,7 +246,7 @@ export async function completeFanvue(state: string, browser: string, code: strin
       'Fanvue hat die benötigten Leserechte oder Tokens nicht geliefert.',
       'Bitte den Fanvue-Creator @kiikiixoxo verbinden. Es wurden keine fremden Zahlen übernommen.',
     ];
-    const message = error instanceof Error && safeMessages.includes(error.message)
+    const message = error instanceof FanvueTokenError || (error instanceof Error && safeMessages.includes(error.message))
       ? error.message : `${stage} fehlgeschlagen. Bitte Verbindung prüfen.`;
     await update(row.user_id,id,{last_error:message});
     throw new Error(message);

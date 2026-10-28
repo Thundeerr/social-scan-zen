@@ -87,4 +87,15 @@ describe("Fanvue analytics boundaries", () => {
     await expect(fanvueStatus("other")).rejects.toThrow();
     expect(f).not.toHaveBeenCalled();
   });
+  it("reports safe token failure categories without leaking provider content", async () => {
+    const f = vi.fn().mockResolvedValue(Response.json({ error: "invalid_request", error_description: "SECRET" }, { status: 400 }));
+    vi.stubGlobal("fetch", f);
+    await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("HTTP 400, invalid_request");
+    f.mockResolvedValue(Response.json({ error: "SECRET" }, { status: 403 }));
+    await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("(HTTP 403).");
+    f.mockRejectedValue(new TypeError("SECRET"));
+    await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("Netzwerkverbindung");
+    f.mockRejectedValue(new DOMException("SECRET", "TimeoutError"));
+    await expect(exchangeFanvue({ clientSecret: "secret" }, {})).rejects.toThrow("Zeitlimit");
+  });
 });
