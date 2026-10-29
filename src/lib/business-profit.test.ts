@@ -68,3 +68,17 @@ it("withholds totals when periods differ or required inputs are missing", () => 
     ),
   ).toBeNull();
 });
+
+it("cancellations reduce future costs without refunding historical payments", () => {
+  const current = { ...snapshot("CupidBot laufende Abos (Portal)", {
+    "Aktive Abos": 2, "Monatsmittel USD": 16 + 8 * 52 / 12,
+  }), period_start: "2026-10-29", period_end: "2026-10-29" };
+  const before = profitEstimate(snapshots, plan, wave)!;
+  const after = profitEstimate([current, ...snapshots], plan, wave)!;
+  expect(after.subscriptionCount).toBe(2);
+  expect(after.monthlySubscriptionsUsd).toBeCloseTo(50.6666667);
+  expect(after.monthly).toBeCloseTo(512.91, 2);
+  expect(after.surplus).toBe(before.surplus);
+  expect(after.paid).toBe(93.42);
+  expect(after.costs).toBe(before.costs);
+});

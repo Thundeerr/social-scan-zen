@@ -37,7 +37,7 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-cyan-300/20 p-4">
           <h3 className="font-semibold">Closer: {p.charged} berechnete Gespräche</h3>
-          <p>{p.remaining ?? "unbekannt"} von 500 Abo-Gesprächen übrig · Link: 100/100</p>
+          <p>{p.remaining ?? "unbekannt"} Gesprächscredits übrig (Stand {p.end})</p>
           <p className="mt-2 text-sm text-slate-400">
             Tatsächlich bezahlt: 72 $ Instagram + 32 $ Link = 104 $. Der rechnerische Gesprächswert
             von {p.usageUsd.toFixed(2)} $ ist keine Aborechnung und wird nicht zusätzlich berechnet.
@@ -46,22 +46,22 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
         <div className="rounded-xl border border-fuchsia-300/20 p-4">
           <h3 className="font-semibold">Monat bei diesem Tempo: ca. {eur(p.monthly)}</h3>
           <p className="mt-2 text-sm text-slate-400">
-            Aktuelle Fixkosten + Generation auf 30 Tage + {p.monthlySubscriptionsUsd} $ monatliches
-            Abo-Mittel. Vier Abos: 24 $ monatlich und 24 $ wöchentlich (52 Wochen / 12 Monate). Kein
+            Aktuelle Fixkosten + Generation auf 30 Tage + {p.monthlySubscriptionsUsd.toFixed(2)} $ monatliches
+            Abo-Mittel. Stand {p.subscriptionDate}: {p.subscriptionCount ?? "?"} Abos,
+            {" "}{p.subscriptionMonthlyUsd ?? "?"} $ monatlich und {p.subscriptionWeeklyUsd ?? "?"} $ wöchentlich (52 Wochen / 12 Monate). Kein
             Langzeitmittel der Generation.
           </p>
         </div>
       </div>
       <details className="text-sm text-slate-300">
-        <summary className="cursor-pointer py-2">Rechnung & vier laufende Abos</summary>
+        <summary className="cursor-pointer py-2">Rechnung & laufende Abos</summary>
         <p>
           Aktuelle monatliche Fixkosten: {eur(p.fixed)} · Kiikii-Generation: {eur(p.generation)} ·
           Bezahlte CupidBot-Abos: {eur(p.paid)}.
         </p>
         <p className="mt-2">
-          Link: 8 $ / Woche. Instagram: 8 $ / Monat + 16 $ / Monat + 16 $ / Woche. Diese Abos kosten
-          auch bei ungenutzten Gesprächen. Die letzte Wochenrechnung reicht bis 3. November; hier
-          vollständig als bezahlte Ausgabe berücksichtigt. Keine Abos gekündigt.
+          {p.subscriptionNote} Bereits bezahlte Rechnungen bleiben als Ausgaben berücksichtigt.
+          Kündigungen reduzieren die künftigen laufenden Kosten, nicht rückwirkend die bisherigen Ausgaben.
         </p>
         <p className="mt-2">
           Fixkosten nach heutiger Aufteilung für einen ganzen Monat angesetzt; keine historische

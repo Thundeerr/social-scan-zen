@@ -36,7 +36,8 @@ export function profitEstimate(
     usageUsd = charged * price,
     revenue = revenueUsd / rate;
   const days = Number(fv.period_end.slice(-2));
-  const monthlySubscriptionsUsd = subscriptions.values["Monatsmittel USD"];
+  const currentSubscriptions = find("CupidBot laufende Abos (Portal)") ?? subscriptions;
+  const monthlySubscriptionsUsd = currentSubscriptions.values["Monatsmittel USD"];
   if (
     !Number.isFinite(monthlySubscriptionsUsd) ||
     monthlySubscriptionsUsd < 0 ||
@@ -56,6 +57,11 @@ export function profitEstimate(
     paid,
     revenue,
     monthlySubscriptionsUsd,
+    subscriptionCount: currentSubscriptions.values["Aktive Abos"],
+    subscriptionMonthlyUsd: currentSubscriptions.values["Monatliche Tarife USD"],
+    subscriptionWeeklyUsd: currentSubscriptions.values["Wöchentliche Tarife USD"],
+    subscriptionDate: currentSubscriptions.period_end,
+    subscriptionNote: currentSubscriptions.note,
     costs: fixed + generation + paid,
     surplus: revenue - fixed - generation - paid,
     cautiousCosts: fixed + generation + paid,
