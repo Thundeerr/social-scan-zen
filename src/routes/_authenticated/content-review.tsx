@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { ArrowDown, Check, Clapperboard, Play, Send, Settings2 } from "lucide-react";
 import { contentReviewFn } from "@/lib/content-review.functions";
 import { models, MAX_REVIEW_BYTES, type ReviewItem, type ReviewAction } from "@/lib/content-review";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,17 +20,24 @@ export const Route = createFileRoute("/_authenticated/content-review")({
   component: ContentReview,
 });
 const labels = {
-  uploading: "Upload offen",
-  pending: "Braucht Freigabe",
-  approved: "Freigegeben",
-  rejected: "Abgelehnt",
-  changes: "Änderungen gewünscht",
+  uploading: "Upload pending",
+  pending: "Needs approval",
+  approved: "Approved",
+  rejected: "Rejected",
+  changes: "Changes requested",
 };
 const notifyLabels = {
-  none: "Noch nicht gesendet",
-  sending: "Versand gestartet – Bot prüfen",
-  sent: "Im Review-Bot",
-  uncertain: "Versand unklar – Bot prüfen",
+  none: "Not sent yet",
+  sending: "Sending started — check the bot",
+  sent: "In the review bot",
+  uncertain: "Delivery unclear — check the bot",
+};
+const statusStyles: Record<ReviewItem["status"], string> = {
+  uploading: "border-border bg-muted text-muted-foreground",
+  pending: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+  approved: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+  rejected: "border-rose-400/25 bg-rose-400/10 text-rose-200",
+  changes: "border-primary/30 bg-primary/10 text-primary",
 };
 
 function ContentReview() {
@@ -58,7 +66,7 @@ function ContentReview() {
       await cache.invalidateQueries({ queryKey: key });
       return result;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Aktion fehlgeschlagen.");
+      setMessage(error instanceof Error ? error.message : "Action failed.");
       return null;
     } finally {
       await cache.invalidateQueries({ queryKey: key });
@@ -67,11 +75,11 @@ function ContentReview() {
   }
   async function upload() {
     if (!file || file.size > MAX_REVIEW_BYTES || !file.name.toLowerCase().endsWith(".mp4")) {
-      setMessage("Bitte ein MP4-Video bis 40 MB auswählen.");
+      setMessage("Choose an MP4 video up to 40 MB.");
       return;
     }
     setBusy(true);
-    setMessage("Video wird hochgeladen und geprüft …");
+    setMessage("Uploading and checking your video …");
     try {
       const created = await contentReviewFn({ data: { action: "create", model, title, caption } });
       const item = created.item!;
@@ -84,15 +92,15 @@ function ContentReview() {
           contentType: "video/mp4",
           upsert: false,
         });
-      if (error) throw new Error("Upload fehlgeschlagen. Der offene Eintrag bleibt sichtbar.");
+      if (error) throw new Error("Upload failed. The pending item remains visible.");
       await contentReviewFn({ data: { action: "finalize", id: item.id, revision: item.revision } });
       setTitle("");
       setCaption("");
       setFile(null);
       if (fileInput.current) fileInput.current.value = "";
-      setMessage("Video gespeichert. Jetzt Vorschau und Caption prüfen.");
+      setMessage("Video saved. Check the preview and caption next.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Upload fehlgeschlagen.");
+      setMessage(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       await cache.invalidateQueries({ queryKey: key });
       setBusy(false);
@@ -101,89 +109,96 @@ function ContentReview() {
   const items = (query.data?.items ?? []).filter((i) => filter === "all" || i.model === filter);
   const sorted = [...items].sort((a, b) => Number(b.id === focus) - Number(a.id === focus));
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Content Review</h1>
-        <p className="mt-2 text-muted-foreground">
-          Kiikii & Tuuva · Video und Caption gemeinsam freigeben. Veröffentlichen bleibt ein eigener
-          Schritt.
-        </p>
-      </header>
-      <div className="rounded-xl border bg-card p-4 text-sm">
-        {query.data?.telegramReady
-          ? "Review-Bot verbunden. Karten werden nur an deinen privaten Chat gesendet."
-          : "Freigaben in InstaScanner. Die Verbindung zum gemeinsamen Review-Bot ist noch nicht vollständig eingerichtet."}
-      </div>
-      <ChannelAlerts userId={user.id} />
-      <ModelPipeline />
-      <details className="rounded-xl border bg-card p-4">
-        <summary className="cursor-pointer font-medium">Reel zur Freigabe hinzufügen</summary>
-        <div className="mt-4 grid gap-3">
-          <label>
-            Model
-            <select
-              aria-label="Model für neues Reel"
-              value={model}
-              onChange={(e) => setModel(e.target.value as keyof typeof models)}
-              className="ml-3 rounded border bg-background p-2"
-            >
-              {Object.entries(models).map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Input
-            aria-label="Reel-Titel"
-            placeholder="Titel"
-            value={title}
-            maxLength={160}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <Textarea
-            aria-label="Neue Caption"
-            placeholder="Caption inklusive Hashtags"
-            maxLength={2200}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-          />
-          <Input
-            ref={fileInput}
-            aria-label="MP4-Video"
-            type="file"
-            accept="video/mp4,.mp4"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <Button disabled={busy || !file || !title.trim()} onClick={() => void upload()}>
-            Hochladen
-          </Button>
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
+      <header className="flex flex-wrap items-start justify-between gap-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Your content
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Review reels</h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Watch the video, check the caption, then approve. Publishing is a separate step.
+          </p>
         </div>
-      </details>
+        <a
+          href="#review-settings"
+          className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Settings2 className="h-4 w-4" />
+          Connections & pipeline
+          <ArrowDown className="h-4 w-4 text-muted-foreground" />
+        </a>
+      </header>
       {message && (
-        <p role="status" className="rounded border p-3 text-sm">
+        <p
+          role="status"
+          className="sticky top-20 z-20 rounded-xl border border-primary/30 bg-card p-4 text-sm shadow-lg"
+        >
           {message}
         </p>
       )}
       {query.error && (
-        <p role="alert">
-          Freigaben konnten nicht geladen werden. Bitte erneut anmelden oder später versuchen.
+        <p
+          role="alert"
+          className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
+        >
+          Could not load reviews. Sign in again or try later.
         </p>
       )}
-      <div className="flex gap-2">
-        {[["all", "Alle Models"], ...Object.entries(models)].map(([id, name]) => (
-          <Button
-            key={id}
-            variant={filter === id ? "default" : "outline"}
-            onClick={() => setFilter(id)}
-          >
-            {name}
-          </Button>
-        ))}
-      </div>
-      {query.isPending && <p>Lade Freigaben …</p>}
+      <section
+        className="rounded-2xl border border-border bg-card p-4 md:p-5"
+        aria-label="Filter reels"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2">
+            {[["all", "All"], ...Object.entries(models)].map(([id, name]) => (
+              <Button
+                key={id}
+                className="min-h-12 min-w-24 rounded-xl text-sm"
+                aria-pressed={filter === id}
+                variant={filter === id ? "default" : "outline"}
+                onClick={() => setFilter(id)}
+              >
+                {name}
+              </Button>
+            ))}
+          </div>
+          {query.isSuccess && (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {items.filter((item) => item.status === "pending").length}
+              </span>{" "}
+              awaiting approval
+              <span className="mx-2 text-border">/</span>
+              {items.length} loaded
+            </p>
+          )}
+        </div>
+        {query.isSuccess && (
+          <p className="mt-4 flex items-start gap-2 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+            <Send className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {query.data?.telegramReady
+              ? "Telegram connected. You can also send reels to your private review chat."
+              : "You can approve here. The Telegram review bot connection is not fully set up yet."}
+          </p>
+        )}
+      </section>
+      {query.isPending && (
+        <p
+          role="status"
+          className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground"
+        >
+          Loading your reels …
+        </p>
+      )}
       {query.isSuccess && !items.length && (
-        <p className="text-muted-foreground">Hier erscheinen deine nächsten Reels zur Freigabe.</p>
+        <div className="rounded-2xl border border-dashed p-10 text-center">
+          <Clapperboard className="mx-auto mb-3 h-8 w-8 text-primary" />
+          <p className="font-medium">No reels here yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your completed videos will appear here for review.
+          </p>
+        </div>
       )}
       {sorted.map((item) => (
         <ReviewCard
@@ -196,8 +211,76 @@ function ContentReview() {
         />
       ))}
       <p className="text-xs text-muted-foreground">
-        Letzte 100 Einträge. FanWake-Nachrichten bleiben im bestehenden Bot-Chat.
+        Latest 100 items. FanWake messages stay in the existing bot chat.
       </p>
+      <section
+        id="review-settings"
+        className="scroll-mt-24 space-y-4 border-t border-border pt-8"
+        aria-labelledby="review-settings-title"
+      >
+        <div>
+          <h2 id="review-settings-title" className="text-lg font-semibold">
+            Connections & pipeline
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage Instagram, Telegram and video processing.
+          </p>
+        </div>
+        <ChannelAlerts userId={user.id} />
+        <ModelPipeline />
+        <details className="rounded-xl border bg-card p-4">
+          <summary className="min-h-8 cursor-pointer font-medium">
+            Upload your own video for review
+          </summary>
+          <div className="mt-4 grid gap-3">
+            <label className="grid gap-2 text-sm font-medium">
+              Character
+              <select
+                aria-label="Model for new reel"
+                value={model}
+                onChange={(e) => setModel(e.target.value as keyof typeof models)}
+                className="min-h-12 rounded-lg border bg-background p-3"
+              >
+                {Object.entries(models).map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Input
+              className="min-h-12"
+              aria-label="Reel title"
+              placeholder="Title"
+              value={title}
+              maxLength={160}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <Textarea
+              aria-label="New caption"
+              placeholder="Caption including hashtags"
+              maxLength={2200}
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+            />
+            <Input
+              className="min-h-12"
+              ref={fileInput}
+              aria-label="MP4 video"
+              type="file"
+              accept="video/mp4,.mp4"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              className="min-h-12"
+              disabled={busy || !file || !title.trim()}
+              onClick={() => void upload()}
+            >
+              Upload video
+            </Button>
+          </div>
+        </details>
+      </section>
     </div>
   );
 }
@@ -222,124 +305,154 @@ function ReviewCard({
   const base = { id: item.id, revision: item.revision };
   return (
     <article
-      className={`rounded-xl border bg-card p-4 space-y-4 ${focused ? "border-primary" : ""}`}
+      className={`overflow-hidden rounded-2xl border bg-card p-4 space-y-5 md:p-6 ${focused ? "border-primary ring-2 ring-primary/20" : "border-border"}`}
     >
-      <div className="flex flex-wrap justify-between gap-2">
-        <div>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">
             {models[item.model]} · Version {item.revision}
           </p>
-          <h2 className="font-semibold">{item.title}</h2>
+          <h2 className="mt-1 break-words text-lg font-semibold">{item.title}</h2>
         </div>
-        <span className="text-sm">{labels[item.status]}</span>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusStyles[item.status]}`}
+        >
+          {item.status === "approved" && <Check className="h-3.5 w-3.5" />}
+          {labels[item.status]}
+        </span>
       </div>
-      {url && (
-        <video
-          className="mx-auto max-h-[60vh] max-w-full rounded-lg"
-          controls
-          playsInline
-          preload="metadata"
-          src={url}
-        />
-      )}
-      {item.status !== "uploading" && (
-        <CopyVideoButton reference={reviewVideoReference(item.id, item.revision)} />
-      )}
-      {item.status === "uploading" ? (
-        <Button
-          disabled={busy}
-          variant="outline"
-          onClick={() => void run({ action: "finalize", ...base })}
-        >
-          Bereits hochgeladenes Video prüfen
-        </Button>
-      ) : (
-        <Button
-          disabled={busy}
-          variant="outline"
-          onClick={async () => {
-            const result = await run({ action: "preview", ...base });
-            if (result?.url) setUrl(result.url);
-          }}
-        >
-          Vorschau laden / erneuern
-        </Button>
-      )}
-      <label className="block text-sm">
-        Caption & Hashtags
-        <Textarea
-          className="mt-2"
-          value={caption}
-          maxLength={2200}
-          disabled={!!item.publish_post_id}
-          onChange={(e) => setCaption(e.target.value)}
-        />
-      </label>
-      {dirty && (
-        <Button
-          disabled={busy || item.status === "uploading"}
-          onClick={() => void run({ action: "edit", ...base, caption })}
-        >
-          Caption speichern · neue Freigabe nötig
-        </Button>
-      )}
-      {item.status === "pending" && (
-        <>
-          <Textarea
-            aria-label="Änderungswunsch"
-            placeholder="Änderungswunsch / Notiz"
-            maxLength={2000}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-          <div className="flex flex-wrap gap-2">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="min-w-0 space-y-3">
+          {url && (
+            <video
+              className="mx-auto max-h-[65vh] w-full rounded-xl bg-black object-contain"
+              controls
+              playsInline
+              preload="metadata"
+              src={url}
+            />
+          )}
+          {item.status === "uploading" ? (
             <Button
-              disabled={busy || dirty || !caption.trim()}
-              onClick={() => void run({ action: "decide", ...base, decision: "approved", note })}
-            >
-              Freigeben
-            </Button>
-            <Button
+              className="min-h-14 w-full whitespace-normal rounded-xl px-4"
+              disabled={busy}
               variant="outline"
-              disabled={busy || dirty || !note.trim()}
-              onClick={() => void run({ action: "decide", ...base, decision: "changes", note })}
+              onClick={() => void run({ action: "finalize", ...base })}
             >
-              Änderung wünschen
+              Check uploaded video
             </Button>
+          ) : (
             <Button
+              className="min-h-14 w-full whitespace-normal rounded-xl border-primary/30 bg-primary/5 px-4 text-primary hover:bg-primary/10"
+              disabled={busy}
               variant="outline"
-              disabled={busy || dirty}
-              onClick={() => void run({ action: "decide", ...base, decision: "rejected", note })}
+              onClick={async () => {
+                const result = await run({ action: "preview", ...base });
+                if (result?.url) setUrl(result.url);
+              }}
             >
-              Ablehnen
+              <Play className="h-4 w-4" />
+              {url ? "Refresh preview" : "Watch video"}
             </Button>
+          )}
+          {item.status !== "uploading" && (
+            <CopyVideoButton reference={reviewVideoReference(item.id, item.revision)} />
+          )}
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {notifyLabels[item.notification]} ·{" "}
+            {item.bytes ? (item.bytes / 1048576).toFixed(1) + " MB" : "Upload pending"}
+          </p>
+        </div>
+        <div className="min-w-0 space-y-4">
+          <label className="block text-sm font-medium">
+            Caption & Hashtags
+            <Textarea
+              className="mt-2 min-h-28 rounded-xl bg-background/60 text-sm font-normal leading-relaxed"
+              value={caption}
+              maxLength={2200}
+              disabled={!!item.publish_post_id}
+              onChange={(e) => setCaption(e.target.value)}
+            />
+          </label>
+          {dirty && (
             <Button
-              variant="outline"
-              disabled={busy || dirty || !telegramReady || item.notification !== "none"}
-              onClick={() => void run({ action: "notify", ...base })}
+              className="min-h-12 w-full whitespace-normal rounded-xl"
+              disabled={busy || item.status === "uploading"}
+              onClick={() => void run({ action: "edit", ...base, caption })}
             >
-              An Review-Bot senden
+              Save caption · approval required again
             </Button>
-          </div>
-        </>
-      )}
-      {item.note && <p className="whitespace-pre-wrap text-sm">{item.note}</p>}
-      {item.telegram_message_id && (
-        <Button
-          variant="outline"
-          disabled={busy || !telegramReady}
-          onClick={() => void run({ action: "refresh_card", ...base })}
-        >
-          Telegram-Buttons aktualisieren
-        </Button>
-      )}
-      {(item.status === "approved" || item.publish_post_id) && (
-        <ModelPublish item={item} dirty={dirty} />
-      )}
-      <p className="text-xs text-muted-foreground">
-        {notifyLabels[item.notification]} ·{" "}
-        {item.bytes ? (item.bytes / 1048576).toFixed(1) + " MB" : "Upload ausstehend"}
-      </p>
+          )}
+          {item.status === "pending" && (
+            <>
+              <Textarea
+                className="min-h-20 rounded-xl bg-background/60"
+                aria-label="Requested change"
+                placeholder="Requested change / note"
+                maxLength={2000}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  className="min-h-12 whitespace-normal rounded-xl px-3"
+                  disabled={busy || dirty || !caption.trim()}
+                  onClick={() =>
+                    void run({ action: "decide", ...base, decision: "approved", note })
+                  }
+                >
+                  <Check className="h-4 w-4" />
+                  Approve
+                </Button>
+                <Button
+                  className="min-h-12 whitespace-normal rounded-xl px-3"
+                  variant="outline"
+                  disabled={busy || dirty || !note.trim()}
+                  onClick={() => void run({ action: "decide", ...base, decision: "changes", note })}
+                >
+                  Request changes
+                </Button>
+                <Button
+                  className="min-h-12 whitespace-normal rounded-xl px-3"
+                  variant="outline"
+                  disabled={busy || dirty}
+                  onClick={() =>
+                    void run({ action: "decide", ...base, decision: "rejected", note })
+                  }
+                >
+                  Reject
+                </Button>
+                <Button
+                  className="min-h-12 whitespace-normal rounded-xl px-3"
+                  variant="outline"
+                  disabled={busy || dirty || !telegramReady || item.notification !== "none"}
+                  onClick={() => void run({ action: "notify", ...base })}
+                >
+                  Send to review bot
+                </Button>
+              </div>
+            </>
+          )}
+          {item.note && (
+            <p className="whitespace-pre-wrap rounded-xl bg-muted/50 p-3 text-sm leading-relaxed">
+              {item.note}
+            </p>
+          )}
+          {item.telegram_message_id && (
+            <Button
+              className="min-h-12 w-full whitespace-normal rounded-xl"
+              variant="outline"
+              disabled={busy || !telegramReady}
+              onClick={() => void run({ action: "refresh_card", ...base })}
+            >
+              Refresh Telegram buttons
+            </Button>
+          )}
+          {(item.status === "approved" || item.publish_post_id) && (
+            <ModelPublish item={item} dirty={dirty} />
+          )}
+        </div>
+      </div>
     </article>
   );
 }

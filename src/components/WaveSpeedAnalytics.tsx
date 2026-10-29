@@ -24,9 +24,9 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
   const projection = r ? generationRunRate(r) : null;
   return (
     <section className="rounded-2xl border border-cyan-400/30 bg-[#101321] p-5 space-y-4">
-      <h2 className="text-xl font-semibold text-cyan-200">⚡ WaveSpeed · echte Kosten</h2>
+      <h2 className="text-xl font-semibold text-cyan-200">⚡ WaveSpeed · actual costs</h2>
       <p className="text-sm text-slate-300">
-        Automatisch vor dem 20-Uhr-Bericht. Keine Generierung durch diesen Abruf.
+        Synced automatically before the 20:00 report. This sync does not generate content.
       </p>
       {(q.error || m.error || s?.error) && (
         <p role="alert" className="text-amber-200">
@@ -37,10 +37,10 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {[
-              ["Guthaben · ganzes Konto", r.balance],
-              ["Kiikii · zugeordnet", r.kiikii],
-              ["Tuuva · zugeordnet", r.tuuva],
-              ["Noch unzugeordnet", r.unassigned],
+              ["Balance · whole account", r.balance],
+              ["Kiikii · allocated", r.kiikii],
+              ["Tuuva · allocated", r.tuuva],
+              ["Unallocated", r.unassigned],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-xl border border-white/10 p-4">
                 <p className="text-sm text-slate-300">{label}</p>
@@ -51,38 +51,37 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
             ))}
           </div>
           <p className="text-sm text-slate-400">
-            Monat {r.month} · {r.recordCount} Buchungen · {dollars(r.charged)} abgebucht −{" "}
-            {dollars(r.refunded)} erstattet = {dollars(r.net)} Verbrauch. Aufladungen werden nicht
-            nochmals addiert.
+            Month {r.month} · {r.recordCount} transactions · {dollars(r.charged)} charged −{" "}
+            {dollars(r.refunded)} refunded = {dollars(r.net)} usage. Top-ups are not added again.
           </p>
           <p className="text-sm text-slate-400">
-            Stand {new Date(r.observed).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })} Uhr.
+            As of {new Date(r.observed).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })}{" "}
+            Berlin time.
           </p>
           {berlinTime(new Date(r.observed)).day !== berlinTime().day && (
-            <p className="text-amber-200">Älterer Stand – noch keine aktuellen Zahlen.</p>
+            <p className="text-amber-200">Older snapshot — current figures not available yet.</p>
           )}
           {r.unknownTypes > 0 && (
             <p className="text-amber-200">
-              {r.unknownTypes} andere Buchungen sind nicht als Verbrauch eingerechnet. Zuordnung
-              prüfen.
+              {r.unknownTypes} other transactions are not included as usage. Check their allocation.
             </p>
           )}
           {projection && (
             <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/5 p-5 space-y-3">
               <h3 className="text-xl font-semibold text-fuchsia-200">
-                Content-Output · Monatsplanung
+                Content output · monthly planning
               </h3>
               <p className="text-3xl font-semibold">
                 {estimate(projection.total)}{" "}
                 <span className="text-base font-normal text-slate-300">
-                  / 30 Tage · gesamtes Konto
+                  / 30 days · whole account
                 </span>
               </p>
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
                   ["Kiikii", projection.kiikii],
                   ["Tuuva", projection.tuuva],
-                  ["Noch offen", projection.unassigned],
+                  ["Unassigned", projection.unassigned],
                 ].map(([label, value]) => (
                   <p key={String(label)}>
                     {label}
@@ -93,19 +92,18 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
                 ))}
               </div>
               <p className="text-sm text-slate-300">
-                Bisheriger Nettoverbrauch ÷ {projection.days} Kalendertage × 30. Der laufende Tag
-                ist nur teilweise erfasst. Beide Charaktere sind enthalten, ohne gleiche
-                Produktionsmenge zu unterstellen.
+                Net usage so far ÷ {projection.days} calendar days × 30. Today is only partially
+                recorded. Both characters are included without assuming equal output.
               </p>
               <p className="text-sm text-amber-100">
-                Hochrechnung aus {r.month}, noch kein Durchschnitt abgeschlossener Monate. Enthält
-                Bilder, Videos und Revisionen; kein Preis pro freigegebenem Reel. Unzugeordnete
-                Kosten bleiben im Kontogesamtwert enthalten.
+                Projection from {r.month}, not an average of completed months. Includes images,
+                videos and revisions; not a cost per approved reel. Unallocated costs remain in the
+                account total.
               </p>
             </div>
           )}
           <details className="text-sm text-slate-300">
-            <summary className="cursor-pointer py-2">Tagesverbrauch ansehen</summary>
+            <summary className="cursor-pointer py-2">View daily usage</summary>
             {Object.entries(r.daily)
               .sort(([a], [b]) => b.localeCompare(a))
               .map(([day, v]) => (
@@ -116,15 +114,15 @@ export function WaveSpeedAnalytics({ userId }: { userId: string }) {
           </details>
         </>
       ) : (
-        <p>Noch kein bestätigter WaveSpeed-Abruf.</p>
+        <p>No confirmed WaveSpeed sync yet.</p>
       )}
       <Button className="h-14 px-8" disabled={m.isPending || s?.pending} onClick={() => m.mutate()}>
-        WaveSpeed-Zahlen aktualisieren
+        Refresh WaveSpeed figures
       </Button>
       {(s?.pending || m.isSuccess) && (
         <p role="status" className="text-cyan-200">
-          Abruf angefordert. Der Statistikdienst prüft alle fünf Minuten; zwischen Abrufen liegen
-          mindestens zehn Minuten.
+          Sync requested. The analytics service checks every five minutes; syncs are at least ten
+          minutes apart.
         </p>
       )}
     </section>

@@ -11,13 +11,13 @@ export function CopyVideoButton({ reference }: { reference: string }) {
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(reference);
-            setMessage("Kopiert – bei Video erstellen einfügen.");
+            setMessage("Copied — paste it on Create video.");
           } catch {
-            setMessage("Kopieren nicht erlaubt. Bitte Browser-Berechtigung prüfen.");
+            setMessage("Copying blocked. Check your browser permissions.");
           }
         }}
       >
-        Video kopieren
+        Copy video
       </Button>
       {message && (
         <span role="status" className="text-xs text-muted-foreground">

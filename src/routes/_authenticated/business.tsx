@@ -98,15 +98,15 @@ function Business() {
                 KIIKII<span className="text-fuchsia-400">.</span>{" "}
                 <span className="font-light text-slate-300">HQ</span>
               </h1>
-              <p className="mt-3 text-slate-300">Dein Geld. Dein Überblick. Dein nächster Move.</p>
+              <p className="mt-3 text-slate-300">Your money. Your overview. Your next move.</p>
             </div>
             <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/5 px-4 py-3 font-mono text-xs text-cyan-200">
               <div className="flex items-center gap-2">
                 <Radio size={14} />
-                {r ? date(r.at.day) + " · " + r.at.time : "VERBINDUNG …"}
+                {r ? date(r.at.day) + " · " + r.at.time : "CONNECTING …"}
               </div>
               <div className="mt-2 text-slate-400">
-                BERLIN · {r?.enabled ? "REPORT 20:00" : "REPORT PAUSIERT"}
+                BERLIN · {r?.enabled ? "REPORT 20:00" : "REPORT PAUSED"}
               </div>
             </div>
           </div>
@@ -117,7 +117,7 @@ function Business() {
               disabled={query.isFetching}
             >
               <RefreshCw size={18} />
-              {query.isFetching ? "Hole den Status …" : "Zahlen aktualisieren"}
+              {query.isFetching ? "Loading status …" : "Refresh numbers"}
             </Button>
             <Button
               className="h-14 bg-fuchsia-500 text-base font-semibold text-white hover:bg-fuchsia-600"
@@ -125,7 +125,7 @@ function Business() {
               disabled={action.isPending || !r}
             >
               <Send size={18} />
-              {action.isPending ? "Ab zu Telegram …" : "Bericht an mein Telegram"}
+              {action.isPending ? "Sending to Telegram …" : "Send report to my Telegram"}
             </Button>
           </div>
         </header>
@@ -139,15 +139,15 @@ function Business() {
         )}
         {action.isSuccess && (
           <p role="status" className="text-cyan-200">
-            Signal angekommen. Dein Bericht ist in Telegram. ✓
+            Signal received. Your report is in Telegram. ✓
           </p>
         )}
         {r && <BusinessProfit value={profitEstimate(r.snapshots, r.allocation, r.wave?.report)} />}
-        <nav aria-label="Bereiche der Kostenübersicht" className="grid grid-cols-3 gap-2">
+        <nav aria-label="Cost overview sections" className="grid grid-cols-3 gap-2">
           {[
-            ["#monthly-costs", "01 / Kosten"],
+            ["#monthly-costs", "01 / Costs"],
             ["#live-heading", "02 / Content"],
-            ["#data-sources", "03 / Daten"],
+            ["#data-sources", "03 / Data"],
           ].map(([href, label]) => (
             <a
               key={href}
@@ -164,7 +164,7 @@ function Business() {
             <summary className="cursor-pointer py-2 text-lg font-semibold text-cyan-100">
               Generation & WaveSpeed{" "}
               <span className="mt-1 block text-sm font-normal text-slate-400">
-                Verbrauch, Guthaben und Zuordnung ansehen
+                View usage, balance and allocation
               </span>
             </summary>
             <div className="mt-5">
@@ -172,7 +172,7 @@ function Business() {
             </div>
           </details>
         </div>
-        {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
+        {query.isPending && <p role="status">Midna is gathering your numbers …</p>}
         {r && (
           <>
             <section
@@ -182,40 +182,40 @@ function Business() {
               <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
                 <h2 id="live-heading" className="flex items-center gap-2 text-xl font-semibold">
                   <Zap className="text-cyan-300" size={20} />
-                  Was läuft?
+                  What's happening?
                 </h2>
                 <span className="font-mono text-xs text-cyan-200">
-                  LIVE AUS INSTASCANNER · {r.at.time}
+                  LIVE FROM INSTASCANNER · {r.at.time}
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric
-                  label="Heute veröffentlicht"
+                  label="Published today"
                   value={number(r.live.published_today)}
-                  detail="Kiikii · seit 00:00 Uhr"
+                  detail="Kiikii · since midnight"
                 />
                 <Metric
-                  label="Bereit im Zeitplan"
+                  label="Scheduled and ready"
                   value={number(r.live.scheduled)}
                   detail={
                     r.live.last_scheduled
-                      ? "Letzter Termin: " +
+                      ? "Last scheduled: " +
                         date(r.live.last_scheduled) +
                         " · " +
                         berlinTime(new Date(r.live.last_scheduled)).time
-                      : "Noch kein bestätigter Vorlauf"
+                      : "No confirmed schedule yet"
                   }
                 />
                 <Metric
-                  label="Warten auf dein Okay"
+                  label="Waiting for your approval"
                   value={number(r.live.review_pending)}
-                  detail="Review offen · noch nicht freigegeben"
+                  detail="Review pending · not approved yet"
                   pink
                 />
               </div>
               <p className="mt-4 text-sm text-slate-400">
-                {r.live.jobs_today} neue Jobs heute. Hier zählen nur Posts mit einer zugeordneten
-                Kiikii-Review.
+                {r.live.jobs_today} new jobs today. Only posts linked to a Kiikii review are counted
+                here.
               </p>
             </section>
             <details
@@ -225,47 +225,46 @@ function Business() {
               <summary className="cursor-pointer py-2">
                 <h2 id="money-heading" className="flex items-center gap-2 text-xl font-semibold">
                   <Wallet className="text-fuchsia-300" size={20} />
-                  Aufladungen & Zahlungsplanung
+                  Top-ups & payment planning
                 </h2>
                 <span className="font-mono text-xs text-slate-300">
-                  MONAT {r.at.day.slice(0, 7)}
+                  MONTH {r.at.day.slice(0, 7)}
                 </span>
               </summary>
               <p className="mb-5 mt-3 text-sm text-slate-400">
-                Separate Zahlungsübersicht. Diese Beträge nicht noch einmal zu den Kosten oben
-                addieren.
+                Separate payment overview. Do not add these amounts to the costs above again.
               </p>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric
-                  label="Kiikii · nur USD-Zahlungsplanung"
+                  label="Kiikii · USD payment planning only"
                   value={usd(r.costs.cashPlan)}
                   detail={
                     usd(r.costs.fixed) +
-                    " USD-Fixanteil + " +
+                    " USD fixed share + " +
                     usd(r.costs.topups) +
-                    " aufgeladen. EUR-Fixanteil separat oben."
+                    " topped up. EUR fixed share shown separately above."
                   }
                   pink
                 />
                 <Metric
-                  label="Gemeinsame Aufladungen"
+                  label="Shared top-ups"
                   value={usd(shared)}
-                  detail="Gemeinsame USD-Aufladungen; keine Verbrauchskosten"
+                  detail="Shared USD top-ups; not usage costs"
                   pink
                 />
                 <Metric
-                  label="Dein Monatsrahmen"
+                  label="Your monthly budget"
                   value={usd(r.budget)}
-                  detail="Warnungen werden lauter. Kein Auto-Stopp."
+                  detail="Stronger warnings as you approach the limit. No automatic stop."
                 />
               </div>
               <div className="mt-5 flex justify-between gap-3 text-sm">
-                <span>Nur USD-Teilbetrag · EUR fehlen hier · kein vollständiger Budgetstand</span>
+                <span>USD subtotal only · EUR excluded · not the full budget picture</span>
                 <strong>{progress}%</strong>
               </div>
               <div
                 role="progressbar"
-                aria-label="Erfasste Kiikii-Fixkosten und Aufladungen relativ zum Budget; unvollständig"
+                aria-label="Recorded Kiikii fixed costs and top-ups against budget; incomplete"
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
@@ -279,17 +278,17 @@ function Business() {
               <div className="mt-5 flex gap-3 rounded-xl border border-amber-300/25 bg-amber-300/5 p-4 text-amber-100">
                 <AlertTriangle className="mt-1 shrink-0" size={19} />
                 <div>
-                  <p className="font-semibold">Noch kein grünes Licht fürs Budget.</p>
+                  <p className="font-semibold">Budget status is not complete yet.</p>
                   <p className="mt-1 text-sm leading-relaxed">
-                    Monatliche Fixkostenaufteilung: {mixedMoney(r.allocation.totals.kiikii)}. Die
-                    Gewinn-Schätzung oben verwendet einen datierten Wechselkurs. Diese ältere
-                    Zahlungsübersicht zeigt nur USD. Die gemeinsame WaveSpeed-Aufladung ist keine
-                    zusätzliche Ausgabe neben dem Verbrauch.
+                    Monthly fixed cost allocation: {mixedMoney(r.allocation.totals.kiikii)}. The
+                    profit estimate above uses a dated exchange rate. This older payment overview
+                    shows USD only. Shared WaveSpeed top-ups are not an extra expense on top of
+                    usage.
                   </p>
                 </div>
               </div>
               <details className="mt-4 text-sm text-slate-300">
-                <summary className="cursor-pointer py-2">Kosten genauer ansehen</summary>
+                <summary className="cursor-pointer py-2">View cost details</summary>
                 <div className="mt-3 space-y-3">
                   {r.entries
                     .filter((e) => e.kind !== "fixed" || !r.allocation.entries.length)
@@ -306,19 +305,19 @@ function Business() {
                               : e.kind === "topup"
                                 ? "Aufladung"
                                 : "Verbrauch"}{" "}
-                            · {e.scope === "shared" ? "geteilt" : e.scope} · ab {date(e.day)}
+                            · {e.scope === "shared" ? "shared" : e.scope} · from {date(e.day)}
                           </span>
                         </div>
                         <span className="shrink-0">{usd(e.cents)}</span>
                       </div>
                     ))}
                   <p>
-                    Job-Reservierungen: {usd(r.live.reserved_month_cents)}. Schätzungen, keine
-                    Rechnungen; nicht zusätzlich auf Aufladungen gerechnet.
+                    Job reservations: {usd(r.live.reserved_month_cents)}. Estimates, not invoices;
+                    not added to top-ups.
                   </p>
                   <p>
-                    Grobe Projektion zugeordneter Zahlungen: {usd(r.forecast)}. Unregelmäßige
-                    Aufladungen und fehlende Kosten machen sie unsicher.
+                    Rough projection of allocated payments: {usd(r.forecast)}. Irregular top-ups and
+                    missing costs make this uncertain.
                   </p>
                 </div>
               </details>
@@ -329,57 +328,58 @@ function Business() {
             >
               <div className="mb-5 flex flex-wrap justify-between gap-2">
                 <h2 id="fans-heading" className="text-xl font-semibold">
-                  Fans & Einnahmen
+                  Fans & revenue
                 </h2>
                 <span className="font-mono text-xs text-amber-200">
-                  LETZTE BESTÄTIGTE WERTE · ZEITSTEMPEL BEACHTEN
+                  LATEST CONFIRMED VALUES · CHECK TIMESTAMPS
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric
-                  label="Fanvue-Subs gesamt"
-                  value={number(fanvue?.values["Subs gesamt"])}
+                  label="Total Fanvue subscribers"
+                  value={number(fanvue?.values["Total subscribers"])}
                   detail={
                     fanvue
-                      ? "Stand " +
+                      ? "As of " +
                         new Date(fanvue.observed_at).toLocaleString("de-DE", {
                           timeZone: "Europe/Berlin",
                         })
-                      : "Daten fehlen"
+                      : "Data missing"
                   }
                 />
                 <Metric
-                  label="Fanvue netto"
+                  label="Fanvue net revenue"
                   value={
-                    fanvue?.values["Netto vor Betriebskosten USD"] === undefined
+                    fanvue?.values["Net before operating costs, USD"] === undefined
                       ? "—"
-                      : usd(fanvue.values["Netto vor Betriebskosten USD"] * 100)
+                      : usd(fanvue.values["Net before operating costs, USD"] * 100)
                   }
                   detail={
                     fanvue
-                      ? `${date(fanvue.period_start)} – ${date(fanvue.period_end)} · vor Betriebskosten`
-                      : "Daten fehlen"
+                      ? `${date(fanvue.period_start)} – ${date(fanvue.period_end)} · before operating costs`
+                      : "Data missing"
                   }
                   pink
                 />
                 <Metric
                   label="Instagram-Follower"
-                  value={number(instagram?.values["Follower gesamt"])}
+                  value={number(instagram?.values["Total followers"])}
                   detail={
                     instagram
-                      ? (instagram.source === "Instagram API" ? "API-Abruf am " : "Abgelesen am ") +
-                        date(instagram.observed_at)
-                      : "Daten fehlen"
+                      ? (instagram.source === "Instagram API"
+                          ? "API fetched on "
+                          : "Recorded on ") + date(instagram.observed_at)
+                      : "Data missing"
                   }
                 />
               </div>
               <p className="mt-4 text-sm text-slate-400">
-                Kosten pro neuem Follower / zahlendem Sub: noch offen. Dafür müssen Kosten, Zeitraum
-                und neue Fans zusammenpassen.
+                Cost per new follower / paying subscriber: not available yet. Costs, dates and new
+                fans must cover the same period.
               </p>
               <details className="mt-5">
                 <summary className="cursor-pointer py-3 text-sm text-cyan-200">
-                  Quellen & Einzelwerte anzeigen
+                  Show sources & individual values
                 </summary>
                 <div className="space-y-2">
                   {r.snapshots.map((s) => (
@@ -389,10 +389,10 @@ function Business() {
                         <span className="ml-3 text-slate-400">
                           {date(s.observed_at)} ·{" "}
                           {s.observed_at.slice(0, 10) < r.at.day
-                            ? "älterer Stand"
+                            ? "older snapshot"
                             : s.source.endsWith(" API")
                               ? "API-Abruf"
-                              : "manuell erfasst"}
+                              : "manually recorded"}
                         </span>
                       </summary>
                       <div className="mt-3 text-sm leading-relaxed text-slate-300">
@@ -420,9 +420,9 @@ function Business() {
           className="scroll-mt-6 rounded-2xl border border-white/15 bg-[#101321] p-5 md:p-6"
         >
           <summary className="cursor-pointer py-2 text-xl font-semibold">
-            Daten & Verbindungen{" "}
+            Data & connections{" "}
             <span className="mt-1 block text-sm font-normal text-slate-400">
-              Fanvue, Instagram und Closer · Status prüfen oder verbinden
+              Fanvue, Instagram and Closer · check status or connect
             </span>
           </summary>
           <div className="mt-6 space-y-5">

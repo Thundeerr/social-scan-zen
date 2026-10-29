@@ -23,32 +23,30 @@ export function ReelInboxDm({ userId }: { userId: string }) {
   const status = query.data && typeof query.data.enabled === "boolean" ? query.data : null;
   return (
     <section className="space-y-3 rounded-xl border bg-card p-4">
-      <h2 className="font-medium">Reels per Instagram-DM sammeln</h2>
-      <p className="text-sm">
-        @kiikii.bat oder @thundeerr999 → direkt an @followerstarteam senden.
-      </p>
+      <h2 className="font-medium">Collect reels through Instagram DMs</h2>
+      <p className="text-sm">@kiikii.bat or @thundeerr999 → send directly to @followerstarteam.</p>
       <p className="text-sm text-muted-foreground">
-        Ohne Zusatz → Kiikii. Für Tuuva schreibe „Tuuva“ direkt beim Teilen dazu. Bitte nicht als
-        separate Nachricht danach. Die Reels werden nur gesammelt – keine automatische Generierung.
+        No note → Kiikii. For Tuuva, add “Tuuva” when sharing, not as a separate message afterwards.
+        Reels are only collected; generation does not start automatically.
       </p>
       <p role="status" className="text-sm">
         {query.isError
-          ? "DM-Status konnte nicht geladen werden."
+          ? "Could not load DM status."
           : !status
-            ? "DM-Status wird geladen …"
+            ? "Loading DM status …"
             : !status.readyToConnect
-              ? "DM-Verbindung benötigt Einrichtung oder Erneuerung."
+              ? "The DM connection needs setup or renewal."
               : !status.enabled
-                ? "DM-Empfang noch nicht aktiviert."
+                ? "DM collection is not enabled yet."
                 : status.lastReceived
-                  ? `Letzte zugelassene DM: ${new Date(status.lastReceived).toLocaleString("de-DE")}`
-                  : "Empfang eingerichtet. Zustellung durch Meta noch nicht bestätigt – bitte eine Test-DM senden."}
+                  ? `Last accepted DM: ${new Date(status.lastReceived).toLocaleString("de-DE")}`
+                  : "Collection is configured. Delivery from Meta is not confirmed yet; send a test DM."}
       </p>
       {status?.enabled && (
         <p className="text-xs text-muted-foreground">
-          Verifizierte Absender:{" "}
-          {status.senders.length ? status.senders.map((s) => `@${s}`).join(", ") : "noch keine"}.
-          Verbindung gültig bis{" "}
+          Verified senders:{" "}
+          {status.senders.length ? status.senders.map((s) => `@${s}`).join(", ") : "none yet"}.
+          Connection valid until{" "}
           {status.expiresAt ? new Date(status.expiresAt).toLocaleDateString("de-DE") : "unbekannt"}.
         </p>
       )}
@@ -56,13 +54,13 @@ export function ReelInboxDm({ userId }: { userId: string }) {
         <p key={index} className="text-sm">
           @{r.sender} · {new Date(r.received_at).toLocaleString("de-DE")} ·{" "}
           {r.status === "queued"
-            ? `${r.link_count} Reel-Link(s) gespeichert${r.model ? ` · ${r.model === "tuuva" ? "Tuuva" : "Kiikii"}` : ""}`
-            : `${dmReceiptExplanation(r.diagnostics)} Bitte ersatzweise den kopierten Reel-Link als Text senden.`}
+            ? `${r.link_count} reel link(s) saved${r.model ? ` · ${r.model === "tuuva" ? "Tuuva" : "Kiikii"}` : ""}`
+            : `${dmReceiptExplanation(r.diagnostics)} Please send the copied reel link as text instead.`}
         </p>
       ))}
       {!!status?.collected?.length && (
         <div className="space-y-2">
-          <h3 className="font-medium">Gesammelte Reels</h3>
+          <h3 className="font-medium">Collected reels</h3>
           {status.collected.map((item, index) => {
             const reel = Array.isArray(item.reel_inbox_items)
               ? item.reel_inbox_items[0]
@@ -75,13 +73,13 @@ export function ReelInboxDm({ userId }: { userId: string }) {
               >
                 <strong>{item.model === "tuuva" ? "Tuuva" : "Kiikii"}</strong>
                 <a href={reel.canonical_url} target="_blank" rel="noreferrer" className="underline">
-                  Vorlage ansehen
+                  View source
                 </a>
                 <Button
                   variant="outline"
                   onClick={() => navigator.clipboard.writeText(reel.canonical_url)}
                 >
-                  Link kopieren
+                  Copy link
                 </Button>
               </div>
             );
@@ -95,7 +93,7 @@ export function ReelInboxDm({ userId }: { userId: string }) {
             mutation.mutate({ data: { action: status?.enabled ? "disable" : "enable" } })
           }
         >
-          {status?.enabled ? "DM-Empfang pausieren" : "DM-Empfang aktivieren"}
+          {status?.enabled ? "Pause DM collection" : "Enable DM collection"}
         </Button>
       </div>
       {mutation.isError && (
@@ -104,34 +102,33 @@ export function ReelInboxDm({ userId }: { userId: string }) {
         </p>
       )}
       <details>
-        <summary className="cursor-pointer text-sm">Einmalige Meta-Einrichtung</summary>
+        <summary className="cursor-pointer text-sm">One-time Meta setup</summary>
         <p className="my-2 text-sm">
-          In der bestehenden Meta-App muss die untenstehende Webhook-Adresse für
-          Instagram-Nachrichten bestätigt und das Feld „messages“ abonniert sein. Testrollen oder
-          die passende Meta-Freigabe sind erforderlich. Die Aktivierung allein bestätigt noch keine
-          echte Zustellung.
+          In the existing Meta app, verify the webhook URL below for Instagram messages and
+          subscribe to the “messages” field. Test roles or the appropriate Meta approval are
+          required. Enabling this alone does not confirm delivery.
         </p>
         <Button
           variant="outline"
           disabled={mutation.isPending}
           onClick={() => mutation.mutate({ data: { action: "setup" } })}
         >
-          Einrichtungsdaten anzeigen
+          Show setup details
         </Button>
         {setup && (
           <div className="mt-2 space-y-2">
             <p className="break-all text-xs">{setup.webhook}</p>
             <Button variant="outline" onClick={() => navigator.clipboard.writeText(setup.webhook)}>
-              Webhook-Adresse kopieren
+              Copy webhook URL
             </Button>
             <Button
               variant="outline"
               onClick={() => navigator.clipboard.writeText(setup.verifyToken)}
             >
-              Verify-Token kopieren
+              Copy verify token
             </Button>
             <Button variant="ghost" onClick={() => setSetup(undefined)}>
-              Ausblenden
+              Hide
             </Button>
           </div>
         )}

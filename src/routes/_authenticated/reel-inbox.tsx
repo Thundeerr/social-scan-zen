@@ -11,20 +11,25 @@ import { ReelInboxDm } from "@/components/reel-inbox-dm";
 
 export const Route = createFileRoute("/_authenticated/reel-inbox")({ component: ReelInbox });
 const statuses = {
-  queued: "Wartet auf PC",
-  working: "PC verarbeitet",
-  ready: "Auf PC bestätigt",
-  failed: "Aktion erforderlich",
+  queued: "Waiting for PC",
+  working: "PC processing",
+  ready: "Confirmed on PC",
+  failed: "Action required",
+};
+const stageLabels: Record<(typeof stages)[number], string> = {
+  Neu: "New",
+  "In Arbeit": "In progress",
+  Verwendet: "Used",
 };
 const errors: Record<string, string> = {
-  unavailable: "Instagram liefert das Reel nicht öffentlich aus. Original-Link bleibt gespeichert.",
-  unsupported: "Dieses Reel wird derzeit nicht unterstützt.",
-  interrupted: "Download unterbrochen. Erneut versuchen.",
-  validation: "Die heruntergeladene Datei hat die Videoprüfung nicht bestanden.",
-  path_blocked: "Lokaler Zielpfad ist nicht freigegeben.",
-  disk_error: "Dateiablage fehlgeschlagen. Speicherplatz und OneDrive prüfen.",
-  conflict: "Dateikonflikt: Es wurde nichts überschrieben.",
-  setup: "PC-Helfer oder Videowerkzeuge sind noch nicht eingerichtet.",
+  unavailable: "Instagram does not make this reel publicly available. The original link is saved.",
+  unsupported: "This reel is not currently supported.",
+  interrupted: "Download interrupted. Try again.",
+  validation: "The downloaded file failed video validation.",
+  path_blocked: "The local destination folder is not allowed.",
+  disk_error: "Could not save the file. Check storage space and OneDrive.",
+  conflict: "File conflict: nothing was overwritten.",
+  setup: "The PC helper or video tools are not set up yet.",
 };
 function ReelInbox() {
   const { user } = Route.useRouteContext();
@@ -51,12 +56,12 @@ function ReelInbox() {
       const result = await mutation.mutateAsync({ data: { action: "submit", text, test } });
       const count = result.results.filter((r: { duplicate: boolean }) => !r.duplicate).length;
       setMessage(
-        `${count} neu gespeichert · ${result.results.length - count} bereits vorhanden${result.invalid.length ? ` · Ungültig: ${result.invalid.join(", ")}` : ""}`,
+        `${count} newly saved · ${result.results.length - count} already saved${result.invalid.length ? ` · Invalid: ${result.invalid.join(", ")}` : ""}`,
       );
       setText(result.invalid.join("\n"));
       setBefore(undefined);
     } catch {
-      setMessage("Noch nicht bestätigt. Links bleiben hier stehen. Bitte erneut versuchen.");
+      setMessage("Not confirmed yet. Your links stay here. Please try again.");
     }
   }
   const device = query.data?.device;
@@ -73,27 +78,27 @@ function ReelInbox() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <header>
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">Kiikii · Vorlagen</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">Kiikii · Sources</p>
         <h1 className="text-2xl font-semibold">Reel Inbox</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Links einfügen. Senden. Der PC legt verfügbare Reels sicher in deinen Vorlagen ab.
+          Paste links and send. Your PC saves available reels in your source folder.
         </p>
       </header>
       <p role="status" className="rounded-lg border p-3 text-sm">
         {online
-          ? "PC erreichbar"
+          ? "PC online"
           : device?.revoked
-            ? "PC-Kopplung widerrufen"
-            : "PC offline oder noch nicht gekoppelt"}{" "}
-        · Aufträge bleiben online gespeichert.
+            ? "PC pairing revoked"
+            : "PC offline or not paired yet"}{" "}
+        · Jobs remain saved online.
         {device?.last_seen_at && (
-          <span> Zuletzt: {new Date(device.last_seen_at).toLocaleString("de-DE")}</span>
+          <span> Last seen: {new Date(device.last_seen_at).toLocaleString("de-DE")}</span>
         )}
       </p>
       <ReelInboxDm userId={user.id} />
       <section className="space-y-3 rounded-xl border bg-card p-4">
         <label htmlFor="reels" className="font-medium">
-          Instagram-Reel-Links
+          Instagram reel links
         </label>
         <Textarea
           id="reels"
@@ -105,15 +110,15 @@ function ReelInbox() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={test} onChange={(e) => setTest(e.target.checked)} />
-            Als Testmaterial markieren
+            Mark as test material
           </label>
           <Button disabled={!text.trim() || mutation.isPending} onClick={send}>
-            Senden
+            Send
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Bis zu 50 Links. Keine Instagram-Anmeldung erforderlich. Nicht öffentlich abrufbare Reels
-          werden als Fehler angezeigt.
+          Up to 50 links. No Instagram login required. Reels that are not publicly available will
+          show an error.
         </p>
         {message && (
           <p role="status" className="break-words text-sm">
@@ -123,18 +128,18 @@ function ReelInbox() {
       </section>
       {(query.isError || mutation.isError) && (
         <p role="alert" className="text-destructive">
-          {String((query.error || mutation.error)?.message || "Verbindung fehlgeschlagen")}
+          {String((query.error || mutation.error)?.message || "Connection failed")}
         </p>
       )}
       <Input
-        aria-label="Reels durchsuchen"
-        placeholder="Geladene Reels nach Titel, Creator, Status oder ID durchsuchen"
+        aria-label="Search reels"
+        placeholder="Search loaded reels by title, creator, status or ID"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {query.isLoading && <p>Inbox wird geladen …</p>}
+      {query.isLoading && <p>Loading inbox …</p>}
       {!query.isLoading && !query.isError && !items.length && (
-        <p className="text-muted-foreground">Hier erscheinen deine gespeicherten Links.</p>
+        <p className="text-muted-foreground">Your saved links appear here.</p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         {items.map((item) => (
@@ -149,14 +154,14 @@ function ReelInbox() {
             )}
             <div>
               <span className="text-xs text-muted-foreground">
-                {item.is_test ? "TESTMATERIAL · " : ""}
+                {item.is_test ? "TEST MATERIAL · " : ""}
                 {statuses[item.status]}
               </span>
               <h2 className="break-words font-medium">
                 {String(item.receipt?.title || item.shortcode)}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {String(item.receipt?.creator || "Creator noch unbekannt")}
+                {String(item.receipt?.creator || "Creator unknown")}
               </p>
             </div>
             <a
@@ -165,24 +170,25 @@ function ReelInbox() {
               rel="noreferrer"
               className="text-sm underline"
             >
-              Original-Reel öffnen
+              Open original reel
             </a>
             <p className="text-sm">
-              Bestätigt: {item.confirmed_stage || "Noch nicht lokal gespeichert"}
+              Confirmed:{" "}
+              {item.confirmed_stage ? stageLabels[item.confirmed_stage] : "Not saved locally yet"}
               {item.confirmed_stage && item.desired_stage !== item.confirmed_stage
-                ? ` → ${item.desired_stage} angefordert`
+                ? ` → ${stageLabels[item.desired_stage]} requested`
                 : ""}
             </p>
             {item.receipt && (
               <p className="break-words text-xs text-muted-foreground">
                 {String(item.receipt.folder)} ·{" "}
                 {Math.round((Number(item.receipt.bytes) / 1024 / 1024) * 10) / 10} MB
-                {item.receipt.gallery === false ? " · Galerie-Aktualisierung offen" : ""}
+                {item.receipt.gallery === false ? " · Gallery refresh pending" : ""}
               </p>
             )}
             {item.error_code && (
               <p role="status" className="text-sm text-destructive">
-                {errors[item.error_code] || "PC-Fehler. Bitte Status prüfen."}
+                {errors[item.error_code] || "PC error. Please check the status."}
               </p>
             )}
             <div className="flex flex-wrap gap-2">
@@ -198,7 +204,7 @@ function ReelInbox() {
                       mutation.mutate({ data: { action: "move", id: item.id, stage } })
                     }
                   >
-                    {stage}
+                    {stageLabels[stage]}
                   </Button>
                 ))}
               {item.status === "failed" && (
@@ -207,7 +213,7 @@ function ReelInbox() {
                   onClick={() => mutation.mutate({ data: { action: "retry", id: item.id } })}
                   disabled={mutation.isPending}
                 >
-                  Erneut versuchen
+                  Try again
                 </Button>
               )}
             </div>
@@ -217,28 +223,27 @@ function ReelInbox() {
       <div className="flex gap-2">
         {before && (
           <Button variant="outline" onClick={() => setBefore(undefined)}>
-            Neueste
+            Latest
           </Button>
         )}
         {query.data?.items.length === 100 && (
           <Button variant="outline" onClick={() => setBefore(query.data!.items.at(-1)!.created_at)}>
-            Ältere laden
+            Load older
           </Button>
         )}
       </div>
       <details className="space-y-3 rounded-xl border p-4">
-        <summary className="cursor-pointer font-medium">Windows-PC verbinden / stoppen</summary>
+        <summary className="cursor-pointer font-medium">Connect / stop Windows PC</summary>
         <p className="text-sm">
-          Einen PC koppeln. Ein neuer Schlüssel ersetzt den alten. Den Schlüssel nur in
-          „Einrichten.ps1“ auf deinem PC eingeben. Er erlaubt ausschließlich die Verarbeitung deiner
-          Reel Inbox.
+          Pair one PC. A new key replaces the old one. Enter it only in “Einrichten.ps1” on your PC.
+          It grants access only to process your Reel Inbox.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             disabled={mutation.isPending}
             onClick={async () => {
-              if (window.confirm("Neuen PC-Schlüssel erstellen und bisherigen widerrufen?")) {
+              if (window.confirm("Create a new PC key and revoke the previous one?")) {
                 try {
                   const r = await mutation.mutateAsync({ data: { action: "pair" } });
                   setToken(r.token);
@@ -248,36 +253,36 @@ function ReelInbox() {
               }
             }}
           >
-            PC-Schlüssel erstellen
+            Create PC key
           </Button>
           <Button
             variant="outline"
             disabled={mutation.isPending}
             onClick={() => {
-              if (window.confirm("PC-Zugriff widerrufen? Dateien bleiben erhalten.")) {
+              if (window.confirm("Revoke PC access? Your files will be kept.")) {
                 setToken("");
                 mutation.mutate({ data: { action: "revoke" } });
               }
             }}
           >
-            PC-Zugriff widerrufen
+            Revoke PC access
           </Button>
         </div>
         {token && (
           <div>
-            <p className="text-sm">Nur jetzt sichtbar. Nach dem Einrichten ausblenden.</p>
-            <Input aria-label="PC-Schlüssel" readOnly type="password" value={token} />
+            <p className="text-sm">Visible only now. Hide it after setup.</p>
+            <Input aria-label="PC key" readOnly type="password" value={token} />
             <Button variant="outline" onClick={() => navigator.clipboard.writeText(token)}>
-              Schlüssel kopieren
+              Copy key
             </Button>
             <Button variant="ghost" onClick={() => setToken("")}>
-              Ausblenden
+              Hide
             </Button>
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          Am PC: Stoppen.ps1 beendet den Helfer. Deinstallieren.ps1 entfernt Autostart und Kopplung
-          auf diesem PC. Deine Medien bleiben erhalten.
+          On your PC: Stoppen.ps1 stops the helper. Deinstallieren.ps1 removes startup and pairing
+          on this PC. Your media is kept.
         </p>
       </details>
     </div>

@@ -1,168 +1,86 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  LayoutDashboard,
-  Users,
-  MapPin,
-  Images,
-  Sparkles,
-  Download,
-  Radar,
-  Settings,
-  Activity,
-  Send,
-  Flame,
-  Gauge,
-  Eye,
-  Clapperboard,
-  ChevronRight,
-} from "lucide-react";
+import { ChevronRight, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/layout/BrandMark";
+import { getActiveNavigationItem, navigationGroups } from "./navigation";
 
-type NavItem = {
-  to: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  hint: string | null;
-};
-
-type NavGroup = {
-  id: string;
-  label: string;
-  defaultOpen: boolean;
-  items: NavItem[];
-};
-
-const groups: NavGroup[] = [
-  {
-    id: "core",
-    label: "Content Watch",
-    defaultOpen: true,
-    items: [
-      { to: "/", label: "Dashboard", icon: LayoutDashboard, hint: "G D" },
-      { to: "/accounts", label: "Tracked Accounts", icon: Users, hint: "G T" },
-      { to: "/locations", label: "Tracked Locations", icon: MapPin, hint: "G L" },
-      { to: "/assets", label: "New Assets", icon: Images, hint: "G A" },
-      { to: "/scanner", label: "Scanner", icon: Radar, hint: "G S" },
-      { to: "/downloads", label: "Archive", icon: Download, hint: null },
-      { to: "/reel-inbox", label: "Reel Inbox", icon: Clapperboard, hint: null },
-      { to: "/content-review", label: "Content Review", icon: Clapperboard, hint: null },
-      { to: "/catalogue", label: "Content Catalogue", icon: Images, hint: null },
-      { to: "/generate", label: "Video erstellen", icon: Clapperboard, hint: null },
-      { to: "/business", label: "Zahlen & Kosten", icon: Gauge, hint: null },
-    ],
-  },
-  {
-    id: "transition",
-    label: "Account Status Watch",
-    defaultOpen: true,
-    items: [{ to: "/monitor", label: "Monitor", icon: Eye, hint: null }],
-  },
-  {
-    id: "publisher",
-    label: "FollowerStar Content",
-    defaultOpen: true,
-    items: [{ to: "/publisher", label: "Content Publisher", icon: Clapperboard, hint: null }],
-  },
-  {
-    id: "ops",
-    label: "Operations",
-    defaultOpen: false,
-    items: [
-      { to: "/discovery", label: "Discovery", icon: Sparkles, hint: "G X" },
-      { to: "/discovery/analytics", label: "Discovery Analytics", icon: Gauge, hint: null },
-      { to: "/burn", label: "Token Burn Rate", icon: Flame, hint: null },
-      { to: "/activity", label: "Activity", icon: Activity, hint: null },
-      { to: "/telegram", label: "Telegram", icon: Send, hint: null },
-      { to: "/settings", label: "Settings", icon: Settings, hint: null },
-    ],
-  },
-];
-
-const allItems = groups.flatMap((g) => g.items);
-const STORAGE_KEY = "instascanner.sidebar.groups";
+const STORAGE_KEY = "instascanner.sidebar.groups.v2";
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  // Longest-prefix wins so /discovery/analytics doesn't also light up /discovery.
-  const activeTo = allItems.reduce<string | null>((best, { to }) => {
-    const match = to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(to + "/");
-    if (!match) return best;
-    if (!best || to.length > best.length) return to;
-    return best;
-  }, null);
-
+  const activeTo = getActiveNavigationItem(pathname)?.to;
   const [open, setOpen] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(groups.map((g) => [g.id, g.defaultOpen])),
+    Object.fromEntries(navigationGroups.map((group) => [group.id, group.defaultOpen])),
   );
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setOpen((prev) => ({ ...prev, ...JSON.parse(raw) }));
+      if (raw) setOpen((previous) => ({ ...previous, ...JSON.parse(raw) }));
     } catch {
-      /* ignore */
+      // Navigation remains usable when browser storage is unavailable.
     }
   }, []);
 
-  // Keep the group containing the current route open.
   useEffect(() => {
-    const group = groups.find((g) => g.items.some((i) => i.to === activeTo));
-    if (group) setOpen((prev) => (prev[group.id] ? prev : { ...prev, [group.id]: true }));
+    const group = navigationGroups.find((item) => item.items.some((i) => i.to === activeTo));
+    if (group)
+      setOpen((previous) => (previous[group.id] ? previous : { ...previous, [group.id]: true }));
   }, [activeTo]);
 
   const toggle = (id: string) => {
-    setOpen((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
+    setOpen((previous) => {
+      const next = { ...previous, [id]: !previous[id] };
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch {
-        /* ignore */
+        // The expanded state is still retained for this session.
       }
       return next;
     });
   };
 
   return (
-    <aside className="hidden md:flex sticky top-0 h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-sidebar-border">
-        <BrandMark />
-        <div className="flex min-w-0 flex-col leading-tight">
-          <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex xl:w-72">
+      <Link
+        to="/"
+        className="flex h-20 shrink-0 items-center gap-3 border-b border-sidebar-border px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+      >
+        <BrandMark className="h-10 w-10 rounded-xl" />
+        <div className="min-w-0">
+          <span className="block text-base font-semibold tracking-tight text-sidebar-foreground">
             InstaScanner
           </span>
-          <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Autonomous Monitoring
-          </span>
+          <span className="block text-xs text-muted-foreground">Your content workspace</span>
         </div>
-      </div>
+      </Link>
 
-      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {groups.map((group) => {
+      <nav aria-label="Main navigation" className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
+        {navigationGroups.map((group) => {
           const expanded = open[group.id] ?? group.defaultOpen;
-          const hasActive = group.items.some((i) => i.to === activeTo);
+          const hasActive = group.items.some((item) => item.to === activeTo);
           return (
-            <div key={group.id} className="space-y-1">
+            <div key={group.id}>
               <button
                 type="button"
                 onClick={() => toggle(group.id)}
                 aria-expanded={expanded}
-                className="flex w-full items-center gap-2 min-h-11 rounded-lg px-3 py-2 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-sidebar-foreground"
+                aria-controls={`sidebar-${group.id}`}
+                className="mb-1 flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent/40 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
+                <span className="flex-1 text-left">{group.label}</span>
+                {!expanded && hasActive && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
                 <ChevronRight
+                  aria-hidden="true"
                   className={cn(
-                    "h-3 w-3 transition-transform duration-200",
+                    "h-4 w-4 transition-transform motion-reduce:transition-none",
                     expanded && "rotate-90",
                   )}
                 />
-                <span className="flex-1 text-left">{group.label}</span>
-                {!expanded && hasActive && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
               </button>
-
-              {expanded &&
-                group.items.map(({ to, label, icon: Icon, hint }) => {
+              <div id={`sidebar-${group.id}`} hidden={!expanded} className="space-y-1">
+                {group.items.map(({ to, label, icon: Icon }) => {
                   const active = to === activeTo;
                   return (
                     <Link
@@ -170,38 +88,33 @@ export function AppSidebar() {
                       to={to}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                        "flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                         active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground ring-1 ring-inset ring-primary/25"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                          ? "bg-primary/10 font-semibold text-primary ring-1 ring-inset ring-primary/25"
+                          : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                       )}
                     >
                       <Icon
-                        className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")}
+                        aria-hidden="true"
+                        className={cn(
+                          "h-[18px] w-[18px] shrink-0",
+                          active ? "text-primary" : "text-muted-foreground",
+                        )}
                       />
-                      <span className="flex-1">{label}</span>
-                      {hint && (
-                        <kbd className="hidden lg:inline-flex items-center rounded border border-border/60 bg-background/40 px-1 font-mono text-[9px] font-medium text-muted-foreground/80 tracking-wider">
-                          {hint}
-                        </kbd>
-                      )}
+                      <span>{label}</span>
                     </Link>
                   );
                 })}
+              </div>
             </div>
           );
         })}
       </nav>
 
-      <div className="p-3 border-t border-sidebar-border">
-        <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/40 ring-1 ring-primary/40 flex items-center justify-center text-[11px] font-semibold text-primary-foreground">
-            OW
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-xs font-medium text-sidebar-foreground">Operator</span>
-            <span className="text-[10px] text-muted-foreground">Internal · 2 seats</span>
-          </div>
+      <div className="shrink-0 border-t border-sidebar-border px-6 py-5">
+        <div className="flex items-center gap-2 text-[11px] font-medium tracking-[0.12em] text-muted-foreground">
+          <Moon aria-hidden="true" className="h-3.5 w-3.5 text-primary" />
+          MIDNA <span className="text-primary/50">//</span> NIGHT SHIFT
         </div>
       </div>
     </aside>

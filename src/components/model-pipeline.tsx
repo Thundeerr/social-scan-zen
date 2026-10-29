@@ -21,28 +21,26 @@ export function ModelPipeline() {
       if (result.token) setToken(result.token);
       await cache.invalidateQueries({ queryKey: ["model-pipeline"] });
     } catch {
-      setError("Aktion nicht bestätigt. Bitte Verbindung prüfen.");
+      setError("Action not confirmed. Check your connection.");
     } finally {
       setBusy(false);
     }
   }
   return (
     <details className="rounded-xl border bg-card p-4">
-      <summary className="cursor-pointer font-medium">
-        Automatische Reel-Pipeline · 720p · höchstens 3 $ täglich
-      </summary>
+      <summary className="cursor-pointer font-medium">Generation pipeline</summary>
       <div className="mt-4 space-y-3">
-        <p>Instagram → FollowerStar → Generierung → Telegram-Freigabe → Instagram</p>
+        <p>Instagram → FollowerStar → generation → Telegram review → Instagram</p>
         <p>
-          {p?.enabled ? "Verarbeitung eingeschaltet" : "Verarbeitung pausiert"} ·{" "}
+          {p?.enabled ? "Processing enabled" : "Processing paused"} ·{" "}
           {p?.last_seen_at
-            ? "Server zuletzt gesehen: " + new Date(p.last_seen_at).toLocaleString()
-            : "Cloud-Server noch nicht verbunden"}
+            ? "Server last seen: " + new Date(p.last_seen_at).toLocaleString()
+            : "Cloud server not connected yet"}
         </p>
         {(p?.profiles ?? []).map((m: { model: string; sender_username: string | null }) => (
           <p key={m.model}>
             {m.model}:{" "}
-            {m.sender_username ? "@" + m.sender_username : "Instagram-Absender noch offen"}
+            {m.sender_username ? "@" + m.sender_username : "Instagram sender not set yet"}
           </p>
         ))}
         <div className="flex gap-2">
@@ -50,12 +48,12 @@ export function ModelPipeline() {
             disabled={busy || !p?.last_seen_at}
             onClick={() => void act(p?.enabled ? "pause" : "enable")}
           >
-            {p?.enabled ? "Generierung pausieren" : "Generierung einschalten"}
+            {p?.enabled ? "Pause generation" : "Enable generation"}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Das Budget gilt gemeinsam für beide Models pro deutschem Kalendertag. Reicht es nicht,
-          wartet der Auftrag. Öffentliche Posts brauchen weiterhin deine Bestätigung.
+          The daily budget is shared by both models and resets on German calendar days. Jobs wait
+          when the budget is insufficient. Public posts still require your approval.
         </p>
         {(p?.jobs ?? []).map(
           (j: { id: string; model: string; state: string; issue: string | null }) => (
@@ -64,13 +62,13 @@ export function ModelPipeline() {
               {
                 (
                   {
-                    queued: "Wartet auf Server",
-                    working: "Quelle wird vorbereitet",
-                    budget_wait: "Wartet auf Tagesbudget",
-                    reserved: "Generierung reserviert",
-                    generating: "Video wird generiert",
-                    review: "Zur Freigabe",
-                    blocked: "Braucht Aufmerksamkeit",
+                    queued: "Waiting for server",
+                    working: "Preparing source",
+                    budget_wait: "Waiting for daily budget",
+                    reserved: "Generation reserved",
+                    generating: "Generating video",
+                    review: "Ready for review",
+                    blocked: "Needs attention",
                   } as Record<string, string>
                 )[j.state]
               }
@@ -79,13 +77,13 @@ export function ModelPipeline() {
           ),
         )}
         <details>
-          <summary>Server einrichten</summary>
+          <summary>Server setup</summary>
           <p className="my-3 text-sm">
-            Ein neuer Schlüssel ersetzt den bisherigen und pausiert die Verarbeitung. Nur in die
-            geschützte Server-Konfiguration eintragen.
+            A new key replaces the current key and pauses processing. Only enter it in the protected
+            server configuration.
           </p>
           <Button disabled={busy} onClick={() => void act("pair")}>
-            Neuen Server-Schlüssel erzeugen
+            Generate new server key
           </Button>
           {token && (
             <>
@@ -93,17 +91,15 @@ export function ModelPipeline() {
                 className="mt-3 w-full rounded border bg-background p-3"
                 readOnly
                 value={token}
-                aria-label="Server-Schlüssel"
+                aria-label="Server key"
               />
               <Button variant="outline" onClick={() => setToken("")}>
-                Schlüssel ausblenden
+                Hide key
               </Button>
             </>
           )}
         </details>
-        {(error || query.error) && (
-          <p role="alert">{error || "Pipeline-Status nicht erreichbar."}</p>
-        )}
+        {(error || query.error) && <p role="alert">{error || "Pipeline status unavailable."}</p>}
       </div>
     </details>
   );

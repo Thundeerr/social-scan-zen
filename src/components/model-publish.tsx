@@ -26,61 +26,59 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
       await cache.invalidateQueries({ queryKey: ["model-publication", item.id] });
       await cache.invalidateQueries({ queryKey: ["content-review"] });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Aktion fehlgeschlagen.");
+      setError(e instanceof Error ? e.message : "Action failed.");
     } finally {
       setBusy(false);
     }
   }
   return (
-    <section className="space-y-3 rounded-lg border p-3">
-      <h3 className="font-medium">Auf Instagram veröffentlichen</h3>
+    <section className="min-w-0 space-y-3 rounded-lg border p-3 [&_button]:min-h-12 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:break-words">
+      <h3 className="font-medium">Publish to Instagram</h3>
       <p className="text-sm">
         {p?.username
-          ? `Ziel: @${p.username} · ${models[item.model]}`
-          : `${models[item.model]} zuerst oben mit Instagram verbinden.`}
+          ? `Destination: @${p.username} · ${models[item.model]}`
+          : `Connect ${models[item.model]} to Instagram in Connections & pipeline below.`}
       </p>
       {p?.status && (
         <p className="text-sm">
           {(
             {
-              approved: "Vorbereitet – wartet auf deinen Post-Befehl",
-              scheduled: "Zum Posten eingereiht",
-              publishing: "Wird veröffentlicht",
-              published: "Veröffentlicht",
-              failed: "Veröffentlichung gestoppt – bitte prüfen",
+              approved: "Prepared — waiting for your publish command",
+              scheduled: "Queued for publishing",
+              publishing: "Publishing",
+              published: "Published",
+              failed: "Publishing stopped — please review",
             } as Record<string, string>
           )[p.status] ?? p.status}
         </p>
       )}
       {p?.permalink && (
         <a className="block underline" href={p.permalink} target="_blank" rel="noopener noreferrer">
-          Post auf Instagram ansehen
+          View post on Instagram
         </a>
       )}
-      {(error || query.error) && (
-        <p role="alert">{error || "Veröffentlichungsstatus nicht erreichbar."}</p>
-      )}
+      {(error || query.error) && <p role="alert">{error || "Publication status unavailable."}</p>}
       {p?.error && <p role="alert">{p.error}</p>}
       {p?.paused && (
         <p className="text-sm">
-          Cloud-Publishing ist pausiert.{" "}
+          Cloud publishing is paused.{" "}
           <a className="underline" href="/publisher#publishing-switch">
-            Publishing-Einstellung öffnen
+            Open publishing settings
           </a>
         </p>
       )}
       {!p?.post_id && (
-        <label className="block text-sm">
-          Veröffentlichungsart
+        <label className="grid gap-2 text-sm">
+          Post type
           <select
-            aria-label="Veröffentlichungsart"
+            aria-label="Post type"
             value={mode}
             disabled={busy}
             onChange={(e) => setMode(e.target.value as "normal" | "trial")}
-            className="ml-2 rounded border bg-background p-2"
+            className="min-h-12 w-full min-w-0 max-w-full rounded border bg-background p-2"
           >
-            <option value="normal">Normales Reel</option>
-            <option value="trial">Trial Reel · manuelle Übernahme</option>
+            <option value="normal">Regular reel</option>
+            <option value="trial">Trial reel · manual sharing to feed</option>
           </select>
         </label>
       )}
@@ -89,24 +87,24 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
           disabled={busy || dirty || !p?.connected}
           onClick={() => void act({ action: "prepare", publish_mode: mode, ...ref })}
         >
-          Veröffentlichung vorbereiten
+          Prepare post
         </Button>
       )}
       {p?.status === "approved" && (
         <>
           <p className="text-sm">
-            Das freigegebene Video und die Caption sind fest übernommen. Cover: erstes Videobild. Es
+            The approved video and caption are locked in. Cover: the first video frame.
             {p.publish_mode === "trial"
-              ? "wird ein Trial Reel für Nicht-Follower gepostet. Keine automatische Übernahme in den normalen Feed und keine Telegram-Ankündigung."
-              : "wird ein normales Reel mit Anzeige im Feed gepostet."}
+              ? " This will be a trial reel for non-followers, with no automatic feed sharing or Telegram announcement."
+              : " This will be a regular reel, also shown in the feed."}
           </p>
           {confirm ? (
             <div className="rounded border border-primary p-3 space-y-3">
               <p>
-                Jetzt als {p.publish_mode === "trial" ? "Trial Reel" : "normales Reel"} auf @
-                {p.username} posten?
+                Publish a {p.publish_mode === "trial" ? "trial reel" : "regular reel"} to @
+                {p.username} now?
                 {p.publish_mode !== "trial" &&
-                  " Die Channel-Ankündigung folgt nach Erfolg, sofern sie aktiviert und heute noch frei ist."}
+                  " A channel announcement follows a successful post if enabled and still available today."}
               </p>
               <Button
                 disabled={busy || dirty || p.paused || !p.connected || !p.ig_user_id}
@@ -120,11 +118,10 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
                   })
                 }
               >
-                Jetzt {p.publish_mode === "trial" ? "Trial Reel" : "Reel"} auf @{p.username}{" "}
-                veröffentlichen
+                Publish {p.publish_mode === "trial" ? "trial reel" : "reel"} to @{p.username} now
               </Button>
               <Button variant="outline" onClick={() => setConfirm(false)}>
-                Zurück
+                Back
               </Button>
             </div>
           ) : (
@@ -132,7 +129,7 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
               disabled={busy || dirty || p.paused || !p.connected}
               onClick={() => setConfirm(true)}
             >
-              Posten …
+              Publish …
             </Button>
           )}
           <Button
@@ -140,7 +137,7 @@ export function ModelPublish({ item, dirty }: { item: ReviewItem; dirty: boolean
             disabled={busy}
             onClick={() => void act({ action: "cancel", ...ref })}
           >
-            Vorbereitung zurücknehmen
+            Cancel preparation
           </Button>
         </>
       )}

@@ -24,12 +24,12 @@ export function CloserAnalyticsConnection({ userId }: { userId: string }) {
     <section className="rounded-2xl border border-violet-400/30 bg-[#101321] p-5 space-y-4">
       <h2 className="text-xl font-semibold text-violet-200">📡 IG Closer · Kiikii</h2>
       <p className="text-sm text-slate-300">
-        Gespräche → Link verschickt → gemeldete Conversion. Täglich vor dem 20-Uhr-Bericht.
+        Conversations → link shared → reported conversion. Daily before the 20:00 report.
       </p>
       {s?.lastSynced && (
         <p className="text-sm text-slate-400">
-          Letzter Abruf:{" "}
-          {new Date(s.lastSynced).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })} Uhr
+          Last sync: {new Date(s.lastSynced).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })}{" "}
+          Berlin time
         </p>
       )}
       {(q.error || m.error || s?.error) && (
@@ -40,8 +40,8 @@ export function CloserAnalyticsConnection({ userId }: { userId: string }) {
       {s && (!s.configured || s.error?.includes("HTTP 401") || s.error?.includes("HTTP 403")) && (
         <div className="space-y-3">
           <p className="text-sm text-slate-300">
-            CupidBot → Profile → Account → <strong>Access token</strong>. Hier einfügen, nicht den
-            Chatter-Token. Wird verschlüsselt auf dem Server gespeichert.
+            CupidBot → Profile → Account → <strong>Access token</strong>. Paste it here, not the
+            Chatter token. Stored encrypted on the server.
           </p>
           <label htmlFor="closer-token" className="block text-sm">
             CupidBot Access token
@@ -61,22 +61,22 @@ export function CloserAnalyticsConnection({ userId }: { userId: string }) {
             disabled={m.isPending || token.trim().length < 16}
             onClick={() => m.mutate("configure")}
           >
-            Closer sicher verbinden
+            Connect Closer securely
           </Button>
         </div>
       )}
       {s?.configured && (
         <Button className="h-14 px-8" disabled={m.isPending} onClick={() => m.mutate("sync")}>
-          Closer-Zahlen jetzt holen
+          Sync Closer now
         </Button>
       )}
-      {m.isPending && <p role="status">Prüfe Closer-Zugang …</p>}
+      {m.isPending && <p role="status">Checking Closer access …</p>}
       {m.data?.skipped && (
-        <p role="status">Vor Kurzem abgerufen. Frühestens nach 10 Minuten erneut.</p>
+        <p role="status">Synced recently. Wait at least 10 minutes before trying again.</p>
       )}
       <p className="text-xs text-slate-400">
-        Nur Statistiken für Kiikii. Kein Chatversand. Sieben abgeschlossene Tage; Conversions sind
-        keine bestätigten zahlenden Subs.
+        Kiikii analytics only. No messages sent. Covers seven completed days; conversions are not
+        confirmed paying subscribers.
       </p>
     </section>
   );

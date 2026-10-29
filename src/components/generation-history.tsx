@@ -17,33 +17,27 @@ export function GenerationHistory() {
     refetchInterval: 10000,
   });
   return (
-    <section className="space-y-4 border-t pt-6" aria-label="Meine Videos">
+    <section className="space-y-4 border-t pt-6" aria-label="My videos">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold">Meine Videos</h2>
+        <h2 className="text-2xl font-bold">My videos</h2>
         <Button
           type="button"
           variant="outline"
           disabled={query.isFetching}
           onClick={() => void query.refetch()}
         >
-          Aktualisieren
+          Refresh
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Deine letzten 50 Aufträge · aktualisiert sich automatisch.
+        Your latest 50 jobs · refreshes automatically.
       </p>
-      {query.isPending && <p role="status">Aufträge werden geladen …</p>}
-      {query.isError && (
-        <p role="alert">Aufträge konnten nicht aktualisiert werden. Bitte erneut versuchen.</p>
-      )}
+      {query.isPending && <p role="status">Loading jobs …</p>}
+      {query.isError && <p role="alert">Could not refresh jobs. Please try again.</p>}
       {query.data?.enabled === false && (
-        <p className="rounded-xl border p-3">
-          Verarbeitung pausiert. Wartende Aufträge bleiben gespeichert.
-        </p>
+        <p className="rounded-xl border p-3">Processing paused. Queued jobs remain saved.</p>
       )}
-      {query.data?.jobs.length === 0 && (
-        <p>Noch keine Aufträge. Dein nächster Auftrag erscheint hier.</p>
-      )}
+      {query.data?.jobs.length === 0 && <p>No jobs yet. Your next job will appear here.</p>}
       {query.data?.jobs.map((job) => (
         <JobCard key={job.id} job={job} />
       ))}
@@ -57,24 +51,22 @@ function JobCard({ job }: { job: GenerationHistoryJob }) {
     <article className="space-y-3 rounded-2xl border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 className="text-lg font-semibold">
-          {job.model === "kiikii" ? "Kiikii" : "Tuuva"} · {item?.title || "Video-Auftrag"}
+          {job.model === "kiikii" ? "Kiikii" : "Tuuva"} · {item?.title || "Video job"}
         </h3>
         <time className="text-sm text-muted-foreground" dateTime={job.created_at}>
           {new Date(job.created_at).toLocaleString("de-DE")}
         </time>
       </div>
       <p className="inline-flex rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground">
-        {jobStateLabels[job.state] ?? "Status wird geprüft"}
+        {jobStateLabels[job.state] ?? "Checking status"}
       </p>
-      {job.issue && (
-        <p role="status">{jobIssueLabels[job.issue] ?? "Der Auftrag muss geprüft werden."}</p>
-      )}
+      {job.issue && <p role="status">{jobIssueLabels[job.issue] ?? "This job needs attention."}</p>}
       {item && item.status !== "uploading" ? (
         <ResultVideo key={`${item.id}:${item.revision}`} item={item} />
       ) : (
         job.review_id && (
           <p className="text-sm text-muted-foreground">
-            Ergebnis wird übernommen oder ist noch nicht abrufbar.
+            The result is being saved or is not available yet.
           </p>
         )
       )}
@@ -84,10 +76,10 @@ function JobCard({ job }: { job: GenerationHistoryJob }) {
           search={{ item: job.review_id }}
           className="inline-flex min-h-12 items-center underline"
         >
-          Zur Prüfung
+          Review
         </Link>
       )}
-      <p className="text-xs text-muted-foreground">Auftrag {job.id}</p>
+      <p className="text-xs text-muted-foreground">Job {job.id}</p>
     </article>
   );
 }
@@ -101,7 +93,7 @@ function ResultVideo({ item }: { item: NonNullable<GenerationHistoryJob["review"
       const result = await contentReviewFn({
         data: { action: "preview", id: item.id, revision: item.revision },
       });
-      if (!result.url) throw Error("Vorschau fehlt.");
+      if (!result.url) throw Error("Preview missing.");
       return result.url;
     },
     staleTime: 8 * 60 * 1000,
@@ -130,14 +122,14 @@ function ResultVideo({ item }: { item: NonNullable<GenerationHistoryJob["review"
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch {
-      setError("Download fehlgeschlagen. Bitte erneut versuchen.");
+      setError("Download failed. Please try again.");
     } finally {
       setDownloadBusy(false);
     }
   }
   return (
     <div className="space-y-3">
-      {preview.isPending && <p role="status">Videovorschau wird geladen …</p>}
+      {preview.isPending && <p role="status">Loading video preview …</p>}
       {preview.data && (
         <video
           key={preview.data}
@@ -146,12 +138,12 @@ function ResultVideo({ item }: { item: NonNullable<GenerationHistoryJob["review"
           playsInline
           preload="metadata"
           className="max-h-96 w-full rounded-xl bg-black"
-          aria-label={`Ergebnis: ${item.title}`}
-          onError={() => setError("Video nicht abspielbar. Bitte Vorschau neu laden.")}
+          aria-label={`Result: ${item.title}`}
+          onError={() => setError("Cannot play video. Please reload the preview.")}
         />
       )}
       {(preview.isError || error) && (
-        <p role="alert">{error || "Videovorschau konnte nicht geladen werden."}</p>
+        <p role="alert">{error || "Could not load the video preview."}</p>
       )}
       <div className="flex flex-wrap gap-2">
         <Button
@@ -160,7 +152,7 @@ function ResultVideo({ item }: { item: NonNullable<GenerationHistoryJob["review"
           disabled={downloadBusy}
           onClick={() => void download()}
         >
-          {downloadBusy ? "Wird geladen …" : "Herunterladen"}
+          {downloadBusy ? "Loading …" : "Download"}
         </Button>
         {(preview.isError || error) && (
           <Button
@@ -171,7 +163,7 @@ function ResultVideo({ item }: { item: NonNullable<GenerationHistoryJob["review"
               void preview.refetch();
             }}
           >
-            Vorschau neu laden
+            Reload preview
           </Button>
         )}
       </div>

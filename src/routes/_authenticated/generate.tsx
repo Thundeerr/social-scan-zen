@@ -36,7 +36,7 @@ function GeneratePage() {
     /* Shown by preflight below. */
   }
   const character =
-    model === "kiikii" ? "Kiikii" : model === "tuuva" ? "Tuuva" : "Charakter wählen";
+    model === "kiikii" ? "Kiikii" : model === "tuuva" ? "Tuuva" : "Choose a character";
   const hasSource = source === "link" ? !!url.trim() : !!file;
   const checked = check?.key === key ? check : undefined;
   const duplicates = checked?.result?.duplicates ?? [];
@@ -69,7 +69,7 @@ function GeneratePage() {
             file.size > MAX_SOURCE_BYTES ||
             !file.name.toLowerCase().endsWith(".mp4")
           )
-            throw Error("Bitte eine MP4-Datei bis 40 MB auswählen.");
+            throw Error("Choose an MP4 file up to 40 MB.");
           const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
           const sha256 = Array.from(new Uint8Array(digest), (b) =>
             b.toString(16).padStart(2, "0"),
@@ -82,7 +82,7 @@ function GeneratePage() {
         if (!cancelled)
           setCheck({
             key,
-            error: error instanceof Error ? error.message : "Prüfung fehlgeschlagen.",
+            error: error instanceof Error ? error.message : "Check failed.",
           });
       }
     }, 400);
@@ -96,26 +96,26 @@ function GeneratePage() {
     retry: false,
     mutationFn: async () => {
       if (!model || !promptId || !checked?.result || (duplicates.length > 0 && !confirmed))
-        throw Error("Bitte Vorlage prüfen und Charakter auswählen.");
+        throw Error("Check the source and choose a character.");
       if (source === "link")
         return generationSubmitFn({
           data: { action: "link", model, url, prompt_id: promptId, duplicate_confirmed: confirmed },
         });
-      if (!file) throw Error("Bitte ein Video auswählen.");
+      if (!file) throw Error("Choose a video.");
       if (!uploaded) {
-        setProgress("Video wird hochgeladen …");
+        setProgress("Uploading video …");
         const prepared = await generationSubmitFn({
           data: { action: "prepare", model, id: uploadId },
         });
-        if (!prepared.path || !prepared.token) throw Error("Upload nicht vorbereitet.");
+        if (!prepared.path || !prepared.token) throw Error("Upload is not ready.");
         const result = await supabase.storage
           .from("generation-sources")
           .uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: "video/mp4" });
         if (result.error && !/already exists|duplicate/i.test(result.error.message))
-          throw Error("Upload nicht bestätigt. Mit derselben Datei erneut versuchen.");
+          throw Error("Upload not confirmed. Try again with the same file.");
         setUploaded(true);
       }
-      setProgress("Upload wird geprüft …");
+      setProgress("Checking upload …");
       return generationSubmitFn({
         data: {
           action: "upload",
@@ -173,7 +173,7 @@ function GeneratePage() {
           const result = await contentReviewFn({
             data: { action: "preview", id: parsed.id, revision: parsed.revision },
           });
-          if (!result.url) throw Error("Dieses Video ist nicht verfügbar.");
+          if (!result.url) throw Error("This video is unavailable.");
           mediaUrl = result.url;
         } else mediaUrl = parsed.url;
         if (controller.signal.aborted) return;
@@ -183,10 +183,10 @@ function GeneratePage() {
         if (!controller.signal.aborted)
           setImportError(
             error instanceof TypeError
-              ? "Video konnte nicht geladen werden. Der Anbieter muss direkten Download erlauben. Alternativ Datei hochladen."
+              ? "Could not load the video. The provider must allow direct downloads. You can upload the file instead."
               : error instanceof Error
                 ? error.message
-                : "Video konnte nicht geladen werden.",
+                : "Could not load the video.",
           );
       } finally {
         if (!controller.signal.aborted) setImporting(false);
@@ -199,7 +199,7 @@ function GeneratePage() {
   }, [url, source]);
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 md:p-6">
-      <h1 className="text-3xl font-bold">Video erstellen</h1>
+      <h1 className="text-3xl font-bold">Create video</h1>
       <form
         className="space-y-5"
         onSubmit={(e) => {
@@ -208,10 +208,10 @@ function GeneratePage() {
         }}
       >
         <fieldset disabled={submit.isPending} className="space-y-3">
-          <legend className="sr-only">Ausgangsvideo</legend>
+          <legend className="sr-only">Source video</legend>
           <label
             tabIndex={0}
-            aria-label="Video ablegen oder mit Strg+V einfügen"
+            aria-label="Drop a video or paste with Ctrl+V"
             onPaste={(e) => {
               if (submit.isPending) return;
               e.preventDefault();
@@ -227,9 +227,9 @@ function GeneratePage() {
               else if (!submit.isPending) chooseText(e.dataTransfer.getData("text/plain"));
             }}
           >
-            <span className="text-2xl font-bold">{file ? file.name : "Video hier ablegen"}</span>
+            <span className="text-2xl font-bold">{file ? file.name : "Drop your video here"}</span>
             <span className="text-sm text-muted-foreground">
-              Datei auswählen oder Strg+V · MP4 bis 40 MB
+              Choose a file or Ctrl+V · MP4 up to 40 MB
             </span>
             <input
               className="sr-only"
@@ -239,18 +239,18 @@ function GeneratePage() {
             />
           </label>
           <Input
-            aria-label="Video oder Link einfügen"
+            aria-label="Paste a video or link"
             className="h-14"
             type="text"
             value={url}
-            placeholder="Kopiertes Video oder Link einfügen"
+            placeholder="Paste a copied video or link"
             onChange={(e) => {
               chooseText(e.target.value);
             }}
           />
           {importing && (
             <p role="status" className="text-sm">
-              Video wird geladen …
+              Loading video …
             </p>
           )}
           {importError && (
@@ -269,7 +269,7 @@ function GeneratePage() {
           )}
           {source === "link" && reel && (
             <details className="rounded-xl border p-3">
-              <summary className="cursor-pointer">Vorschau ansehen</summary>
+              <summary className="cursor-pointer">View preview</summary>
               <iframe
                 title="Instagram-Vorschau"
                 src={"https://www.instagram.com/p/" + reel.shortcode + "/embed/"}
@@ -284,12 +284,12 @@ function GeneratePage() {
                 rel="noopener noreferrer"
                 className="inline-block py-3 underline"
               >
-                Original öffnen
+                Open original
               </a>
             </details>
           )}
           <label className="flex items-center gap-3 text-sm">
-            Charakter
+            Character
             <select
               className="h-12 flex-1 rounded-lg border bg-background px-3 text-base"
               value={model ?? ""}
@@ -299,7 +299,7 @@ function GeneratePage() {
               }}
             >
               <option value="" disabled>
-                Bitte auswählen
+                Please choose
               </option>
               <option value="kiikii">Kiikii</option>
               <option value="tuuva">Tuuva</option>
@@ -307,7 +307,7 @@ function GeneratePage() {
           </label>
         </fieldset>
         <fieldset disabled={submit.isPending} className="grid grid-cols-2 gap-3">
-          <legend className="sr-only">Prompt auswählen</legend>
+          <legend className="sr-only">Choose a prompt</legend>
           {(["prompt_1", "prompt_2"] as const).map((value, index) => (
             <Button
               key={value}
@@ -325,22 +325,22 @@ function GeneratePage() {
             </Button>
           ))}
         </fieldset>
-        {hasSource && !checked && <p role="status">Vorlage wird geprüft …</p>}
+        {hasSource && !checked && <p role="status">Checking source …</p>}
         {checked?.error && (
           <div role="alert" className="rounded-xl border border-destructive p-4">
             <p>{checked.error}</p>
             <Button type="button" variant="outline" onClick={() => setRetryCheck((v) => v + 1)}>
-              Erneut prüfen
+              Check again
             </Button>
           </div>
         )}
         {!!duplicates.length && !saved && (
           <div role="alert" className="space-y-3 rounded-xl border-2 border-amber-500 p-4">
-            <p className="font-bold">Diese Vorlage wurde schon eingereicht.</p>
+            <p className="font-bold">This source has already been submitted.</p>
             <p className="text-sm">
               {source === "link"
-                ? "Ein vorhandener Auftrag behält seinen bisherigen Prompt."
-                : "Ein weiterer Upload kann erneut Guthaben verbrauchen."}
+                ? "An existing job keeps its original prompt."
+                : "Another upload may use more credits."}
             </p>
             <label className="flex min-h-12 items-center gap-3">
               <input
@@ -350,7 +350,7 @@ function GeneratePage() {
                 disabled={submit.isPending}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
-              Verstanden, fortfahren
+              I understand, continue
             </label>
           </div>
         )}
@@ -366,11 +366,11 @@ function GeneratePage() {
             (!!duplicates.length && !confirmed)
           }
         >
-          {submit.isPending ? progress || "Wird gespeichert …" : "Video erstellen"}
+          {submit.isPending ? progress || "Saving …" : "Create video"}
         </Button>
         <p className="text-sm text-muted-foreground">
-          {checked?.result?.enabled === false ? "Pipeline pausiert. Dein Auftrag wartet. " : ""}
-          Generierung verbraucht Guthaben.
+          {checked?.result?.enabled === false ? "Pipeline paused. Your job will wait. " : ""}
+          Generation uses credits.
         </p>
       </form>
       {submit.isError && (
@@ -380,9 +380,9 @@ function GeneratePage() {
       )}
       {saved && (
         <div role="status" className="space-y-2 rounded-xl border p-4">
-          <p className="text-xl font-bold">Auftrag gespeichert · {character}</p>
+          <p className="text-xl font-bold">Job saved · {character}</p>
           <Link to="/content-review" className="inline-flex min-h-12 items-center underline">
-            Zur Video-Prüfung
+            Review video
           </Link>
         </div>
       )}

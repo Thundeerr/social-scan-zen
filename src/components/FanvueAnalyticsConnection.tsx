@@ -25,22 +25,23 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
   const s = q.data?.status;
   return (
     <section className="rounded-2xl border border-cyan-400/30 bg-[#101321] p-5 space-y-4">
-      <h2 className="text-xl font-semibold text-cyan-200">📡 Fanvue anschließen</h2>
+      <h2 className="text-xl font-semibold text-cyan-200">📡 Connect Fanvue</h2>
       <p className="text-sm text-slate-300">
         {s?.connected
-          ? `Verbunden mit @${s.handle}`
-          : "Einmal verbinden. Danach täglich automatisch vor dem 20-Uhr-Bericht."}
+          ? `Connected to @${s.handle}`
+          : "Connect once. Syncs automatically each day before the 20:00 report."}
       </p>
       {s?.lastSynced && (
         <p className="text-sm text-slate-400">
-          Letzter erfolgreicher Abruf:{" "}
-          {new Date(s.lastSynced).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })} Uhr
+          Last successful sync:{" "}
+          {new Date(s.lastSynced).toLocaleString("de-DE", { timeZone: "Europe/Berlin" })} Berlin
+          time
         </p>
       )}
       {typeof window !== "undefined" &&
         new URLSearchParams(window.location.search).get("fanvue") === "error" && (
           <p role="alert" className="text-amber-200">
-            Anmeldung nicht abgeschlossen. Bitte nochmals verbinden und @kiikiixoxo auswählen.
+            Sign-in incomplete. Please reconnect and select @kiikiixoxo.
           </p>
         )}
       {(q.error || mutation.error || s?.error) && (
@@ -51,8 +52,8 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
       {s && (!s.configured || (!s.connected && s.error?.includes("invalid_client"))) && (
         <div className="space-y-3">
           <p className="text-sm">
-            Den aktuellen Client Secret deiner App hier einfügen. Er wird verschlüsselt auf dem
-            Server gespeichert und danach nicht mehr angezeigt.
+            Paste your app's current client secret here. It is encrypted on the server and will not
+            be shown again.
           </p>
           <label className="block text-sm" htmlFor="fanvue-secret">
             Fanvue Client Secret
@@ -60,9 +61,9 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
           <input
             id="fanvue-secret"
             type="password"
-              autoComplete="new-password"
-              data-lpignore="true"
-              data-1p-ignore="true"
+            autoComplete="new-password"
+            data-lpignore="true"
+            data-1p-ignore="true"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
             className="w-full rounded-lg border border-white/20 bg-black/40 p-3"
@@ -72,12 +73,12 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
             disabled={mutation.isPending || secret.trim().length < 16}
             onClick={() => mutation.mutate("configure")}
           >
-            {s.configured ? "Secret sicher ersetzen" : "Zugang sicher speichern"}
+            {s.configured ? "Replace secret securely" : "Save credentials securely"}
           </Button>
           <details className="text-sm text-slate-400">
-            <summary>Einrichtung in Fanvue</summary>
+            <summary>Fanvue setup</summary>
             <p className="mt-2">
-              App: Kiikii HQ Analytics · Leserechte: read:self, read:insights. Rückleitungsadresse:
+              App: Kiikii HQ Analytics · Read permissions: read:self, read:insights. Redirect URL:
             </p>
             <code className="break-all">{FANVUE_CALLBACK}</code>
           </details>
@@ -91,7 +92,7 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
               disabled={mutation.isPending}
               onClick={() => mutation.mutate("connect")}
             >
-              Mit Fanvue verbinden
+              Connect to Fanvue
             </Button>
           )}
           {s.connected && !s.needsReconnect && (
@@ -100,7 +101,7 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
               disabled={mutation.isPending}
               onClick={() => mutation.mutate("sync")}
             >
-              Fanvue-Zahlen jetzt holen
+              Sync Fanvue now
             </Button>
           )}
           {s.connected && (
@@ -110,16 +111,16 @@ export function FanvueAnalyticsConnection({ userId }: { userId: string }) {
               disabled={mutation.isPending}
               onClick={() => mutation.mutate("disconnect")}
             >
-              Verbindung trennen
+              Disconnect
             </Button>
           )}
         </div>
       )}
-      {mutation.isPending && <p role="status">Verbindung wird bearbeitet …</p>}
+      {mutation.isPending && <p role="status">Updating connection …</p>}
       <p className="text-xs text-slate-400">
-        Nur Konto & Analytics lesen. Manuelle Abrufe höchstens alle 10 Minuten. Keine Nachrichten,
-        Uploads oder Veröffentlichungen. Trennen entfernt die lokal gespeicherten Tokens; den
-        App-Zugriff kannst du zusätzlich in Fanvue widerrufen.
+        Reads account data and analytics only. Manual syncs are limited to once every 10 minutes. No
+        messages, uploads or publishing. Disconnecting removes stored tokens; you can also revoke
+        app access in Fanvue.
       </p>
     </section>
   );

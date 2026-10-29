@@ -9,20 +9,20 @@ export type GenerationHistoryJob = {
 };
 
 export const jobStateLabels: Record<string, string> = {
-  queued: "Wartet auf Verarbeitung",
-  working: "Quelle wird vorbereitet",
-  budget_wait: "Wartet auf Tagesbudget",
-  reserved: "Generierung wird vorbereitet",
-  generating: "Video wird erstellt",
-  review: "Video erstellt",
-  blocked: "Auftrag braucht Aufmerksamkeit",
+  queued: "Waiting for processing",
+  working: "Preparing source",
+  budget_wait: "Waiting for daily budget",
+  reserved: "Preparing generation",
+  generating: "Creating video",
+  review: "Video ready",
+  blocked: "Job needs attention",
 };
 
 export const jobIssueLabels: Record<string, string> = {
-  source_unavailable: "Die Quelle konnte nicht geladen werden.",
-  duration: "Die Videolänge passt nicht zu den erlaubten Grenzen.",
-  validation: "Eine Datei konnte nicht geprüft werden.",
-  provider_uncertain: "Die Bestätigung des Anbieters fehlt. Bitte nicht erneut absenden.",
-  provider_failed: "Der Anbieter konnte das Video nicht erstellen.",
-  setup: "Die Server-Konfiguration muss geprüft werden.",
+  source_unavailable: "Could not load the source.",
+  duration: "The video duration is outside the allowed range.",
+  validation: "A file could not be validated.",
+  provider_uncertain: "Provider confirmation is missing. Do not submit again.",
+  provider_failed: "The provider could not create the video.",
+  setup: "The server configuration needs to be checked.",
 };

@@ -121,6 +121,17 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+    scrollbar-color: var(--border) var(--background);
+    scrollbar-width: thin;
+  }
+
+  nav {
+    scrollbar-color: var(--border) transparent;
+    scrollbar-width: thin;
+  }
+
   * {
     border-color: var(--color-border);
   }
