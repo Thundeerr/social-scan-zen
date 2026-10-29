@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Radio, RefreshCw, Send, AlertTriangle, ArrowUpRight, Wallet, Zap } from "lucide-react";
+import { Radio, RefreshCw, Send, AlertTriangle, Wallet, Zap } from "lucide-react";
 import { businessReportFn } from "@/lib/business-report.functions";
 import { berlinTime, usd } from "@/lib/business-report";
 import { Button } from "@/components/ui/button";
@@ -92,13 +92,13 @@ function Business() {
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="mb-3 font-mono text-xs tracking-[.22em] text-fuchsia-300">
-                MIDNA // NIGHT SHIFT
+                MIDNA // FINANCE TERMINAL
               </p>
               <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">
                 KIIKII<span className="text-fuchsia-400">.</span>{" "}
                 <span className="font-light text-slate-300">HQ</span>
               </h1>
-              <p className="mt-3 text-slate-300">Weniger Chaos. Mehr zahlende Fans. 🦇</p>
+              <p className="mt-3 text-slate-300">Dein Geld. Dein Überblick. Dein nächster Move.</p>
             </div>
             <div className="rounded-lg border border-cyan-300/25 bg-cyan-300/5 px-4 py-3 font-mono text-xs text-cyan-200">
               <div className="flex items-center gap-2">
@@ -143,11 +143,35 @@ function Business() {
           </p>
         )}
         {r && <BusinessProfit value={profitEstimate(r.snapshots, r.allocation, r.wave?.report)} />}
-        <FanvueAnalyticsConnection userId={user.id} />
-        <InstagramAnalyticsConnection userId={user.id} />
-        <CloserAnalyticsConnection userId={user.id} />
-        <WaveSpeedAnalytics userId={user.id} />
-        {r && <BusinessCostAllocation plan={r.allocation} />}
+        <nav aria-label="Bereiche der Kostenübersicht" className="grid grid-cols-3 gap-2">
+          {[
+            ["#monthly-costs", "01 / Kosten"],
+            ["#live-heading", "02 / Content"],
+            ["#data-sources", "03 / Daten"],
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              className="flex min-h-14 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/5 px-2 text-center text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/15 focus-visible:outline-2 focus-visible:outline-cyan-300"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+        <div id="monthly-costs" className="scroll-mt-6 space-y-5">
+          {r && <BusinessCostAllocation plan={r.allocation} />}
+          <details className="group rounded-2xl border border-cyan-300/20 bg-[#101321] p-5">
+            <summary className="cursor-pointer py-2 text-lg font-semibold text-cyan-100">
+              Generation & WaveSpeed{" "}
+              <span className="mt-1 block text-sm font-normal text-slate-400">
+                Verbrauch, Guthaben und Zuordnung ansehen
+              </span>
+            </summary>
+            <div className="mt-5">
+              <WaveSpeedAnalytics userId={user.id} />
+            </div>
+          </details>
+        </div>
         {query.isPending && <p role="status">Midna sammelt die Zahlen …</p>}
         {r && (
           <>
@@ -194,19 +218,23 @@ function Business() {
                 Kiikii-Review.
               </p>
             </section>
-            <section
+            <details
               aria-labelledby="money-heading"
               className="rounded-2xl border border-fuchsia-400/20 bg-[#101321]/90 p-5 md:p-6"
             >
-              <div className="mb-5 flex flex-wrap justify-between gap-2">
+              <summary className="cursor-pointer py-2">
                 <h2 id="money-heading" className="flex items-center gap-2 text-xl font-semibold">
                   <Wallet className="text-fuchsia-300" size={20} />
-                  Credits im Blick
+                  Aufladungen & Zahlungsplanung
                 </h2>
                 <span className="font-mono text-xs text-slate-300">
                   MONAT {r.at.day.slice(0, 7)}
                 </span>
-              </div>
+              </summary>
+              <p className="mb-5 mt-3 text-sm text-slate-400">
+                Separate Zahlungsübersicht. Diese Beträge nicht noch einmal zu den Kosten oben
+                addieren.
+              </p>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric
                   label="Kiikii · nur USD-Zahlungsplanung"
@@ -255,9 +283,8 @@ function Business() {
                   <p className="mt-1 text-sm leading-relaxed">
                     Monatliche Fixkostenaufteilung: {mixedMoney(r.allocation.totals.kiikii)}. Die
                     Gewinn-Schätzung oben verwendet einen datierten Wechselkurs. Diese ältere
-                    Zahlungsübersicht zeigt nur USD. Die
-                    gemeinsame WaveSpeed-Aufladung ist keine zusätzliche Ausgabe neben dem
-                    Verbrauch.
+                    Zahlungsübersicht zeigt nur USD. Die gemeinsame WaveSpeed-Aufladung ist keine
+                    zusätzliche Ausgabe neben dem Verbrauch.
                   </p>
                 </div>
               </div>
@@ -295,7 +322,7 @@ function Business() {
                   </p>
                 </div>
               </details>
-            </section>
+            </details>
             <section
               aria-labelledby="fans-heading"
               className="rounded-2xl border border-white/10 bg-[#101321]/90 p-5 md:p-6"
@@ -350,57 +377,60 @@ function Business() {
                 Kosten pro neuem Follower / zahlendem Sub: noch offen. Dafür müssen Kosten, Zeitraum
                 und neue Fans zusammenpassen.
               </p>
-              <div className="mt-5 space-y-2">
-                {r.snapshots.map((s) => (
-                  <details key={s.source} className="rounded-lg border border-white/10 p-3">
-                    <summary className="cursor-pointer text-sm">
-                      <span className="font-semibold">{s.source}</span>
-                      <span className="ml-3 text-slate-400">
-                        {date(s.observed_at)} ·{" "}
-                        {s.observed_at.slice(0, 10) < r.at.day
-                          ? "älterer Stand"
-                          : s.source.endsWith(" API")
-                            ? "API-Abruf"
-                            : "manuell erfasst"}
-                      </span>
-                    </summary>
-                    <div className="mt-3 text-sm leading-relaxed text-slate-300">
-                      <p>
-                        {s.period_start === s.period_end ? "Ablesetag" : "Zeitraum"}:{" "}
-                        {date(s.period_start)}
-                        {s.period_start !== s.period_end ? " – " + date(s.period_end) : ""}
-                      </p>
-                      {Object.entries(s.values).map(([k, v]) => (
-                        <p key={k}>
-                          {k}: <strong className="text-white">{number(v)}</strong>
+              <details className="mt-5">
+                <summary className="cursor-pointer py-3 text-sm text-cyan-200">
+                  Quellen & Einzelwerte anzeigen
+                </summary>
+                <div className="space-y-2">
+                  {r.snapshots.map((s) => (
+                    <details key={s.source} className="rounded-lg border border-white/10 p-3">
+                      <summary className="cursor-pointer text-sm">
+                        <span className="font-semibold">{s.source}</span>
+                        <span className="ml-3 text-slate-400">
+                          {date(s.observed_at)} ·{" "}
+                          {s.observed_at.slice(0, 10) < r.at.day
+                            ? "älterer Stand"
+                            : s.source.endsWith(" API")
+                              ? "API-Abruf"
+                              : "manuell erfasst"}
+                        </span>
+                      </summary>
+                      <div className="mt-3 text-sm leading-relaxed text-slate-300">
+                        <p>
+                          {s.period_start === s.period_end ? "Ablesetag" : "Zeitraum"}:{" "}
+                          {date(s.period_start)}
+                          {s.period_start !== s.period_end ? " – " + date(s.period_end) : ""}
                         </p>
-                      ))}
-                      <p className="mt-2 text-slate-400">{s.note}</p>
-                    </div>
-                  </details>
-                ))}
-              </div>
+                        {Object.entries(s.values).map(([k, v]) => (
+                          <p key={k}>
+                            {k}: <strong className="text-white">{number(v)}</strong>
+                          </p>
+                        ))}
+                        <p className="mt-2 text-slate-400">{s.note}</p>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </details>
             </section>
-            <aside className="flex gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/5 p-5">
-              <ArrowUpRight className="shrink-0 text-cyan-300" />
-              <div>
-                <p className="font-mono text-xs tracking-widest text-cyan-200">
-                  MIDNAS NÄCHSTER MOVE
-                </p>
-                <p className="mt-2">
-                  Fanvue, Instagram und WaveSpeed zusammen im täglichen Bericht. Offene Lücken
-                  bleiben sichtbar.
-                </p>
-                <p className="mt-2 text-sm text-slate-400">
-                  Fanvue und Instagram werden nach der Verbindung täglich aus der API abgeglichen.
-                  WaveSpeed liefert Guthaben und tatsächliche Abrechnungen. Beim Closer ist der
-                  Kontofilter noch in Klärung; bis zur Bestätigung bleibt sein Abruf pausiert.
-                  Link-Zahlen sind weiterhin manuell. Tapclick fehlt.
-                </p>
-              </div>
-            </aside>
           </>
         )}
+        <details
+          id="data-sources"
+          className="scroll-mt-6 rounded-2xl border border-white/15 bg-[#101321] p-5 md:p-6"
+        >
+          <summary className="cursor-pointer py-2 text-xl font-semibold">
+            Daten & Verbindungen{" "}
+            <span className="mt-1 block text-sm font-normal text-slate-400">
+              Fanvue, Instagram und Closer · Status prüfen oder verbinden
+            </span>
+          </summary>
+          <div className="mt-6 space-y-5">
+            <FanvueAnalyticsConnection userId={user.id} />
+            <InstagramAnalyticsConnection userId={user.id} />
+            <CloserAnalyticsConnection userId={user.id} />
+          </div>
+        </details>
         <footer className="flex flex-wrap justify-between gap-2 border-t border-white/10 pt-4 font-mono text-xs text-slate-400">
           <span>KIIKII HQ // NO GUESSWORK</span>
           <span>Does it make the boat go faster?</span>

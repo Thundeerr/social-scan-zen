@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { channelAlertTelegramCall } from "./messaging/telegram-transport";
 import { waveStatus } from "./wavespeed-analytics.server";
-import { allocationPlan, mixedMoney, type CostAllocation } from "./business-cost-allocation";
+import { allocationPlan, type CostAllocation } from "./business-cost-allocation";
 import { generationRunRate } from "./wavespeed-analytics";
 import {
   berlinTime,
@@ -74,70 +74,44 @@ export async function businessReport(user: string, now = new Date()) {
   const forecast = forecastCash(costs.fixed, costs.topups, local.day);
   const fv =
     latest.find((s) => s.source === "Fanvue API") ?? latest.find((s) => s.source === "Fanvue");
-  const ig =
-    latest.find((s) => s.source === "Instagram API") ??
-    latest.find((s) => s.source === "Instagram");
-  const closer = latest.find((s) => s.source === "Closer API");
   const wave = await waveStatus(user);
   const wr = wave?.report;
   const generation = wr ? generationRunRate(wr) : null;
-  const value = (snapshot: MetricSnapshot | undefined, metric: string) =>
-    snapshot?.values[metric]?.toLocaleString("de-DE") ?? "unbekannt";
   const profit = profitEstimate(latest, allocation, wr);
+  const euro = (n: number) => n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   const text = [
-    "🦇 KIIKII HQ // MIDNAS NIGHT SHIFT",
-    `${local.day} · ${local.time} Uhr · Berlin`,
+    "🦇 MIDNA // KIIKII MONEY CHECK",
+    `${local.day} · ${local.time} Uhr`,
     "",
     ...(profit
       ? [
-          `💜 Überschuss-Schätzung ${profit.start}–${profit.end}: ${profit.surplus.toFixed(2)} EUR bei ${profit.costs.toFixed(2)} EUR Kosten inkl. aktueller Monatsfixkosten und bezahlter CupidBot-Abos. Alle9 Zahlungen zugeordnet:72USD Instagram+32USD Link. Laufend ${profit.subscriptionCount ?? "?"} Abos im Mittel ${profit.monthlySubscriptionsUsd.toFixed(2)} USD/Monat (Stand ${profit.subscriptionDate}). ${profit.charged} Gespräche; ${profit.remaining} übrig. Keine periodengerechte Buchhaltung. FX ${profit.fxDay}.`,
+          `💜 Übrig: ${euro(profit.surplus)} · Schätzung vor Steuern`,
+          `Rechnung: ${profit.start} – ${profit.end}`,
+          `Einnahmen netto ${euro(profit.revenue)} − Kosten ${euro(profit.costs)}`,
+          `Monatskosten bei diesem Tempo: ≈ ${euro(profit.monthly)}`,
         ]
-      : []),
-    "⚡ WAS LÄUFT?",
-    `${live.published_today} heute veröffentlicht · ${live.scheduled} eingeplant`,
-    `${live.review_pending} warten auf dein Okay. ${live.jobs_today} neue Jobs heute.`,
+      : [
+          "⚠️ Gewinn offen: Daten fehlen oder Zeiträume passen nicht zusammen.",
+          ...(fv
+            ? [
+                `Fanvue netto: ${fv.values["Netto vor Betriebskosten USD"] === undefined ? "unbekannt" : usd(fv.values["Netto vor Betriebskosten USD"] * 100)} · ${fv.period_start} – ${fv.period_end} · vor Betriebskosten`,
+              ]
+            : []),
+        ]),
+    "",
+    `🎬 ${live.published_today} heute gepostet · ${live.scheduled} geplant · ${live.review_pending} zur Review`,
     live.last_scheduled
-      ? `Vorlauf bis ${berlinTime(new Date(live.last_scheduled)).day}, ${berlinTime(new Date(live.last_scheduled)).time} Uhr.`
-      : "Noch kein bestätigter Vorlauf. Die Queue braucht Nachschub.",
-    "",
-    "💸 CREDITS CHECK · " + local.day.slice(0, 7),
-    hasAllocation
-      ? `Kiikii monatlich: ${mixedMoney(allocation.totals.kiikii)} fix. Tuuva nutzt dieselbe Infrastruktur; noch kein zusätzlicher Fixkostenanteil.`
-      : `Fixkosten bisher: ${usd(costs.fixed)}.`,
-    `Monatsrahmen ${usd(budget)}. USD-Teilzahlungen ${usd(costs.topups)}; gemeinsame Aufladungen ${usd(costs.sharedTopups)}.`,
-    hasAllocation
-      ? "Die ältere USD-Zahlungsübersicht ist kein vollständiger Budgetstand."
-      : "Kostenaufteilung fehlt noch.",
-    "Aufladung ≠ Verbrauch. Zahlungen und Verbrauch werden nicht zusammengezählt.",
+      ? `Vorlauf bis ${berlinTime(new Date(live.last_scheduled)).day}`
+      : "⚠️ Kein Vorlauf – Queue braucht Nachschub.",
     wr
-      ? `WaveSpeed · ${wr.month} · Stand ${berlinTime(new Date(wr.observed)).day} ${berlinTime(new Date(wr.observed)).time}:\nGuthaben ${usd(wr.balance * 100)}${wr.balance < 5 ? " ⚠️ niedrig" : ""}\nVerbrauch ${usd(wr.net * 100)}: Kiikii ${usd(wr.kiikii * 100)}, Tuuva ${usd(wr.tuuva * 100)}, unzugeordnet ${usd(wr.unassigned * 100)}.\n${usd(wr.charged * 100)} abgebucht − ${usd(wr.refunded * 100)} erstattet.${wr.unknownTypes ? ` ${wr.unknownTypes} andere Buchungen nicht eingerechnet.` : ""}`
-      : "WaveSpeed: bestätigte Abrechnung fehlt.",
-    wave?.error
-      ? "⚠️ WaveSpeed-Abruf gestört; angezeigte Werte sind der letzte bestätigte Stand."
-      : "",
-    generation
-      ? `30-Tage-Generierungsprognose: ${usd(generation.total * 100)} fürs Konto; davon Kiikii ${usd(generation.kiikii * 100)}, Tuuva ${usd(generation.tuuva * 100)}, offen ${usd(generation.unassigned * 100)}. Basis ${generation.days} Kalendertage inkl. laufendem Tag, kein Langzeitmittel.`
-      : "",
-    `Job-Reservierungen: ${usd(live.reserved_month_cents)} – Schätzung, keine Rechnung.`,
-    "Warnungen statt Autostopp. Ungeklärte Anbieterposten bleiben offen.",
+      ? `⚡ WaveSpeed: ${usd(wr.balance * 100)} Guthaben · Stand ${berlinTime(new Date(wr.observed)).day}${wr.balance < 5 ? " · ⚠️ niedrig" : ""}`
+      : "⚠️ WaveSpeed-Abrechnung fehlt.",
+    ...(wave?.error ? ["⚠️ WaveSpeed-Abruf gestört; letzter bestätigter Stand."] : []),
+    ...(wr && (wr.unassigned > 0 || wr.unknownTypes > 0)
+      ? ["⚠️ WaveSpeed: offene Kostenzuordnung im Dashboard prüfen."]
+      : []),
     "",
-    "📡 LETZTE BESTÄTIGTE SIGNALE",
-    fv
-      ? `Fanvue · ${fv.period_start} bis ${fv.period_end}:\n${value(fv, "Subs gesamt")} Subs gesamt\n${value(fv, "Netto vor Betriebskosten USD")} $ netto vor Betriebskosten. Kein Gewinn.\n${fv.source === "Fanvue API" ? "API-Abruf" : "Manuell erfasst"}: ${berlinTime(new Date(fv.observed_at)).day} ${berlinTime(new Date(fv.observed_at)).time} Uhr.`
-      : "Fanvue: Daten fehlen.",
-    ig
-      ? `Instagram: ${value(ig, "Follower gesamt")} Follower · Stand ${berlinTime(new Date(ig.observed_at)).day}.`
-      : "Instagram: Daten fehlen.",
-    "Fanvue und Instagram nach Verbindung täglich per API; Zeitstempel beachten.",
-    closer
-      ? `Closer · ${closer.period_start} bis ${closer.period_end}: ${value(closer, "Gespräche gesamt")} Gespräche → ${value(closer, "Link verschickt")} Links → ${value(closer, "Conversions (Closer, keine bestätigten Subs)")} gemeldete Conversions.`
-      : "Closer: Kontofilter beim Support in Klärung. Automatischer Abruf pausiert.",
-    "Closer-Conversions sind keine bestätigten bezahlten Subs. Tapclick fehlt.",
-    "Kosten pro neuem Follower / zahlendem Sub: noch unbekannt.",
-    "",
-    "🎯 NÄCHSTER MOVE",
-    "Unzugeordnete Kosten prüfen; Closer-Supportantwort und Link-Statistiken fehlen noch.",
-    "Unten auf Status Kiikii tippen für alle Zahlen und Zeiträume.",
+    "Alle Details → https://instascanner.app/business",
   ].join("\n");
   return {
     text,
@@ -238,7 +212,7 @@ export async function businessTick(request: Request) {
         await sendBusinessReport(
           owner(),
           `usage-budget:${month}:${actualLevel}`,
-          `VERBRAUCH mindestens ${actualLevel}% · Kiikii\nUSD-Fixkosten + zugeordneter WaveSpeed-Verbrauch: ${usd(actual)} / ${usd(report.budget)}.\nZusätzlich EUR-Fixkosten: ${mixedMoney(report.allocation.totals.kiikii)} monatliche Gesamtaufteilung. Andere variable Anbieter und Zuordnung unvollständig. Aufladungen nicht addiert. Kein Autostopp.`,
+          `⚠️ KIIKII // Budget mindestens ${actualLevel}%\nUSD-Fixanteil + Generation: ${usd(actual)} / ${usd(report.budget)}.\nEUR-Kosten und weitere Posten fehlen hier. Kein Autostopp.\nhttps://instascanner.app/business`,
         );
     }
     if (level)

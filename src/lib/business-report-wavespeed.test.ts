@@ -115,12 +115,15 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 it("daily report includes actual costs and fits Telegram without sending", async () => {
   const { businessReport } = await import("./business-report.server");
   const r = await businessReport("operator", new Date("2026-10-28T19:00:00Z"));
-  expect(r.text).toContain("376 Gespräche");
-  expect(r.text.length).toBeLessThanOrEqual(4000);
-  expect(r.text).toContain("267.78 $");
-  expect(r.text).toContain("89.80 $");
-  expect(r.text).toContain("unzugeordnet 175.98 $");
-  expect(r.text).toContain("Automatischer Abruf pausiert");
+  expect(r.text).toContain("Schätzung vor Steuern");
+  expect(r.text).toContain("2026-10-01 – 2026-10-28");
+  expect(r.text).toContain("Einnahmen netto");
+  expect(r.text).toContain("Monatskosten bei diesem Tempo");
+  expect(r.text).toContain("⚠️ niedrig");
+  expect(r.text).toContain("offene Kostenzuordnung");
+  expect(r.text).toContain("https://instascanner.app/business");
+  expect(r.text.length).toBeLessThan(1100);
+  expect(r.text).not.toContain("Automatischer Abruf pausiert");
   expect(r.costs.fixed).toBe(1000);
   expect(r.allocation.totals.kiikii.EUR).toBe(5725);
   expect(r.entries[0].cents).toBe(9000);
