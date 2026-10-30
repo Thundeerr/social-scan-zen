@@ -106,7 +106,7 @@ export async function workerRequest(request: Request) {
           if (
             error instanceof ReelSourceError &&
             typeof error.reason === "string" &&
-            /^(?:provider_http_[1-5]\d{2}|provider_timeout|provider_aborted|provider_type_error|provider_network)$/.test(
+            /^(?:provider_http_[1-5]\d{2}|provider_http_(?:401|403)_(?:subscription_required|invalid_key|quota_exceeded|endpoint_access_denied)|provider_timeout|provider_aborted|provider_type_error|provider_network)$/.test(
               error.reason,
             ) &&
             error.reason.trim() === error.reason

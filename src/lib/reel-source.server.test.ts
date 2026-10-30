@@ -165,6 +165,66 @@ describe("provider request", () => {
       reason: "provider_http_429",
     });
   });
+  it.each([
+    [401, { message: "Invalid API key. Go to https://private.invalid/?key=secret" }, "invalid_key"],
+    [403, { message: "You are not subscribed to this API." }, "subscription_required"],
+    [
+      403,
+      { message: "You have exceeded the DAILY quota for Requests on your current plan." },
+      "quota_exceeded",
+    ],
+    [
+      403,
+      { error: { message: "This endpoint is not included in your current plan." } },
+      "endpoint_access_denied",
+    ],
+  ])("classifies HTTP %s using only a fixed safe access label", async (status, body, label) => {
+    configure();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json(body, { status: Number(status) })),
+    );
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: "setup",
+      message: "setup",
+      reason: `provider_http_${status}_${label}`,
+    });
+  });
+  it.each([
+    JSON.stringify({ message: "Forbidden https://private.invalid/?key=secret" }),
+    "<html>You are not subscribed to this API.</html>",
+    JSON.stringify({ message: "You are not subscribed to this API.", padding: "x".repeat(8192) }),
+    JSON.stringify({ unrelated: "Invalid API key." }),
+  ])("keeps only HTTP status for unknown or oversized access bodies", async (body) => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 403 })));
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: "setup",
+      reason: "provider_http_403",
+    });
+  });
+  it("retains HTTP 403 if reading the bounded diagnostic body fails", async () => {
+    configure();
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        body: {
+          getReader: () => ({
+            read: vi.fn().mockRejectedValue(new Error("secret stream detail")),
+            cancel,
+          }),
+        },
+      }),
+    );
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: "setup",
+      reason: "provider_http_403",
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
   it("bounds response size and rejects HTML", async () => {
     configure();
     const fetcher = vi

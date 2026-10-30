@@ -124,6 +124,11 @@ describe("worker endpoint", () => {
   it.each([
     ["provider_http_429", " (provider_http_429)"],
     ["provider_http_503", " (provider_http_503)"],
+    ["provider_http_403_subscription_required", " (provider_http_403_subscription_required)"],
+    ["provider_http_401_invalid_key", " (provider_http_401_invalid_key)"],
+    ["provider_http_403_quota_exceeded", " (provider_http_403_quota_exceeded)"],
+    ["provider_http_403_endpoint_access_denied", " (provider_http_403_endpoint_access_denied)"],
+    ["provider_http_403_unknown_private_detail", ""],
     ["provider_timeout", " (provider_timeout)"],
     ["provider_aborted", " (provider_aborted)"],
     ["provider_type_error", " (provider_type_error)"],

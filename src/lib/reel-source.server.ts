@@ -1,8 +1,14 @@
 import { canonicalReel } from "./reel-inbox";
 
 type Failure = "unavailable" | "interrupted" | "setup" | "unsupported";
+type AccessFailure =
+  | "subscription_required"
+  | "invalid_key"
+  | "quota_exceeded"
+  | "endpoint_access_denied";
 type FailureReason =
   | `provider_http_${number}`
+  | `provider_http_${401 | 403}_${AccessFailure}`
   | "provider_timeout"
   | "provider_aborted"
   | "provider_type_error"
@@ -21,6 +27,65 @@ function record(value: unknown): RecordValue | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as RecordValue)
     : null;
+}
+
+async function accessFailure(response: Response): Promise<AccessFailure | undefined> {
+  const reader = response.body?.getReader();
+  if (!reader) return;
+  try {
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 8192) return;
+      chunks.push(part.value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    const text = new TextDecoder().decode(bytes);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = text;
+    }
+    const body = record(payload);
+    const messages = [
+      typeof payload === "string" ? payload : null,
+      body?.message,
+      body?.error,
+      record(body?.error)?.message,
+    ];
+    for (const value of messages) {
+      if (typeof value !== "string") continue;
+      const message = value.trim();
+      if (/^you are not subscribed to this api(?:[.!]|$)/i.test(message))
+        return "subscription_required";
+      if (/^(?:invalid|missing) api key(?:[.!]|$)/i.test(message)) return "invalid_key";
+      if (
+        /^(?:quota exceeded(?:[.!]|$)|you have exceeded (?:the )?(?:(?:daily|monthly|hourly) )?(?:quota|request limit|requests limit)\b)/i.test(
+          message,
+        )
+      )
+        return "quota_exceeded";
+      if (
+        /^(?:endpoint access denied(?:[.!]|$)|access to this endpoint is denied(?:[.!]|$)|you (?:do not|don't) have (?:permission|access) to (?:access |use )?this endpoint\b|this endpoint is not (?:available|included) (?:on|in) your (?:current )?plan\b)/i.test(
+          message,
+        )
+      )
+        return "endpoint_access_denied";
+    }
+  } catch {
+    // Unknown, truncated or unreadable bodies retain only the HTTP status.
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }
 
 export function reelProviderConfigured() {
@@ -132,15 +197,21 @@ export async function resolveReelSource(canonicalUrl: string, shortcode: string)
       signal: AbortSignal.timeout(22000),
     });
     if (!response.ok) {
-      // A body cleanup failure must not hide the HTTP status already received.
-      await response.body?.cancel().catch(() => undefined);
+      let reason: FailureReason = `provider_http_${response.status}`;
+      if (response.status === 401 || response.status === 403) {
+        const access = await accessFailure(response);
+        if (access) reason = `provider_http_${response.status}_${access}`;
+      } else {
+        // A body cleanup failure must not hide the HTTP status already received.
+        await response.body?.cancel().catch(() => undefined);
+      }
       throw new ReelSourceError(
         response.status === 429 || response.status >= 500
           ? "interrupted"
           : response.status === 401 || response.status === 403
             ? "setup"
             : "unavailable",
-        `provider_http_${response.status}`,
+        reason,
       );
     }
     const reader = response.body?.getReader();
