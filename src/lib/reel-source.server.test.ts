@@ -88,7 +88,7 @@ describe("provider request", () => {
     expect(target.origin).toBe("https://instagram-looter2.p.rapidapi.com");
     expect(target.pathname).toBe("/post");
     expect(target.searchParams.get("url")).toBe(url);
-    expect(init.redirect).toBe("error");
+    expect(init.redirect).toBe("manual");
   });
   it("does not send a key to an unconfigured host or caller URL", async () => {
     configure();
@@ -111,7 +111,59 @@ describe("provider request", () => {
       "fetch",
       vi.fn().mockResolvedValue(new Response("secret body", { status: Number(status) })),
     );
-    await expect(resolveReelSource(url, code)).rejects.toThrow(String(message));
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: message,
+      message,
+      reason: `provider_http_${status}`,
+    });
+  });
+  it.each([
+    ["TimeoutError", "provider_timeout"],
+    ["AbortError", "provider_aborted"],
+    ["TypeError", "provider_type_error"],
+    ["Error", "provider_network"],
+  ])("records a safe %s diagnostic without the network message", async (name, reason) => {
+    configure();
+    const failure = new Error("https://private.invalid/video?key=secret-network-data");
+    failure.name = name;
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(failure));
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: "interrupted",
+      message: "interrupted",
+      reason,
+    });
+  });
+  it("rejects a provider redirect without issuing a second fetch or forwarding credentials", async () => {
+    configure();
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { Location: "https://untrusted.invalid/collect" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: "unavailable",
+      reason: "provider_http_302",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1].redirect).toBe("manual");
+    expect(fetcher.mock.calls[0][0].origin).toBe("https://instagram-looter2.p.rapidapi.com");
+  });
+  it("preserves the HTTP diagnostic if response-body cleanup fails", async () => {
+    configure();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        body: { cancel: vi.fn().mockRejectedValue(new Error("private cleanup detail")) },
+      }),
+    );
+    await expect(resolveReelSource(url, code)).rejects.toMatchObject({
+      code: "interrupted",
+      reason: "provider_http_429",
+    });
   });
   it("bounds response size and rejects HTML", async () => {
     configure();

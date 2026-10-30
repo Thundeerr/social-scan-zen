@@ -1,8 +1,17 @@
 import { canonicalReel } from "./reel-inbox";
 
 type Failure = "unavailable" | "interrupted" | "setup" | "unsupported";
+type FailureReason =
+  | `provider_http_${number}`
+  | "provider_timeout"
+  | "provider_aborted"
+  | "provider_type_error"
+  | "provider_network";
 export class ReelSourceError extends Error {
-  constructor(readonly code: Failure) {
+  constructor(
+    readonly code: Failure,
+    readonly reason?: FailureReason,
+  ) {
     super(code);
   }
 }
@@ -117,17 +126,21 @@ export async function resolveReelSource(canonicalUrl: string, shortcode: string)
         "x-rapidapi-host": "instagram-looter2.p.rapidapi.com",
         Accept: "application/json",
       },
-      redirect: "error",
+      // Cloudflare Workers supports manual redirects, not redirect: "error".
+      // Reject the returned 3xx below without forwarding the provider key.
+      redirect: "manual",
       signal: AbortSignal.timeout(22000),
     });
     if (!response.ok) {
-      await response.body?.cancel();
+      // A body cleanup failure must not hide the HTTP status already received.
+      await response.body?.cancel().catch(() => undefined);
       throw new ReelSourceError(
         response.status === 429 || response.status >= 500
           ? "interrupted"
           : response.status === 401 || response.status === 403
             ? "setup"
             : "unavailable",
+        `provider_http_${response.status}`,
       );
     }
     const reader = response.body?.getReader();
@@ -160,6 +173,15 @@ export async function resolveReelSource(canonicalUrl: string, shortcode: string)
   } catch (error) {
     // Provider bodies, API keys and signed CDN links must never enter logs/errors.
     if (error instanceof ReelSourceError) throw error;
-    throw new ReelSourceError("interrupted");
+    const name = error instanceof Error ? error.name : "";
+    const reason =
+      name === "TimeoutError"
+        ? "provider_timeout"
+        : name === "AbortError"
+          ? "provider_aborted"
+          : name === "TypeError"
+            ? "provider_type_error"
+            : "provider_network";
+    throw new ReelSourceError("interrupted", reason);
   }
 }

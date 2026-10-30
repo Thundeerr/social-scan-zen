@@ -12,6 +12,7 @@ vi.mock("./reel-source.server", async (original) => ({
   resolveReelSource: mock.resolve,
 }));
 import { workerRequest } from "./reel-inbox.server";
+import { ReelSourceError } from "./reel-source.server";
 describe("worker endpoint", () => {
   beforeEach(() => {
     mock.rpc.mockReset();
@@ -118,6 +119,46 @@ describe("worker endpoint", () => {
       );
       expect((await response.json()).error).toBe(data ? "setup" : "unavailable");
       expect(mock.resolve).not.toHaveBeenCalled();
+    },
+  );
+  it.each([
+    ["provider_http_429", " (provider_http_429)"],
+    ["provider_http_503", " (provider_http_503)"],
+    ["provider_timeout", " (provider_timeout)"],
+    ["provider_aborted", " (provider_aborted)"],
+    ["provider_type_error", " (provider_type_error)"],
+    ["provider_network", " (provider_network)"],
+    ["https://private.invalid/?key=secret", ""],
+    ["provider_http_429\nsecret", ""],
+    ["provider_timeout\n", ""],
+    [undefined, ""],
+  ])(
+    "records only allowlisted diagnostic %s and keeps the helper response unchanged",
+    async (reason, suffix) => {
+      const source = {
+        canonical_url: "https://www.instagram.com/reel/ABCDE/",
+        shortcode: "ABCDE",
+        run_id: crypto.randomUUID(),
+      };
+      mock.rpc
+        .mockResolvedValueOnce({ data: { ok: true }, error: null })
+        .mockResolvedValueOnce({ data: source, error: null });
+      mock.resolve.mockRejectedValue(Object.assign(new ReelSourceError("interrupted"), { reason }));
+      const eq = vi.fn().mockResolvedValue({ error: null });
+      const update = vi.fn().mockReturnValue({ eq });
+      mock.from.mockReturnValue({ update });
+      const response = await workerRequest(
+        request({ action: "resolve", id: crypto.randomUUID(), lease: crypto.randomUUID() }),
+      );
+      expect(await response.json()).toEqual({ error: "interrupted" });
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: "interrupted",
+          phase_detail: `Reel download fallback: interrupted${suffix}`,
+        }),
+      );
+      expect(eq).toHaveBeenCalledWith("id", source.run_id);
     },
   );
 });

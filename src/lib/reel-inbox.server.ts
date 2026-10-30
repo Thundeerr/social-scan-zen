@@ -97,10 +97,22 @@ export async function workerRequest(request: Request) {
           shortcode: string;
           run_id: string;
         };
+        let diagnostic: string | undefined;
         try {
           result = await resolveReelSource(source.canonical_url, source.shortcode);
         } catch (error) {
           result = { error: error instanceof ReelSourceError ? error.code : "interrupted" };
+          // Only fixed diagnostics enter accounting; never arbitrary messages or causes.
+          if (
+            error instanceof ReelSourceError &&
+            typeof error.reason === "string" &&
+            /^(?:provider_http_[1-5]\d{2}|provider_timeout|provider_aborted|provider_type_error|provider_network)$/.test(
+              error.reason,
+            ) &&
+            error.reason.trim() === error.reason
+          ) {
+            diagnostic = error.reason;
+          }
         }
         const code = (result as { error?: string }).error;
         await db
@@ -110,7 +122,7 @@ export async function workerRequest(request: Request) {
             error: code ?? null,
             completed_at: new Date().toISOString(),
             phase_detail: code
-              ? `Reel download fallback: ${code}`
+              ? `Reel download fallback: ${code}${diagnostic ? ` (${diagnostic})` : ""}`
               : "Reel download source resolved",
           })
           .eq("id", source.run_id);
