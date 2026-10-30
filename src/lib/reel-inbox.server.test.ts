@@ -1,9 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mock = vi.hoisted(() => ({ rpc: vi.fn() }));
+const mock = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  from: vi.fn(),
+  configured: vi.fn(),
+  resolve: vi.fn(),
+}));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: mock }));
+vi.mock("./reel-source.server", async (original) => ({
+  ...(await original<typeof import("./reel-source.server")>()),
+  reelProviderConfigured: mock.configured,
+  resolveReelSource: mock.resolve,
+}));
 import { workerRequest } from "./reel-inbox.server";
 describe("worker endpoint", () => {
-  beforeEach(() => mock.rpc.mockReset());
+  beforeEach(() => {
+    mock.rpc.mockReset();
+    mock.resolve.mockReset();
+    mock.from.mockReset();
+    mock.configured.mockReturnValue(true);
+  });
   const request = (body: unknown, token = "a".repeat(64)) =>
     new Request("https://instascanner.app/api/reel-inbox/worker", {
       method: "POST",
@@ -39,4 +54,70 @@ describe("worker endpoint", () => {
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain("secret-database-internals");
   });
+  it("rejects caller-supplied source URLs", async () => {
+    const response = await workerRequest(
+      request({
+        action: "resolve",
+        id: crypto.randomUUID(),
+        lease: crypto.randomUUID(),
+        url: "https://evil.test",
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(mock.resolve).not.toHaveBeenCalled();
+  });
+  it("requires the owned active lease before invoking the provider", async () => {
+    mock.rpc.mockResolvedValue({ data: null, error: { message: "stale lease" } });
+    expect(
+      (
+        await workerRequest(
+          request({ action: "resolve", id: crypto.randomUUID(), lease: crypto.randomUUID() }),
+        )
+      ).status,
+    ).toBe(503);
+    expect(mock.resolve).not.toHaveBeenCalled();
+  });
+  it("uses only the database source and accounts for the reserved request", async () => {
+    const source = {
+      canonical_url: "https://www.instagram.com/reel/ABCDE/",
+      shortcode: "ABCDE",
+      run_id: crypto.randomUUID(),
+    };
+    mock.rpc
+      .mockResolvedValueOnce({ data: { ok: true }, error: null })
+      .mockResolvedValueOnce({ data: source, error: null });
+    const result = {
+      url: "https://video.fbcdn.net/test.mp4",
+      metadata: { title: "Test", creator: "test" },
+    };
+    mock.resolve.mockResolvedValue(result);
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    mock.from.mockReturnValue({ update });
+    const response = await workerRequest(
+      request({ action: "resolve", id: crypto.randomUUID(), lease: crypto.randomUUID() }),
+    );
+    expect(await response.json()).toEqual(result);
+    expect(mock.rpc.mock.calls[0][1].p_action).toBe("renew");
+    expect(mock.rpc.mock.calls[1][0]).toBe("reel_inbox_resolve_source");
+    expect(mock.resolve).toHaveBeenCalledExactlyOnceWith(source.canonical_url, source.shortcode);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "completed", error: null }),
+    );
+    expect(eq).toHaveBeenCalledWith("id", source.run_id);
+  });
+  it.each([null, { error: "setup" }])(
+    "does not spend on a repeated lease or exhausted budget",
+    async (data) => {
+      mock.rpc
+        .mockResolvedValueOnce({ data: { ok: true }, error: null })
+        .mockResolvedValueOnce({ data, error: null });
+      const response = await workerRequest(
+        request({ action: "resolve", id: crypto.randomUUID(), lease: crypto.randomUUID() }),
+      );
+      expect((await response.json()).error).toBe(data ? "setup" : "unavailable");
+      expect(mock.resolve).not.toHaveBeenCalled();
+    },
+  );
 });

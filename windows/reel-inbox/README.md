@@ -1,5 +1,33 @@
 # Reel Inbox · Windows
 
+## API fallback (2026-10-30)
+
+The helper first tries the existing public extractor. If extraction or the CDN
+download fails, it asks the app for one fresh video URL through the existing
+Instagram Looter subscription. `RAPIDAPI_KEY` stays on the server; the PC only uses
+its existing paired-device key. No browser session is read.
+
+The app validates the device and active item lease, resolves the exact saved
+shortcode through `/post?url=…`, rejects mismatched/image/carousel responses, and
+counts the lookup against the shared monthly API request allowance. Repeated
+requests on the same lease cannot spend again. Temporary provider/network errors
+use the existing bounded retry queue; other failures remain visible for review.
+`unavailable` means retrieval failed, not proof that the Reel is private/deleted.
+
+Downloaded bytes still pass CDN host/address checks, size limits, full FFmpeg
+decoding and SHA-256 verification before atomic placement. Failed partials stay
+in staging. This path only collects source material; it creates no generation or
+publishing jobs. Existing scanner budget accounting is an approximation of actual
+provider usage; these fallback reservations each count as one request.
+
+Deploy `20261030113943_reel_inbox_api_resolve_lease.sql`, then the app, then replace
+the installed `helper.py` after a graceful stop and a backup. Restart only the
+Windows Inbox helper. The generation container does not need rebuilding.
+Use `node tests/reel-inbox-resolve-db.mjs`, the existing Inbox DB tests,
+`python windows/reel-inbox/test_helper.py`, and the `reel-source.server.test.ts` /
+`reel-inbox.server.test.ts` Vitest suites. Retry existing failed entries explicitly;
+do not create duplicate inbox records or generation jobs for a download test.
+
 Die vorhandene InstaScanner-Anmeldung schützt `/reel-inbox`. Links werden in derselben Supabase-Datenbank gespeichert. Der Windows-Helfer fragt ausschließlich ausgehend `https://instascanner.app/api/reel-inbox/worker` ab. Kein Routerport, Tunnel, neuer Hostinganbieter oder kostenpflichtiger Downloader.
 
 ## Bedienung
@@ -35,7 +63,7 @@ Lokaler Betriebszustand: `%USERPROFILE%\.local\share\InstaScanner\ReelInbox\stat
 ## Sicherheits- und Fehlerverhalten
 
 - Ausschließlich feste lokale Zielpfade; keine vom Server gelieferten beliebigen Dateipfade. Keine Symlinks/Junctions, kein Überschreiben bestehender Reel-Ordner, keine Copy/Delete-Ausweichroutine bei Ordnerwechseln.
-- Nur HTTPS-Instagram-Links, öffentliche yt-dlp-Extraktion ohne Cookies, Downloads nur von öffentlichen Instagram-/Facebook-CDN-Adressen. Kein DMs-/WhatsApp-Zugriff, keine Zugriffsumgehung, keine WaveSpeed-Nutzung.
+- Nur HTTPS-Instagram-Links, öffentliche yt-dlp-Extraktion ohne Cookies und der oben beschriebene API-Fallback; Downloads nur von öffentlichen Instagram-/Facebook-CDN-Adressen. Kein DMs-/WhatsApp-Zugriff durch den PC-Helfer, keine Zugriffsumgehung, keine WaveSpeed-Nutzung.
 - Maximal 50 Links pro Eingabe, 512 MiB und eine Stunde je Video. MP4 muss lesbar und mit FFmpeg vollständig dekodierbar sein. Einzelne progressive MP4s und echte stumme Videos werden unterstützt; Carousels, Playlists und nur getrennt angebotene Audio-/Videospuren gelten als nicht unterstützt.
 - Aufträge überleben PC-Ausfälle. Fünf-Minuten-Leases verhindern doppelte Bestätigungen; abgelaufene Aufträge werden erneut angeboten. Nach erfolgreicher Ablage mit verlorener Rückmeldung erkennt der Helfer sein bestehendes Paket an ID und SHA-256.
 - Temporär unterbrochene Downloads werden begrenzt mit Wartezeit wiederholt. Nicht verfügbare Inhalte benötigen einen bewussten erneuten Versuch. Original-Link und Fehlerstatus bleiben gespeichert.
@@ -52,4 +80,4 @@ Migration: `supabase/migrations/20261006020101_reel_inbox.sql`. Bestehender Proz
 
 Rollback bei App-Problemen: vorherigen App-Stand erneut veröffentlichen; neue Inbox-Tabellen und Dateien zur Wiederaufnahme erhalten, Helfer stoppen. Niemals bestehende Publisher-Tabellen oder Einstellungen verändern.
 
-Kosten: keine neuen Abos oder bezahlten APIs. Bestehende Lovable-/Supabase-Kontingente und mobile Daten werden genutzt; Videos bleiben lokal, nur kleine JPEG-Vorschauen/Metadaten liegen in der Inbox-Datenbank. Keine Zusicherung, dass bestehende Verbrauchskontingente unbegrenzt kostenlos sind.
+Kosten: keine neuen Abos. Der Fallback nutzt das bestehende RapidAPI-Kontingent; erfolgreiche öffentliche Abrufe benötigen keine API-Abfrage. Bestehende Lovable-/Supabase-Kontingente und mobile Daten werden genutzt; Videos bleiben lokal, nur kleine JPEG-Vorschauen/Metadaten liegen in der Inbox-Datenbank. Keine Zusicherung, dass bestehende Verbrauchskontingente unbegrenzt kostenlos sind.

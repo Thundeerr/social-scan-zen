@@ -22,14 +22,14 @@ const stageLabels: Record<(typeof stages)[number], string> = {
   Verwendet: "Used",
 };
 const errors: Record<string, string> = {
-  unavailable: "Instagram does not make this reel publicly available. The original link is saved.",
+  unavailable: "Could not retrieve this video. The original link is saved; this does not necessarily mean the reel is private or deleted.",
   unsupported: "This reel is not currently supported.",
   interrupted: "Download interrupted. Try again.",
   validation: "The downloaded file failed video validation.",
   path_blocked: "The local destination folder is not allowed.",
   disk_error: "Could not save the file. Check storage space and OneDrive.",
   conflict: "File conflict: nothing was overwritten.",
-  setup: "The PC helper or video tools are not set up yet.",
+  setup: "Check the PC helper, video tools, and download API configuration or request allowance.",
 };
 function ReelInbox() {
   const { user } = Route.useRouteContext();

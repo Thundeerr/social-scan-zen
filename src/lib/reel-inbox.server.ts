@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { inboxAction, parseReelLinks, workerAction } from "./reel-inbox";
 import type { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { reelProviderConfigured, ReelSourceError, resolveReelSource } from "./reel-source.server";
 
 // Only this server module can call the service-role-only transaction function.
 async function rpc(
@@ -73,7 +74,50 @@ export async function workerRequest(request: Request) {
     }
     const parsed = workerAction.safeParse(JSON.parse(new TextDecoder().decode(bytes)));
     if (!parsed.success) return new Response("{}", { status: 400, headers });
-    const result = await rpc(parsed.data.action, null, parsed.data, await sha256(token));
+    const hash = await sha256(token);
+    let result: unknown;
+    if (parsed.data.action === "resolve") {
+      // Authenticate the device and owned live lease before any provider/config access.
+      await rpc("renew", null, parsed.data, hash);
+      if (!reelProviderConfigured()) {
+        return new Response(JSON.stringify({ error: "setup" }), { headers });
+      }
+      const db = supabaseAdmin as SupabaseClient;
+      const reserved = await db.rpc("reel_inbox_resolve_source", {
+        p_id: parsed.data.id,
+        p_lease: parsed.data.lease,
+        p_device_hash: hash,
+      });
+      if (reserved.error) throw new Error("Source reservation failed");
+      if (!reserved.data) result = { error: "unavailable" };
+      else if (reserved.data.error) result = { error: "setup" };
+      else {
+        const source = reserved.data as {
+          canonical_url: string;
+          shortcode: string;
+          run_id: string;
+        };
+        try {
+          result = await resolveReelSource(source.canonical_url, source.shortcode);
+        } catch (error) {
+          result = { error: error instanceof ReelSourceError ? error.code : "interrupted" };
+        }
+        const code = (result as { error?: string }).error;
+        await db
+          .from("scanner_runs")
+          .update({
+            status: code ? "failed" : "completed",
+            error: code ?? null,
+            completed_at: new Date().toISOString(),
+            phase_detail: code
+              ? `Reel download fallback: ${code}`
+              : "Reel download source resolved",
+          })
+          .eq("id", source.run_id);
+      }
+    } else {
+      result = await rpc(parsed.data.action, null, parsed.data, hash);
+    }
     return new Response(JSON.stringify(result), { headers });
   } catch {
     return new Response(

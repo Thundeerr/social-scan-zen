@@ -5,6 +5,7 @@ import base64
 import csv
 import hashlib
 import html
+import http.client
 import io
 import ipaddress
 import json
@@ -70,8 +71,12 @@ def tree_hash(folder, root):
     return result
 
 def media_url(url):
-    u = urllib.parse.urlsplit(url)
-    if u.scheme != "https" or u.username or u.password or u.port not in (None, 443) or not u.hostname:
+    try:
+        u = urllib.parse.urlsplit(url)
+        port = u.port
+    except (TypeError, ValueError):
+        raise InboxError("unsupported") from None
+    if u.scheme != "https" or u.username or u.password or port not in (None, 443) or not u.hostname:
         raise InboxError("unsupported")
     if not any(u.hostname.endswith("." + host) or u.hostname == host for host in ("cdninstagram.com", "fbcdn.net")):
         raise InboxError("unsupported")
@@ -113,8 +118,8 @@ def download_public(url, target):
             if not size or (expected and expected != size):
                 raise InboxError("interrupted")
     except urllib.error.HTTPError as e:
-        raise InboxError("unavailable" if e.code in (401,403,404,410,429) else "interrupted") from None
-    except (urllib.error.URLError, TimeoutError, ConnectionError):
+        raise InboxError("unavailable" if e.code in (401,403,404,410) else "interrupted") from None
+    except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead):
         raise InboxError("interrupted") from None
 
 def run_tool(args, timeout=90):
@@ -203,19 +208,47 @@ class Library:
             raise InboxError("conflict") from None
         return folder
 
-    def process(self, job, ffprobe, ffmpeg, extractor=extract, downloader=download_public, validator=validate_video, checkpoint=lambda: None):
+    def process(self, job, ffprobe, ffmpeg, extractor=extract, downloader=download_public, validator=validate_video, checkpoint=lambda: None, fallback=None):
         name = self.name(job)
         folder = self.locate(job)
         if folder is None:
             if job.get("confirmed_stage"):
                 raise InboxError("conflict")  # Never silently recreate a missing confirmed original.
-            attempt = safe_path(self.root / ".staging" / str(uuid.uuid4()), self.root)
-            attempt.mkdir()
-            write_new(attempt / "job.json", json.dumps({"id":job["id"], "is_test":job.get("is_test",False)}))
-            url, metadata = extractor(job["canonical_url"])
-            checkpoint()
+            def new_candidate():
+                candidate = safe_path(self.root / ".staging" / str(uuid.uuid4()), self.root)
+                candidate.mkdir()
+                write_new(candidate / "job.json", json.dumps({"id":job["id"], "is_test":job.get("is_test",False)}))
+                return candidate
+            attempt = new_candidate()
             partial = attempt / "video.part"
-            downloader(url, partial)
+            needs_fallback = False
+            recoverable = ("unavailable", "interrupted", "unsupported")
+            checkpoint()
+            try:
+                url, metadata = extractor(job["canonical_url"])
+            except InboxError as error:
+                if fallback is None or error.code not in recoverable:
+                    raise
+                needs_fallback = True
+            if not needs_fallback:
+                checkpoint()
+                try:
+                    downloader(url, partial)
+                except InboxError as error:
+                    if fallback is None or error.code not in recoverable:
+                        raise
+                    needs_fallback = True
+            if needs_fallback:
+                # Checkpoints sit outside download error handling: a lost lease or
+                # stop request must never spend a provider lookup or retry a file.
+                checkpoint()
+                url, metadata = fallback()
+                checkpoint()
+                media_url(url)
+                # Preserve any failed public download in its own staging folder.
+                attempt = new_candidate()
+                partial = attempt / "video.part"
+                downloader(url, partial)
             checkpoint()
             verified = validator(partial, ffprobe, ffmpeg)
             checkpoint()
@@ -312,8 +345,24 @@ def cycle(cloud, library, instance, ffprobe, ffmpeg):
         if os.environ.get("REEL_INBOX_STOP") and Path(os.environ["REEL_INBOX_STOP"]).exists():
             raise InboxError("interrupted")
         cloud.call({"action":"renew","id":job["id"],"lease":job["lease_id"]})
+    def fallback():
+        try:
+            result = cloud.call({"action":"resolve","id":job["id"],"lease":job["lease_id"]})
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            raise InboxError("interrupted") from None
+        except ValueError:
+            raise InboxError("unavailable") from None
+        if not isinstance(result, dict):
+            raise InboxError("unavailable")
+        if "error" in result:
+            code = result["error"]
+            raise InboxError(code if code in ("unavailable", "interrupted", "setup", "unsupported") else "unavailable")
+        metadata = result.get("metadata")
+        if not isinstance(result.get("url"), str) or not isinstance(metadata, dict) or not all(isinstance(metadata.get(key), str) for key in ("title", "creator")):
+            raise InboxError("unavailable")
+        return media_url(result["url"]), {"title":metadata["title"][:500], "creator":metadata["creator"][:200]}
     try:
-        receipt=library.process(job,ffprobe,ffmpeg,checkpoint=checkpoint)
+        receipt=library.process(job,ffprobe,ffmpeg,checkpoint=checkpoint,fallback=fallback)
     except InboxError as error:
         cloud.call({"action":"fail","id":job["id"],"lease":job["lease_id"],"code":error.code})
         return True

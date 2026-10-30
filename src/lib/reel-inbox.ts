@@ -50,6 +50,9 @@ export const inboxAction = z.discriminatedUnion("action", [
 export const workerAction = z.discriminatedUnion("action", [
   z.object({ action: z.literal("claim"), instance: z.string().uuid() }),
   z.object({ action: z.literal("renew"), id: z.string().uuid(), lease: z.string().uuid() }),
+  z
+    .object({ action: z.literal("resolve"), id: z.string().uuid(), lease: z.string().uuid() })
+    .strict(),
   z.object({
     action: z.literal("ack"),
     id: z.string().uuid(),
