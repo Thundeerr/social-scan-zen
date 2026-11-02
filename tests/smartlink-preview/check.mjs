@@ -53,6 +53,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.getByLabel(/^Kampagne/).selectOption("11111111-1111-4111-8111-111111111111");
   await page.getByLabel("Ziel-URL", { exact: true }).fill("https://example.com/new-offer");
+  await page.getByRole("button", { name: "1.000 Links", exact: true }).click();
   await page.getByRole("button", { name: "1.000 Links erstellen", exact: true }).click();
   await page.getByText(/1.100 \/ 1000/).waitFor();
   const download = page.waitForEvent("download");

@@ -7,6 +7,7 @@ let links = Array.from({ length: 12 }, (_, i) => ({
   target: "https://example.com/creator-launch",
   domain: "https://go.example.com",
   active: true,
+  provider: "instascanner", provider_state: "ready", short_url: null,
   campaign_id: id,
   account_id: null,
   recipient_id: null,
@@ -35,6 +36,7 @@ export const Link = React.forwardRef<HTMLAnchorElement, any>(({ to, children, ..
   </a>
 ));
 export async function smartlinkFn({ data: d }: any) {
+  if (d.action === "provider_stats") return {providers:[],top:[]};
   if (d.action === "overview")
     return {
       campaigns,
@@ -47,6 +49,7 @@ export async function smartlinkFn({ data: d }: any) {
       ],
       domains: ["https://go.example.com"],
       trackingReady: true,
+      providers: [{id:"bitly",configured:true},{id:"tinyurl",configured:true},{id:"instascanner",configured:true}],
     };
   if (d.action === "links")
     return {
@@ -100,6 +103,7 @@ export async function smartlinkFn({ data: d }: any) {
       target: d.target,
       domain: d.domain,
       active: true,
+  provider: "instascanner", provider_state: "ready", short_url: null,
       campaign_id: d.campaign,
       account_id: d.account,
       recipient_id: null,
