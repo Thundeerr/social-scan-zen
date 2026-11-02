@@ -44,6 +44,9 @@ const filter = z.object({
 });
 export const smartlinkAction = z.discriminatedUnion("action", [
   z.object({ action: z.literal("overview") }),
+  z.object({ action: z.literal("provider_stats"), filter }),
+  z.object({ action: z.literal("retry_provider"), provider: z.enum(["bitly", "tinyurl"]) }),
+  z.object({ action: z.literal("process_provider"), provider: z.enum(["bitly", "tinyurl"]) }),
   z.object({
     action: z.literal("create_campaign"),
     name: z.string().trim().min(1).max(120),
@@ -63,6 +66,7 @@ export const smartlinkAction = z.discriminatedUnion("action", [
     domain: z.string().url().max(255),
     count: z.number().int().min(1).max(1000),
     request_id: uuid,
+    providers: z.array(z.enum(["instascanner", "bitly", "tinyurl"])).min(1).max(3).refine(v => new Set(v).size === v.length).default(["instascanner"]),
     account: uuid.nullable().default(null),
   }),
   z.object({

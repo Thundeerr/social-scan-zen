@@ -17,6 +17,7 @@ await db.exec(
   ),
 );
 await db.exec(await readFile(new URL('../supabase/migrations/20261102180616_smartlink_overview_alias.sql', import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261102190120_smartlink_providers.sql', import.meta.url),'utf8'));
 const a = crypto.randomUUID(),
   b = crypto.randomUUID(),
   outsider = crypto.randomUUID(),
@@ -189,6 +190,26 @@ for (const role of ["anon", "authenticated"]) {
   await assert.rejects(db.query("select * from public.sl_recipients"));
   await assert.rejects(db.query("select public.sl_rate('test',2,60)"));
 }
+
+await db.exec("reset role; set role service_role");
+await db.query("update public.sl_batches set created_at=now()-interval '2 hours'");
+const providerBatch = { ...payload, request_id: crypto.randomUUID(), count: 101, providers: ["bitly", "tinyurl"] };
+await call(a, "generate", providerBatch);
+const split = (await db.query("select provider,count(*)::int n from public.sl_links where batch_id=$1 group by provider order by provider", [providerBatch.request_id])).rows;
+assert.deepEqual(split, [{provider:"bitly",n:51},{provider:"tinyurl",n:50}]);
+await assert.rejects(call(a,"generate",{...providerBatch,providers:["tinyurl","bitly"]}));
+const claim = async(user,provider)=>(await db.query("select public.sl_provider_claim($1,$2) result",[user,provider])).rows[0].result;
+assert.equal(await claim(b,"bitly"),null);
+const firstJob = await claim(a,"bitly");
+assert.equal(firstJob.provider,"bitly");
+assert.equal(await claim(a,"bitly"),null);
+await db.query("update public.sl_links set provider_state='failed',provider_error='http_429' where id=$1",[firstJob.id]);
+assert.equal(await claim(a,"bitly"),null);
+assert.equal((await claim(a,"tinyurl")).provider,"tinyurl");
+const providerStats = (await db.query("select public.sl_provider_stats($1,'{}') result",[a])).rows[0].result;
+assert.equal(providerStats.providers.find(p=>p.provider==='bitly').failed,1);
+assert.equal((await db.query("select public.sl_provider_stats($1,'{}') result",[b])).rows[0].result.providers.length,0);
+console.log("Provider split, idempotency, isolation, concurrency and circuit-stop tests passed");
 await db.close();
 console.log(
   "PASS: 1,000-link batch, idempotency, pagination, ownership, permissions, limits, consent, suppression, drafts, analytics and retention.",

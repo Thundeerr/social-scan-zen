@@ -1,3 +1,5 @@
+import { ProviderOverview } from "./smartlink-provider-overview";
+import { PROVIDERS, distributeLinks, type ProviderId } from "@/lib/smartlink-providers";
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -42,6 +44,9 @@ type Campaign = {
 };
 type Account = { id: string; name: string; status: string };
 type SmartLink = {
+  provider: ProviderId;
+  provider_state: string;
+  short_url: string | null;
   id: string;
   slug: string;
   target: string;
@@ -68,6 +73,7 @@ type Overview = {
   accounts: Account[];
   domains: string[];
   trackingReady: boolean;
+  providers?: {id:string; configured:boolean}[];
 };
 type Page<T> = { items: T[]; total: number };
 type Analytics = {
@@ -109,9 +115,10 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
   const fn = useServerFn(smartlinkFn),
     cache = useQueryClient();
   const api = <T,>(data: SmartlinkAction) => fn({ data }) as Promise<T>;
+  const [providers, setProviders] = useState<ProviderId[]>(["bitly", "tinyurl"]);
   const [campaign, setCampaign] = useState(""),
     [target, setTarget] = useState(""),
-    [count, setCount] = useState(1000),
+    [count, setCount] = useState(100),
     [domain, setDomain] = useState(""),
     [account, setAccount] = useState("");
   const [search, setSearch] = useState(""),
@@ -216,6 +223,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
             domain: domain || all?.domains[0] || "",
             account: account || null,
             request_id: crypto.randomUUID(),
+            providers,
           };
     setPendingBatch(payload);
     try {
@@ -245,7 +253,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
         rows.push(
           ...page.items.map((item) =>
             kind === "links"
-              ? { ...item, url: (item as SmartLink).domain + "/s/" + (item as SmartLink).slug }
+              ? { ...item, url: (item as SmartLink).provider_state === "ready" ? ((item as SmartLink).short_url || (item as SmartLink).domain + "/s/" + (item as SmartLink).slug) : "" }
               : item,
           ),
         );
@@ -260,6 +268,8 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
               "id",
               "url",
               "target",
+              "provider",
+              "provider_state",
               "campaign_id",
               "account_id",
               "recipient_id",
@@ -305,7 +315,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
   const summary = analytics.data;
   const pageIds = useMemo(() => links.data?.items.map((l) => l.id) || [], [links.data]);
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[1440px] space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <div className="studio-masthead">
         <PageHeader
           eyebrow="Marketing Tools"
@@ -439,9 +449,24 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
                       />
                     </Field>
                   </div>
+                  <fieldset className="space-y-3">
+                    <legend className="text-sm font-medium mb-2">Provider auswählen · gleichmäßige Verteilung</legend>
+                    <div className="grid gap-3 sm:grid-cols-3">{PROVIDERS.map(p => {
+                      const amount = distributeLinks(count, providers).find(a => a.id === p.id)?.count ?? 0;
+                      const connected = all.providers?.find(c => c.id === p.id)?.configured;
+                      return <label key={p.id} className={`rounded-xl border p-4 cursor-pointer ${providers.includes(p.id) ? "border-primary bg-primary/5" : "border-border"}`}>
+                        <div className="flex gap-2 items-center"><input type="checkbox" checked={providers.includes(p.id)} onChange={e => setProviders(current => e.target.checked ? [...current, p.id] : current.filter(id => id !== p.id))}/><span className="font-medium text-sm">{p.name}</span></div>
+                        <p className="mt-3 text-2xl font-semibold">{amount.toLocaleString("de-DE")} <span className="text-xs font-normal text-muted-foreground">Links</span></p>
+                        <p className="mt-1 text-xs text-muted-foreground">{connected ? "Zugang konfiguriert" : "API-Zugang fehlt"}</p>
+                      </label>;
+                    })}</div>
+                    <p className="text-xs text-muted-foreground">{providers.length ? `${providers.length} Provider · je ${(100 / providers.length).toLocaleString("de-DE", {maximumFractionDigits:1})} % · Rest gleichmäßig verteilt` : "Mindestens einen Provider auswählen."}</p>
+                    <div className="flex flex-wrap gap-2">{[10,100,500,1000].map(n=><Button type="button" size="sm" variant={count===n ? "secondary" : "outline"} key={n} onClick={()=>setCount(n)}>{n.toLocaleString("de-DE")} Links</Button>)}</div>
+                    {providers.some(id=>!all.providers?.find(p=>p.id===id)?.configured) && <p role="status" className="text-sm text-amber-400">Für die gewählte Verteilung fehlen API-Zugänge. Unten steht, welche Server-Secrets benötigt werden.</p>}
+                  </fieldset>
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
-                      disabled={busy || !campaign || !all.domains.length || Boolean(pendingBatch)}
+                      disabled={busy || !campaign || !all.domains.length || Boolean(pendingBatch) || !providers.length || providers.some(id => !all.providers?.find(p => p.id === id)?.configured)}
                       type="submit"
                     >
                       <Plus className="h-4 w-4" />
@@ -476,6 +501,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
                   </div>
                 </form>
               </section>
+              <ProviderOverview filter={filter} connections={all.providers || []} />
               <section className={panel}>
                 <div className="flex flex-wrap gap-3 items-center justify-between">
                   <h2 className="font-medium">
@@ -654,7 +680,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
                             </td>
                             <td className="p-3 max-w-sm">
                               <span className="block break-all font-mono text-xs">
-                                {l.domain}/s/{l.slug}
+                                {l.short_url || (l.provider_state === "ready" ? l.domain + "/s/" + l.slug : "Provider-Link noch nicht bereit")}
                               </span>
                               <span className="block break-all text-xs text-muted-foreground mt-1">
                                 {l.target}
@@ -664,7 +690,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
                               <span
                                 className={l.active ? "text-emerald-400" : "text-muted-foreground"}
                               >
-                                {l.active ? "Aktiv" : "Deaktiviert"}
+                                {l.active ? (l.provider_state === "ready" ? "Aktiv" : l.provider_state) : "Deaktiviert"}<span className="block text-xs text-muted-foreground">{l.provider}</span>
                               </span>
                             </td>
                             <td className="p-3 text-xs">
@@ -679,9 +705,10 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                disabled={l.provider_state !== "ready"}
                                 onClick={() =>
                                   void navigator.clipboard
-                                    .writeText(l.domain + "/s/" + l.slug)
+                                    .writeText(l.short_url || l.domain + "/s/" + l.slug)
                                     .then(() => toast.success("Link kopiert."))
                                     .catch(() => toast.error("Kopieren nicht möglich."))
                                 }
@@ -909,6 +936,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
               )}
             </>
           )}
+          {mode === "analytics" && <ProviderOverview filter={filter} connections={all.providers || []} />}
           {mode === "analytics" && (
             <>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

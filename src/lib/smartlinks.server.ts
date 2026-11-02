@@ -1,3 +1,4 @@
+import { createProviderLink, providerConfiguration } from "./smartlink-providers.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { classifyHit, destination, smartlinkAction, type SmartlinkAction } from "./smartlinks";
@@ -40,7 +41,24 @@ export async function smartlinkCommand(user: string, raw: SmartlinkAction) {
     throw new Error("Nicht freigegeben.");
   if (!checked(await db.rpc("sl_rate", { p_key: `operator:${user}`, p_max: 120, p_seconds: 60 })))
     throw new Error("Zu viele Anfragen. Bitte eine Minute warten.");
+  if (data.action === "provider_stats") return checked(await db.rpc("sl_provider_stats", { p_user: user, p: data.filter }));
+  if (data.action === "retry_provider") {
+    checked(await db.from("sl_links").update({provider_state:"pending",provider_error:null}).eq("user_id",user).eq("provider",data.provider).eq("provider_state","failed"));
+    return {ok:true};
+  }
+  if (data.action === "process_provider") {
+    if (!providerConfiguration().find(p => p.id === data.provider)?.configured) throw new Error("Provider nicht verbunden. Server-Zugang einrichten.");
+    if (!checked(await db.rpc("sl_rate", { p_key: `provider:${data.provider}`, p_max: 20, p_seconds: 60 }))) return { state: "throttled" };
+    const job = checked(await db.rpc("sl_provider_claim", { p_user: user, p_provider: data.provider }));
+    if (!job) return { state: "stopped" };
+    const result = await createProviderLink(data.provider, job.domain + "/s/" + job.slug);
+    checked(await db.from("sl_links").update({ provider_state: result.state, short_url: result.url || null, provider_error: result.error || null }).eq("id", job.id).eq("user_id", user).eq("provider_state", "processing"));
+    return { state: result.state };
+  }
   if (data.action === "generate") {
+    const missing = data.providers.filter(id => !providerConfiguration().find(p => p.id === id)?.configured);
+    if (missing.length) throw new Error("Provider nicht verbunden: " + missing.join(", "));
+
     if (!domains().includes(data.domain))
       throw new Error("Shortlink-Domain noch nicht eingerichtet.");
     if (
@@ -65,6 +83,7 @@ export async function smartlinkCommand(user: string, raw: SmartlinkAction) {
     ? {
         ...result,
         domains: domains(),
+        providers: providerConfiguration(),
         trackingReady: Boolean(
           process.env.SMARTLINK_HASH_SECRET?.length &&
           process.env.SMARTLINK_HASH_SECRET.length >= 32,
