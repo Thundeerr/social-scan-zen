@@ -16,6 +16,7 @@ await db.exec(
     "utf8",
   ),
 );
+await db.exec(await readFile(new URL('../supabase/migrations/20261102180616_smartlink_overview_alias.sql', import.meta.url),'utf8'));
 const a = crypto.randomUUID(),
   b = crypto.randomUUID(),
   outsider = crypto.randomUUID(),
@@ -36,6 +37,11 @@ const campaign = await call(a, "create_campaign", {
   template: "Hallo {{name}}: {{link}}",
 });
 const other = await call(b, "create_campaign", { name: "Other", template: "" });
+const overview = await call(a, 'overview');
+assert.equal(overview.campaigns.length, 1);
+assert.equal(overview.campaigns[0].name, 'Launch');
+assert.equal(overview.accounts[0].name, 'creator');
+assert.equal((await call(b, 'overview')).accounts.length, 0);
 const payload = {
   request_id: crypto.randomUUID(),
   campaign: campaign.id,
