@@ -28,6 +28,16 @@ export type NavigationGroup = {
 
 export const navigationGroups: NavigationGroup[] = [
   {
+    id: "marketing",
+    label: "Marketing Tools",
+    defaultOpen: true,
+    items: [
+      { to: "/smartlinks", label: "SmartLink Studio", icon: Send },
+      { to: "/smartlinks/campaigns", label: "Campaigns", icon: Users },
+      { to: "/smartlinks/analytics", label: "Analytics", icon: Gauge },
+    ],
+  },
+  {
     id: "daily",
     label: "Your workspace",
     defaultOpen: true,
