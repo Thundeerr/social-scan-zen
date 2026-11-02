@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTelegramRouteImport } from './routes/_authenticated/telegram'
+import { Route as AuthenticatedSmartlinksRouteImport } from './routes/_authenticated/smartlinks'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
 import { Route as AuthenticatedReelInboxRouteImport } from './routes/_authenticated/reel-inbox'
@@ -29,11 +30,14 @@ import { Route as AuthenticatedBurnRouteImport } from './routes/_authenticated/b
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
+import { Route as AuthenticatedSmartlinksIndexRouteImport } from './routes/_authenticated/smartlinks.index'
 import { Route as AuthenticatedMonitorIndexRouteImport } from './routes/_authenticated/monitor.index'
 import { Route as ApiReelInboxWorkerRouteImport } from './routes/api/reel-inbox/worker'
 import { Route as ApiModelPipelineWorkerRouteImport } from './routes/api/model-pipeline/worker'
 import { Route as ApiModelPipelineSourceRouteImport } from './routes/api/model-pipeline/source'
 import { Route as ApiChannelAlertsTickRouteImport } from './routes/api/channel-alerts/tick'
+import { Route as AuthenticatedSmartlinksCampaignsRouteImport } from './routes/_authenticated/smartlinks.campaigns'
+import { Route as AuthenticatedSmartlinksAnalyticsRouteImport } from './routes/_authenticated/smartlinks.analytics'
 import { Route as AuthenticatedMonitorAccountIdRouteImport } from './routes/_authenticated/monitor.$accountId'
 import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_authenticated/discovery.analytics'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
@@ -70,6 +74,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedTelegramRoute = AuthenticatedTelegramRouteImport.update({
   id: '/telegram',
   path: '/telegram',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSmartlinksRoute = AuthenticatedSmartlinksRouteImport.update({
+  id: '/smartlinks',
+  path: '/smartlinks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -148,6 +157,12 @@ const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSmartlinksIndexRoute =
+  AuthenticatedSmartlinksIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedSmartlinksRoute,
+  } as any)
 const AuthenticatedMonitorIndexRoute =
   AuthenticatedMonitorIndexRouteImport.update({
     id: '/monitor/',
@@ -174,6 +189,18 @@ const ApiChannelAlertsTickRoute = ApiChannelAlertsTickRouteImport.update({
   path: '/api/channel-alerts/tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedSmartlinksCampaignsRoute =
+  AuthenticatedSmartlinksCampaignsRouteImport.update({
+    id: '/campaigns',
+    path: '/campaigns',
+    getParentRoute: () => AuthenticatedSmartlinksRoute,
+  } as any)
+const AuthenticatedSmartlinksAnalyticsRoute =
+  AuthenticatedSmartlinksAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AuthenticatedSmartlinksRoute,
+  } as any)
 const AuthenticatedMonitorAccountIdRoute =
   AuthenticatedMonitorAccountIdRouteImport.update({
     id: '/monitor/$accountId',
@@ -268,14 +295,18 @@ export interface FileRoutesByFullPath {
   '/reel-inbox': typeof AuthenticatedReelInboxRoute
   '/scanner': typeof AuthenticatedScannerRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/smartlinks': typeof AuthenticatedSmartlinksRouteWithChildren
   '/telegram': typeof AuthenticatedTelegramRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/smartlinks/analytics': typeof AuthenticatedSmartlinksAnalyticsRoute
+  '/smartlinks/campaigns': typeof AuthenticatedSmartlinksCampaignsRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
   '/api/model-pipeline/source': typeof ApiModelPipelineSourceRoute
   '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor/': typeof AuthenticatedMonitorIndexRoute
+  '/smartlinks/': typeof AuthenticatedSmartlinksIndexRoute
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
   '/api/public/business-report/wavespeed': typeof ApiPublicBusinessReportWavespeedRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
@@ -310,11 +341,14 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/smartlinks/analytics': typeof AuthenticatedSmartlinksAnalyticsRoute
+  '/smartlinks/campaigns': typeof AuthenticatedSmartlinksCampaignsRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
   '/api/model-pipeline/source': typeof ApiModelPipelineSourceRoute
   '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/monitor': typeof AuthenticatedMonitorIndexRoute
+  '/smartlinks': typeof AuthenticatedSmartlinksIndexRoute
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
   '/api/public/business-report/wavespeed': typeof ApiPublicBusinessReportWavespeedRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
@@ -347,15 +381,19 @@ export interface FileRoutesById {
   '/_authenticated/reel-inbox': typeof AuthenticatedReelInboxRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/smartlinks': typeof AuthenticatedSmartlinksRouteWithChildren
   '/_authenticated/telegram': typeof AuthenticatedTelegramRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/discovery/analytics': typeof AuthenticatedDiscoveryAnalyticsRoute
   '/_authenticated/monitor/$accountId': typeof AuthenticatedMonitorAccountIdRoute
+  '/_authenticated/smartlinks/analytics': typeof AuthenticatedSmartlinksAnalyticsRoute
+  '/_authenticated/smartlinks/campaigns': typeof AuthenticatedSmartlinksCampaignsRoute
   '/api/channel-alerts/tick': typeof ApiChannelAlertsTickRoute
   '/api/model-pipeline/source': typeof ApiModelPipelineSourceRoute
   '/api/model-pipeline/worker': typeof ApiModelPipelineWorkerRoute
   '/api/reel-inbox/worker': typeof ApiReelInboxWorkerRoute
   '/_authenticated/monitor/': typeof AuthenticatedMonitorIndexRoute
+  '/_authenticated/smartlinks/': typeof AuthenticatedSmartlinksIndexRoute
   '/api/public/business-report/tick': typeof ApiPublicBusinessReportTickRoute
   '/api/public/business-report/wavespeed': typeof ApiPublicBusinessReportWavespeedRoute
   '/api/public/cron/check': typeof ApiPublicCronCheckRoute
@@ -389,14 +427,18 @@ export interface FileRouteTypes {
     | '/reel-inbox'
     | '/scanner'
     | '/settings'
+    | '/smartlinks'
     | '/telegram'
     | '/discovery/analytics'
     | '/monitor/$accountId'
+    | '/smartlinks/analytics'
+    | '/smartlinks/campaigns'
     | '/api/channel-alerts/tick'
     | '/api/model-pipeline/source'
     | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/monitor/'
+    | '/smartlinks/'
     | '/api/public/business-report/tick'
     | '/api/public/business-report/wavespeed'
     | '/api/public/cron/check'
@@ -431,11 +473,14 @@ export interface FileRouteTypes {
     | '/'
     | '/discovery/analytics'
     | '/monitor/$accountId'
+    | '/smartlinks/analytics'
+    | '/smartlinks/campaigns'
     | '/api/channel-alerts/tick'
     | '/api/model-pipeline/source'
     | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/monitor'
+    | '/smartlinks'
     | '/api/public/business-report/tick'
     | '/api/public/business-report/wavespeed'
     | '/api/public/cron/check'
@@ -467,15 +512,19 @@ export interface FileRouteTypes {
     | '/_authenticated/reel-inbox'
     | '/_authenticated/scanner'
     | '/_authenticated/settings'
+    | '/_authenticated/smartlinks'
     | '/_authenticated/telegram'
     | '/_authenticated/'
     | '/_authenticated/discovery/analytics'
     | '/_authenticated/monitor/$accountId'
+    | '/_authenticated/smartlinks/analytics'
+    | '/_authenticated/smartlinks/campaigns'
     | '/api/channel-alerts/tick'
     | '/api/model-pipeline/source'
     | '/api/model-pipeline/worker'
     | '/api/reel-inbox/worker'
     | '/_authenticated/monitor/'
+    | '/_authenticated/smartlinks/'
     | '/api/public/business-report/tick'
     | '/api/public/business-report/wavespeed'
     | '/api/public/cron/check'
@@ -545,6 +594,13 @@ declare module '@tanstack/react-router' {
       path: '/telegram'
       fullPath: '/telegram'
       preLoaderRoute: typeof AuthenticatedTelegramRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/smartlinks': {
+      id: '/_authenticated/smartlinks'
+      path: '/smartlinks'
+      fullPath: '/smartlinks'
+      preLoaderRoute: typeof AuthenticatedSmartlinksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -652,6 +708,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/smartlinks/': {
+      id: '/_authenticated/smartlinks/'
+      path: '/'
+      fullPath: '/smartlinks/'
+      preLoaderRoute: typeof AuthenticatedSmartlinksIndexRouteImport
+      parentRoute: typeof AuthenticatedSmartlinksRoute
+    }
     '/_authenticated/monitor/': {
       id: '/_authenticated/monitor/'
       path: '/monitor'
@@ -686,6 +749,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/channel-alerts/tick'
       preLoaderRoute: typeof ApiChannelAlertsTickRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/smartlinks/campaigns': {
+      id: '/_authenticated/smartlinks/campaigns'
+      path: '/campaigns'
+      fullPath: '/smartlinks/campaigns'
+      preLoaderRoute: typeof AuthenticatedSmartlinksCampaignsRouteImport
+      parentRoute: typeof AuthenticatedSmartlinksRoute
+    }
+    '/_authenticated/smartlinks/analytics': {
+      id: '/_authenticated/smartlinks/analytics'
+      path: '/analytics'
+      fullPath: '/smartlinks/analytics'
+      preLoaderRoute: typeof AuthenticatedSmartlinksAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedSmartlinksRoute
     }
     '/_authenticated/monitor/$accountId': {
       id: '/_authenticated/monitor/$accountId'
@@ -795,6 +872,26 @@ const AuthenticatedDiscoveryRouteWithChildren =
     AuthenticatedDiscoveryRouteChildren,
   )
 
+interface AuthenticatedSmartlinksRouteChildren {
+  AuthenticatedSmartlinksAnalyticsRoute: typeof AuthenticatedSmartlinksAnalyticsRoute
+  AuthenticatedSmartlinksCampaignsRoute: typeof AuthenticatedSmartlinksCampaignsRoute
+  AuthenticatedSmartlinksIndexRoute: typeof AuthenticatedSmartlinksIndexRoute
+}
+
+const AuthenticatedSmartlinksRouteChildren: AuthenticatedSmartlinksRouteChildren =
+  {
+    AuthenticatedSmartlinksAnalyticsRoute:
+      AuthenticatedSmartlinksAnalyticsRoute,
+    AuthenticatedSmartlinksCampaignsRoute:
+      AuthenticatedSmartlinksCampaignsRoute,
+    AuthenticatedSmartlinksIndexRoute: AuthenticatedSmartlinksIndexRoute,
+  }
+
+const AuthenticatedSmartlinksRouteWithChildren =
+  AuthenticatedSmartlinksRoute._addFileChildren(
+    AuthenticatedSmartlinksRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
@@ -811,6 +908,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReelInboxRoute: typeof AuthenticatedReelInboxRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSmartlinksRoute: typeof AuthenticatedSmartlinksRouteWithChildren
   AuthenticatedTelegramRoute: typeof AuthenticatedTelegramRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedMonitorAccountIdRoute: typeof AuthenticatedMonitorAccountIdRoute
@@ -833,6 +931,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReelInboxRoute: AuthenticatedReelInboxRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSmartlinksRoute: AuthenticatedSmartlinksRouteWithChildren,
   AuthenticatedTelegramRoute: AuthenticatedTelegramRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedMonitorAccountIdRoute: AuthenticatedMonitorAccountIdRoute,

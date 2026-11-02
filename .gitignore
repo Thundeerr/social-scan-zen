@@ -22,6 +22,7 @@ dist-ssr
 .tools/
 __pycache__/
 .reel-inbox-test/
+.smartlink-temp/
 supabase/.temp/
 
 # Editor directories and files

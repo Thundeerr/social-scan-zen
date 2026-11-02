@@ -11,7 +11,9 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:smartlinks": "vitest run --config tests/smartlinks.vitest.config.ts src/lib/smartlinks.test.ts src/lib/smartlinks-auth.test.ts",
+    "test:smartlinks-db": "node tests/smartlinks-db.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
