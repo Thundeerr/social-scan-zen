@@ -8,6 +8,7 @@ import { CopyVideoButton } from "@/components/copy-video-button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ReelInboxDm } from "@/components/reel-inbox-dm";
+import { KiikiiDmRedirect } from "@/components/kiikii-dm-redirect";
 
 export const Route = createFileRoute("/_authenticated/reel-inbox")({ component: ReelInbox });
 const statuses = {
@@ -22,7 +23,8 @@ const stageLabels: Record<(typeof stages)[number], string> = {
   Verwendet: "Used",
 };
 const errors: Record<string, string> = {
-  unavailable: "Could not retrieve this video. The original link is saved; this does not necessarily mean the reel is private or deleted.",
+  unavailable:
+    "Could not retrieve this video. The original link is saved; this does not necessarily mean the reel is private or deleted.",
   unsupported: "This reel is not currently supported.",
   interrupted: "Download interrupted. Try again.",
   validation: "The downloaded file failed video validation.",
@@ -95,6 +97,7 @@ function ReelInbox() {
           <span> Last seen: {new Date(device.last_seen_at).toLocaleString("de-DE")}</span>
         )}
       </p>
+      <KiikiiDmRedirect userId={user.id} />
       <ReelInboxDm userId={user.id} />
       <section className="space-y-3 rounded-xl border bg-card p-4">
         <label htmlFor="reels" className="font-medium">

@@ -35,6 +35,11 @@ export const Route = createFileRoute("/api/public/instagram/callback")({
             state: parsed.state,
           });
           if (!result.ok) return backToPublisher({ ig_error: result.error });
+          if (result.dmRedirect) {
+            const target = new URL("/reel-inbox", IG_OAUTH_ORIGIN);
+            target.searchParams.set("dm_connected", "1");
+            return new Response(null, { status: 302, headers: { location: target.toString() } });
+          }
           return backToPublisher(
             { ig: "connected", ig_user: result.username },
             result.destination !== "followerstar",

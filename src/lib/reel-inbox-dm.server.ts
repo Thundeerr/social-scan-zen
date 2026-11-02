@@ -240,6 +240,8 @@ export async function dmWebhook(request: Request) {
     const body = JSON.parse(bytes.toString("utf8"));
     dmEvents(body); // malformed batches are rejected before any storage
     await ingestDm(body); // acknowledge only after durable transaction; Meta can retry
+    const { ingestWebsiteDm } = await import("./kiikii-dm-redirect.server");
+    await ingestWebsiteDm(body);
     return new Response("EVENT_RECEIVED", { headers });
   } catch {
     return new Response("Not confirmed; retry", { status: 503, headers });

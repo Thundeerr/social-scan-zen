@@ -40,11 +40,15 @@ export async function createOAuthState(
   userId: string,
   redirectUri: string,
   destination: PublishingDestination = "followerstar",
+  options?: { requestedScopes: string[]; dmRedirect: boolean },
 ): Promise<string> {
   await db.rpc("purge_ig_oauth_states");
   const state = randomBytes(32).toString("base64url");
   const { error } = await (db as SupabaseClient).from("ig_oauth_states").insert({
     destination,
+    ...(options
+      ? { requested_scopes: options.requestedScopes, dm_redirect: options.dmRedirect }
+      : {}),
     state,
     user_id: userId,
     redirect_uri: redirectUri,
@@ -61,7 +65,13 @@ export async function createOAuthState(
 export async function consumeOAuthState(
   db: AdminClient,
   state: string,
-): Promise<{ userId: string; redirectUri: string; destination: PublishingDestination } | null> {
+): Promise<{
+  userId: string;
+  redirectUri: string;
+  destination: PublishingDestination;
+  requestedScopes?: string[];
+  dmRedirect?: boolean;
+} | null> {
   if (!state || state.length > 200) return null;
   const { data, error } = await (db as SupabaseClient)
     .from("ig_oauth_states")
@@ -69,11 +79,17 @@ export async function consumeOAuthState(
     .eq("state", state)
     .is("consumed_at", null)
     .gt("expires_at", new Date().toISOString())
-    .select("user_id, redirect_uri, destination")
+    .select("user_id, redirect_uri, destination, requested_scopes, dm_redirect")
     .maybeSingle();
   if (error || !data) return null;
   if (!["followerstar", "kiikii", "tuuva"].includes(data.destination)) return null;
-  return { userId: data.user_id, redirectUri: data.redirect_uri, destination: data.destination };
+  return {
+    userId: data.user_id,
+    redirectUri: data.redirect_uri,
+    destination: data.destination,
+    ...(data.requested_scopes ? { requestedScopes: data.requested_scopes } : {}),
+    ...(data.dm_redirect ? { dmRedirect: true } : {}),
+  };
 }
 
 type TokenResponse = {
@@ -183,7 +199,8 @@ export async function completeInstagramConnection(
   db: AdminClient,
   input: { code: string; state: string },
 ): Promise<
-  { ok: true; username: string; destination: PublishingDestination } | { ok: false; error: string }
+  | { ok: true; username: string; destination: PublishingDestination; dmRedirect?: boolean }
+  | { ok: false; error: string }
 > {
   const consumed = await consumeOAuthState(db, input.state);
   if (!consumed) {
@@ -192,8 +209,17 @@ export async function completeInstagramConnection(
 
   try {
     const short = await exchangeCodeForToken(input.code, consumed.redirectUri);
+    if (consumed.dmRedirect && !short.permissions.length)
+      throw new Error(
+        "Meta did not report the granted permissions. The existing connection was kept.",
+      );
     const granted = short.permissions.length ? short.permissions : [...IG_SCOPES];
-    const missing = missingScopes(granted);
+    const missing = [
+      ...new Set([
+        ...missingScopes(granted),
+        ...(consumed.requestedScopes ?? []).filter((scope) => !granted.includes(scope)),
+      ]),
+    ];
     if (missing.length) {
       return {
         ok: false,
@@ -251,7 +277,12 @@ export async function completeInstagramConnection(
       if (mappingError)
         throw new Error("Konto verbunden, Channel-Zuordnung bitte in Content Review prüfen.");
     }
-    return { ok: true, username: profile.username, destination: consumed.destination };
+    return {
+      ok: true,
+      username: profile.username,
+      destination: consumed.destination,
+      ...(consumed.dmRedirect ? { dmRedirect: true } : {}),
+    };
   } catch (error) {
     // Never persist a partial connection and never touch an existing healthy one.
     return {

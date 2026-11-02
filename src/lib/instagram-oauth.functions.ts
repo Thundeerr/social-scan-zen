@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { IG_INSIGHTS_SCOPE } from "./instagram-analytics";
 import { IG_SCOPES } from "./instagram-oauth";
+import { DM_SCOPE } from "./kiikii-dm-redirect";
 
 export const startInstagramOAuthFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -18,6 +19,7 @@ export const startInstagramOAuthFn = createServerFn({ method: "POST" })
       .object({
         destination: z.enum(["followerstar", "kiikii", "tuuva"]),
         insights: z.boolean().optional(),
+        messaging: z.boolean().optional(),
       })
       .optional(),
   )
@@ -31,6 +33,19 @@ export const startInstagramOAuthFn = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error || !roles?.some((r) => r.role === "owner" || r.role === "cofounder"))
       throw new Error("Not authorized");
+    if (data?.messaging && data.destination !== "kiikii")
+      throw new Error("Messaging setup is limited to Kiikii.");
+    let scopes: string[] = data?.insights ? [...IG_SCOPES, IG_INSIGHTS_SCOPE] : [...IG_SCOPES];
+    if (data?.messaging) {
+      const current = await (supabaseAdmin as SupabaseClient)
+        .from("ig_connections")
+        .select("granted_scopes")
+        .eq("user_id", context.userId)
+        .eq("destination", "kiikii")
+        .maybeSingle();
+      if (current.error) throw new Error("Could not verify existing permissions.");
+      scopes = [...new Set([...scopes, ...(current.data?.granted_scopes ?? []), DM_SCOPE])];
+    }
 
     // Meta compares redirect URIs exactly. Never derive this from preview,
     // localhost, or the www host (which redirects to the apex domain).
@@ -40,6 +55,7 @@ export const startInstagramOAuthFn = createServerFn({ method: "POST" })
       context.userId,
       redirectUri,
       data?.destination ?? "followerstar",
+      data?.messaging ? { requestedScopes: scopes, dmRedirect: true } : undefined,
     );
 
     // Analytics is optional; existing publishing connections keep their scopes.
@@ -48,7 +64,7 @@ export const startInstagramOAuthFn = createServerFn({ method: "POST" })
         clientId,
         redirectUri,
         state,
-        scopes: data?.insights ? [...IG_SCOPES, IG_INSIGHTS_SCOPE] : IG_SCOPES,
+        scopes,
       }),
     };
   });
