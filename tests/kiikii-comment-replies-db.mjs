@@ -10,6 +10,7 @@ try {
   for (const file of [
     "20261102180531_kiikii_dm_redirect.sql",
     "20261103150628_kiikii_comment_private_replies.sql",
+    "20261103160246_kiikii_comment_test_reply.sql",
   ])
     await db.exec(
       await readFile(new URL("../supabase/migrations/" + file, import.meta.url), "utf8"),
@@ -63,6 +64,47 @@ try {
   assert.equal((await reserve({ hash: "a".repeat(64) })).send, true);
   assert.equal((await reserve({ hash: "a".repeat(64) })).duplicate, true);
   assert.equal((await dm("20")).send, false, "comment reservation suppresses DM");
+  await db.exec(
+    "update ig_comment_redirect_settings set test_reply_once_until=now()+interval '15 minutes'",
+  );
+  assert.equal(
+    (await reserve({ hash: "a".repeat(64) })).duplicate,
+    true,
+    "extra test never retries a previous comment",
+  );
+  assert.equal(
+    (await reserve({ username: "other" })).ignored,
+    true,
+    "extra test remains bound to the test account",
+  );
+  assert.equal(
+    (await reserve({ sender: "20" })).send,
+    true,
+    "authorized extra test works during cooldown",
+  );
+  assert.equal(
+    (await reserve({ sender: "20" })).send,
+    false,
+    "extra test is consumed exactly once",
+  );
+  assert.equal((await dm("20")).send, false, "extra comment test does not open extra DMs");
+  await db.exec(
+    "update ig_comment_redirect_settings set test_reply_once_until=now()-interval '1 second'",
+  );
+  assert.equal(
+    (await reserve({ sender: "20" })).send,
+    false,
+    "expired extra test cannot bypass the limit",
+  );
+  await db.exec(
+    "update ig_comment_redirect_settings set test_reply_once_until=now()+interval '15 minutes',mode='live'",
+  );
+  assert.equal(
+    (await reserve({ sender: "20" })).send,
+    false,
+    "test allowance cannot bypass live mode limits",
+  );
+  await db.exec("update ig_comment_redirect_settings set test_reply_once_until=null,mode='test'");
   assert.equal((await dm("21")).send, true);
   assert.equal((await reserve({ sender: "21" })).send, false, "DM reservation suppresses comment");
   const mixed = await Promise.all([reserve({ sender: "22" }), dm("22"), reserve({ sender: "22" })]);

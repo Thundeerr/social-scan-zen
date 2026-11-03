@@ -47,6 +47,12 @@ CTA. No captions or publishing schedules were changed.
   and comment reservations use the same first lock and contact cooldown. At most
   one send attempt per person per 24 hours across both entry points, including failed
   or uncertain attempts. Comment-ID hashes prevent replay. No automatic send retry.
+- An owner-authorized extra test can be granted server-side with
+  `test_reply_once_until` after applying `20261103160246_kiikii_comment_test_reply.sql`.
+  It only applies in comment test mode to the exact configured test username. A single
+  fresh comment consumes it atomically before the send, even if delivery fails.
+  It does not replay previous comments, clear cooldown/history or affect live visitors.
+  The Nov 3 extra test was explicitly requested by the account owner.
 - DM opt-outs apply to both. Pausing the main DM responder pauses comments; pausing
   comments alone leaves DMs running. Main test mode also restricts comment sends.
 - RLS and service-only grants protect settings, contacts, receipts and reserve RPCs.
