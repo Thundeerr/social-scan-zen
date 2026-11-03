@@ -5,14 +5,44 @@ export const DM_RECEIVER = "followerstarteam";
 export const DM_SENDERS = ["kiikii.bat", "thundeerr999"] as const;
 export const DM_WEBHOOK = "https://instascanner.app/api/public/instagram/inbox-webhook";
 // Only the sender's accompanying text selects a model, never the shared caption or URL.
-export function dmModel(text = ""): "kiikii" | "tuuva" {
+export function dmModelNote(text = ""): "kiikii" | "tuuva" | null {
   const note = text.replace(/https?:\/\/\S+/gi, " ");
-  return /(^|[^\p{L}\p{N}_])tuuva(?=$|[^\p{L}\p{N}_])/iu.test(note) ? "tuuva" : "kiikii";
+  if (/(^|[^\p{L}\p{N}_])tuuva(?=$|[^\p{L}\p{N}_])/iu.test(note)) return "tuuva";
+  if (/(^|[^\p{L}\p{N}_])kiikii(?=$|[^\p{L}\p{N}_])/iu.test(note)) return "kiikii";
+  return null;
+}
+export function dmModel(text = ""): "kiikii" | "tuuva" {
+  return dmModelNote(text) ?? "kiikii";
+}
+export function dmRoutingExplanation(
+  status: string | null | undefined,
+  model: string | null,
+  messageAt?: string | null,
+  now = Date.now(),
+) {
+  const name = model === "tuuva" ? "Tuuva" : "Kiikii";
+  if (status === "note_pending" && messageAt && now - Date.parse(messageAt) > 30000)
+    status = "note_expired";
+  switch (status) {
+    case "note_applied":
+      return `${name} note applied to the preceding reel.`;
+    case "note_pending":
+      return `${name} note received; waiting for its reel. If it stays unmatched, choose the model below.`;
+    case "note_ambiguous":
+      return `${name} note could match several messages. Choose the model on the correct reel below.`;
+    case "note_expired":
+      return `${name} note has no matching recent reel. Choose the model below.`;
+    case "manual":
+      return "Model assignment updated in the Inbox.";
+    default:
+      return null;
+  }
 }
 const id = z.string().regex(/^[0-9]{1,40}$/);
 const message = z.object({
   sender: z.object({ id }),
   recipient: z.object({ id }),
+  timestamp: z.number().int().min(0).max(8640000000000000).optional(),
   message: z
     .object({
       mid: z.string().min(1).max(2000),
@@ -103,6 +133,11 @@ export function dmEvents(body: unknown) {
           sender: event.data.sender.id,
           mid: data.mid,
           model: dmModel(data.text),
+          explicitModel: dmModelNote(data.text),
+          messageAt:
+            event.data.timestamp === undefined
+              ? null
+              : new Date(event.data.timestamp).toISOString(),
           links: [...links.values()],
           diagnostics: {
             attachment_count: attachments.length,
