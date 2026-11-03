@@ -59,15 +59,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("website reply content and intake", () => {
-  it("has 30 distinct short messages with the exact link and an explicit IG boundary", () => {
+  it("has 30 distinct short messages with ten URLs for the same chat and an explicit IG boundary", () => {
     expect(DM_REPLIES).toHaveLength(30);
     expect(new Set(DM_REPLIES).size).toBe(30);
+    const links = new Set<string>();
     for (const text of DM_REPLIES) {
       expect(text.split(DM_LINK)).toHaveLength(2);
+      const urls = text.match(/https:\/\/\S+/g) ?? [];
+      expect(urls).toHaveLength(1);
+      const url = new URL(urls[0]);
+      expect(url.origin).toBe(DM_LINK);
+      expect(url.pathname).toBe("/");
+      expect(url.hash).toBe("");
+      expect([...url.searchParams.keys()]).toEqual(["via"]);
+      expect(url.searchParams.get("via")).toMatch(/^[a-z]+$/);
+      links.add(url.href);
       expect(text).toMatch(/IG|insta/);
       expect(text).toMatch(/don't|no |not /);
       expect(text.length).toBeLessThan(300);
     }
+    expect(links.size).toBe(10);
   });
   it("accepts inbound texts, images and stop, without keeping message bodies", () => {
     expect(websiteDmEvents(payload(), now)).toHaveLength(1);
