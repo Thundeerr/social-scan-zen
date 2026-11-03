@@ -45,6 +45,28 @@ export async function businessReport(user: string, now = new Date()) {
   if (entries.length >= 1000)
     throw new Error("Kostenliste zu groß: Bericht muss paginiert werden.");
   const snapshots = checked(snapshotResult) as MetricSnapshot[];
+  // Daily API snapshots must not age manual costs/rates out of the recent-row window.
+  if (snapshots.length === 100) {
+    const missing = [
+      "Closer Verbrauch (UI)",
+      "Closer Zahlungen (Revolut)",
+      "CupidBot Abos (Portal)",
+      "CupidBot laufende Abos (Portal)",
+      "ECB Wechselkurs",
+    ].filter((source) => !snapshots.some((s) => s.source === source));
+    const older = await Promise.all(
+      missing.map((source) =>
+        db()
+          .from("business_metric_snapshots")
+          .select("*")
+          .eq("user_id", user)
+          .eq("source", source)
+          .order("observed_at", { ascending: false })
+          .limit(1),
+      ),
+    );
+    snapshots.push(...older.flatMap((result) => checked(result) as MetricSnapshot[]));
+  }
   const latest = snapshots.filter(
     (s, i) => snapshots.findIndex((t) => t.source === s.source) === i,
   );
@@ -77,21 +99,27 @@ export async function businessReport(user: string, now = new Date()) {
   const wave = await waveStatus(user);
   const wr = wave?.report;
   const generation = wr ? generationRunRate(wr) : null;
-  const profit = profitEstimate(latest, allocation, wr);
+  const profit = profitEstimate(latest, allocation, wr, local.day);
   const euro = (n: number) => n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   const text = [
     "🦇 MIDNA // KIIKII MONEY CHECK",
     `${local.day} · ${local.time} Uhr`,
     "",
-    ...(profit
+    ...(profit && !("unavailable" in profit)
       ? [
           `💜 Übrig: ${euro(profit.surplus)} · Schätzung vor Steuern`,
           `Rechnung: ${profit.start} – ${profit.end}`,
+          profit.estimateLabel,
+          ...profit.notes,
           `Einnahmen netto ${euro(profit.revenue)} − Kosten ${euro(profit.costs)}`,
           `Monatskosten bei diesem Tempo: ≈ ${euro(profit.monthly)}`,
         ]
       : [
-          "⚠️ Gewinn offen: Daten fehlen oder Zeiträume passen nicht zusammen.",
+          !profit
+            ? "⚠️ Gewinn offen: Keine bestätigten Kostendaten vorhanden."
+            : profit.unavailable === "fx"
+              ? "⚠️ Umrechnung offen: Gültiger ECB-Wechselkurs fehlt."
+              : "⚠️ Umsatz offen: Gültige Fanvue-Einnahmen fehlen.",
           ...(fv
             ? [
                 `Fanvue netto: ${fv.values["Netto vor Betriebskosten USD"] === undefined ? "unbekannt" : usd(fv.values["Netto vor Betriebskosten USD"] * 100)} · ${fv.period_start} – ${fv.period_end} · vor Betriebskosten`,

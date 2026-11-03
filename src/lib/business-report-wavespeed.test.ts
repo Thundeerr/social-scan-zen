@@ -1,4 +1,10 @@
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+const history = vi.hoisted(() => ({ crowded: false, requestedSources: [] as string[] }));
+beforeEach(() => {
+  history.crowded = false;
+  history.requestedSources = [];
+  vi.clearAllMocks();
+});
 vi.mock("./messaging/telegram-transport", () => ({ channelAlertTelegramCall: vi.fn() }));
 vi.mock("./wavespeed-analytics.server", () => ({
   waveStatus: async () => ({
@@ -20,6 +26,7 @@ vi.mock("./wavespeed-analytics.server", () => ({
 vi.mock("@/integrations/supabase/client.server", () => ({
   supabaseAdmin: {
     from: (table: string) => {
+      let source: string | undefined;
       const data =
         table === "business_report_settings"
           ? { monthly_budget_cents: 40000, enabled: true }
@@ -91,11 +98,35 @@ vi.mock("@/integrations/supabase/client.server", () => ({
                 ];
       const chain: any = {
         select: () => chain,
-        eq: () => chain,
+        eq: (column: string, value: string) => {
+          if (column === "source") {
+            source = value;
+            history.requestedSources.push(value);
+          }
+          return chain;
+        },
         order: () => chain,
         limit: () => chain,
         maybeSingle: () => chain,
-        then: (resolve: any) => resolve({ data, error: null }),
+        then: (resolve: any) => {
+          if (table === "business_metric_snapshots" && history.crowded) {
+            const records = data as { source: string }[];
+            return resolve({
+              error: null,
+              data: source
+                ? records.filter((s) => s.source === source)
+                : Array.from({ length: 100 }, () => ({
+                    source: "Fanvue API",
+                    period_start: "2026-11-01",
+                    period_end: "2026-11-03",
+                    observed_at: "2026-11-03T18:00:00Z",
+                    values: { "Netto vor Betriebskosten USD": 0 },
+                    note: "",
+                  })),
+            });
+          }
+          return resolve({ data, error: null });
+        },
       };
       return chain;
     },
@@ -116,6 +147,7 @@ it("daily report includes actual costs and fits Telegram without sending", async
   const { businessReport } = await import("./business-report.server");
   const r = await businessReport("operator", new Date("2026-10-28T19:00:00Z"));
   expect(r.text).toContain("Schätzung vor Steuern");
+  expect(r.text).toContain("Schätzung, Kosten Stand 28.10.2026");
   expect(r.text).toContain("2026-10-01 – 2026-10-28");
   expect(r.text).toContain("Einnahmen netto");
   expect(r.text).toContain("Monatskosten bei diesem Tempo");
@@ -127,6 +159,26 @@ it("daily report includes actual costs and fits Telegram without sending", async
   expect(r.costs.fixed).toBe(1000);
   expect(r.allocation.totals.kiikii.EUR).toBe(5725);
   expect(r.entries[0].cents).toBe(9000);
+  const { channelAlertTelegramCall } = await import("./messaging/telegram-transport");
+  expect(channelAlertTelegramCall).not.toHaveBeenCalled();
+});
+
+it("keeps confirmed costs available beyond the latest 100 daily snapshots without sending", async () => {
+  history.crowded = true;
+  const { businessReport } = await import("./business-report.server");
+  const r = await businessReport("operator", new Date("2026-11-06T19:00:00Z"));
+  expect(r.text).toContain("💜 Übrig:");
+  expect(r.text).toContain("2026-11-01 – 2026-11-03");
+  expect(r.text).toContain("Schätzung, Kosten Stand 28.10.2026");
+  expect(r.text).toContain("ECB-Kurs veraltet: Stand 28.10.2026");
+  expect(r.text).not.toContain("Gewinn offen");
+  expect(history.requestedSources).toEqual([
+    "Closer Verbrauch (UI)",
+    "Closer Zahlungen (Revolut)",
+    "CupidBot Abos (Portal)",
+    "CupidBot laufende Abos (Portal)",
+    "ECB Wechselkurs",
+  ]);
   const { channelAlertTelegramCall } = await import("./messaging/telegram-transport");
   expect(channelAlertTelegramCall).not.toHaveBeenCalled();
 });

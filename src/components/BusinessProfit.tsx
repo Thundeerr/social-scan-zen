@@ -5,8 +5,16 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
   if (!p)
     return (
       <section className="rounded-2xl border border-amber-300/30 p-6 text-amber-100">
-        The profit estimate needs complete figures for the same period. Individual sources are shown
-        below.
+        Gewinn offen: Es sind noch keine bestätigten Kostendaten vorhanden. Einzelne Quellen stehen
+        unten.
+      </section>
+    );
+  if ("unavailable" in p)
+    return (
+      <section className="rounded-2xl border border-amber-300/30 p-6 text-amber-100">
+        {p.unavailable === "fx"
+          ? "Umrechnung offen: Ein gültiger ECB-Wechselkurs fehlt. Kostendaten sind vorhanden."
+          : "Umsatz offen: Gültige Fanvue-Einnahmen für den Zeitraum fehlen. Kostendaten sind vorhanden."}
       </section>
     );
   return (
@@ -17,6 +25,12 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
         <p className="text-sm text-slate-400">
           {p.start} to {p.end} · Estimate before taxes and your own time
         </p>
+        <p className="text-sm text-slate-400">{p.estimateLabel}</p>
+        {p.notes.map((note) => (
+          <p key={note} className="text-sm text-amber-200">
+            {note}
+          </p>
+        ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="relative overflow-hidden rounded-2xl border border-cyan-300/40 bg-gradient-to-br from-cyan-400/15 via-[#101321] to-fuchsia-500/10 p-6 md:p-8">
@@ -34,7 +48,11 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
           {[
             ["Fanvue-Einnahmen", p.revenue, "After Fanvue fees"],
-            ["Included costs", p.costs, "Fixed costs + generation + paid Closer subscriptions"],
+            [
+              "Included costs",
+              p.costs,
+              "Prorated fixed costs + generation + subscription estimate",
+            ],
           ].map(([label, amount, detail]) => (
             <div
               key={String(label)}
@@ -57,14 +75,19 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
           </div>
           <p className="text-3xl font-semibold tabular-nums text-fuchsia-200">
             ≈ {eur(p.monthly)}
-            <span className="ml-2 text-sm font-normal text-slate-400">/ 30 days</span>
+            <span className="ml-2 text-sm font-normal text-slate-400">/ month (estimate)</span>
           </p>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           {[
-            ["Fixkostenanteil", p.fixed],
-            ["Generation · projected", (p.generation / Number(p.end.slice(-2))) * 30],
-            ["Closer & Link · subscription average", p.monthlySubscriptionsUsd / p.rate],
+            ["Fixkostenanteil", p.fixedMonthly],
+            ["Generation · projected", (p.generation / p.days) * 30],
+            [
+              "Closer & Link · subscription average",
+              p.monthlySubscriptionsUsd === null
+                ? (p.subscriptionCosts / p.days) * 30
+                : p.monthlySubscriptionsUsd / p.rate,
+            ],
           ].map(([label, amount]) => (
             <div key={String(label)} className="rounded-xl border border-white/10 bg-black/15 p-4">
               <p className="text-xs text-slate-400">{label}</p>
@@ -73,35 +96,37 @@ export function BusinessProfit({ value: p }: { value: ReturnType<typeof profitEs
           ))}
         </div>
         <p className="mt-4 text-xs leading-relaxed text-slate-400">
-          Projection, not another invoice. Generation extrapolated from this month to 30 days.
-          Current subscriptions as of {p.subscriptionDate}; not a long-term average.
+          Projection, not another invoice. Generation extrapolated from the available daily average
+          to 30 days. Current subscriptions as of {p.subscriptionDate ?? p.paymentDate ?? "unknown"}
+          .
         </p>
       </div>
       <p className="text-sm text-amber-200">
-        All nine CupidBot payments are allocated. Surplus after paid subscriptions; not accrual
-        accounting.
+        Monthly rates are prorated by calendar days; weekly rates by seven days. Historical payments
+        and conversation usage are not added again.
       </p>
       <details className="text-sm text-slate-300">
         <summary className="cursor-pointer py-3 text-cyan-200">How the numbers add up</summary>
         <p className="mb-3">
-          Closer: {p.charged} charged conversations · {p.remaining ?? "unbekannt"} credits left (as
-          of {p.end}). Conversation value {p.usageUsd.toFixed(2)} $ is not an extra subscription
-          charge. Active: {p.subscriptionCount ?? "?"} subscriptions,{" "}
-          {p.subscriptionMonthlyUsd ?? "?"} $ monthly + {p.subscriptionWeeklyUsd ?? "?"} $ weekly;
-          weekly amounts averaged using 52 / 12.
+          Closer: {p.charged ?? "unknown"} charged conversations · {p.remaining ?? "unbekannt"}{" "}
+          credits left (as of {p.usageDate ?? "unknown"}). Conversation value{" "}
+          {p.usageUsd?.toFixed(2) ?? "unknown"} $ is not an extra subscription charge. Active:{" "}
+          {p.subscriptionCount ?? "?"} subscriptions, {p.subscriptionMonthlyUsd ?? "?"} $ monthly +{" "}
+          {p.subscriptionWeeklyUsd ?? "?"} $ weekly; weekly amounts averaged using 52 / 12.
         </p>
         <p>
-          Current monthly fixed costs: {eur(p.fixed)} · Kiikii generation: {eur(p.generation)} ·
-          Paid CupidBot subscriptions: {eur(p.paid)}.
+          Fixed costs for this period: {eur(p.fixed)} · Kiikii generation: {eur(p.generation)} ·
+          Subscription costs for this period: {eur(p.subscriptionCosts)}.
         </p>
         <p className="mt-2">
-          {p.subscriptionNote} Paid invoices remain included as expenses. Cancellations reduce
-          future running costs, not past expenses.
+          {p.subscriptionNote} Last confirmed payments: {p.paid === null ? "unknown" : eur(p.paid)}
+          {p.paymentDate ? ` through ${p.paymentDate}` : ""}. Shown for reference, not added to
+          subscription rates.
         </p>
         <p className="mt-2">
-          Fixed costs use today's allocation for a full month; not historical accounting. Fanvue
-          fees are already included in net revenue. Exchange rate: 1 EUR = {p.rate} USD, ECB as of{" "}
-          {p.fxDay}; not a live rate. Sources and individual payments below.
+          Fixed costs use the confirmed allocation prorated over the revenue period. Fanvue fees are
+          already included in net revenue. Exchange rate: 1 EUR = {p.rate} USD, ECB as of {p.fxDay};
+          not a live rate. Sources and individual payments below.
         </p>
       </details>
     </section>
