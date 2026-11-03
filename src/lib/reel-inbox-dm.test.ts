@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
-import { dmEvents, dmModel } from "./reel-inbox-dm";
+import { dmEvents, dmModel, dmModelNote, dmRoutingExplanation } from "./reel-inbox-dm";
 const mock = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: mock }));
-import { dmWebhook, ingestDm, verifyToken } from "./reel-inbox-dm.server";
+import { dmWebhook, ingestDm, reassignDm, verifyToken } from "./reel-inbox-dm.server";
 const link = "https://www.instagram.com/reel/Chunk8-jurw/?tracking=ignored";
 const event = (extra = {}) => ({
   sender: { id: "20" },
   recipient: { id: "10" },
   message: { mid: "test-message", text: link, ...extra },
 });
-const payload = (e = event()) => ({ object: "instagram", entry: [{ id: "10", messaging: [e] }] });
+const payload = (e: unknown = event()) => ({
+  object: "instagram",
+  entry: [{ id: "10", messaging: [e] }],
+});
 const request = (body: unknown, signature = true) => {
   const text = JSON.stringify(body);
   return new Request("https://instascanner.app/api/public/instagram/inbox-webhook", {
@@ -27,11 +30,15 @@ function query(data: unknown) {
   const q = {
     select: vi.fn(),
     eq: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
     maybeSingle: vi.fn(),
     then: (ok: (r: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok),
   };
   q.select.mockReturnValue(q);
   q.eq.mockReturnValue(q);
+  q.order.mockReturnValue(q);
+  q.limit.mockReturnValue(q);
   q.maybeSingle.mockResolvedValue({ data, error: null });
   return q;
 }
@@ -42,6 +49,62 @@ beforeEach(() => {
   mock.rpc.mockResolvedValue({ data: { ok: true }, error: null });
 });
 describe("DM parsing", () => {
+  it("distinguishes an explicit note from the Kiikii default without retaining message text", () => {
+    expect(dmModelNote()).toBeNull();
+    expect(dmModelNote("nice reel")).toBeNull();
+    expect(dmModelNote("Kiikii")).toBe("kiikii");
+    const note = dmEvents(
+      payload({ ...event({ text: "that's Tuuva please" }), timestamp: 1793700000000 }),
+    )[0];
+    expect(note.explicitModel).toBe("tuuva");
+    expect(note.links).toEqual([]);
+    expect(note.messageAt).toBe(new Date(1793700000000).toISOString());
+    expect(JSON.stringify(note)).not.toContain("that's Tuuva please");
+    expect(dmEvents(payload())[0].explicitModel).toBeNull();
+    expect(dmEvents(payload())[0].messageAt).toBeNull();
+  });
+  it("preserves separate reel and note timestamps even when Meta delivers the note first", () => {
+    const events = dmEvents({
+      object: "instagram",
+      entry: [
+        {
+          id: "10",
+          messaging: [
+            { ...event({ mid: "note", text: "Tuuva" }), timestamp: 1793700002000 },
+            {
+              ...event({
+                mid: "reel",
+                text: undefined,
+                attachments: [{ type: "share", payload: { permalink: link, title: "Kiikii" } }],
+              }),
+              timestamp: 1793700000000,
+            },
+          ],
+        },
+      ],
+    });
+    expect(events.map((e) => [e.mid, e.explicitModel, e.messageAt])).toEqual([
+      ["note", "tuuva", new Date(1793700002000).toISOString()],
+      ["reel", null, new Date(1793700000000).toISOString()],
+    ]);
+    expect(dmEvents(payload({ ...event(), timestamp: -1 }))).toEqual([]);
+  });
+  it("shows actionable note outcomes instead of asking for a nonexistent missing reel link", () => {
+    expect(dmRoutingExplanation("note_applied", "tuuva")).toContain("Tuuva note applied");
+    expect(dmRoutingExplanation("note_pending", "tuuva")).toContain("waiting");
+    expect(dmRoutingExplanation("note_ambiguous", "tuuva")).toContain("Choose the model");
+    expect(dmRoutingExplanation("note_expired", "tuuva")).toContain("no matching recent reel");
+    expect(dmRoutingExplanation("manual", "tuuva")).toContain("updated in the Inbox");
+    expect(
+      dmRoutingExplanation(
+        "note_pending",
+        "tuuva",
+        "2026-11-03T10:00:00Z",
+        Date.parse("2026-11-03T10:00:31Z"),
+      ),
+    ).toContain("no matching recent reel");
+    expect(dmRoutingExplanation(null, null)).toBeNull();
+  });
   it.each([undefined, "", "nice reel", "tuuvas", "https://www.instagram.com/tuuva/reel/ABCDE/"])(
     "defaults to Kiikii for %s",
     (text) => {
@@ -226,12 +289,47 @@ describe("DM authentication and durable intake", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(mock.rpc).toHaveBeenCalledOnce();
     expect(mock.rpc).toHaveBeenCalledWith(
-      "reel_inbox_dm_ingest_v3",
+      "reel_inbox_dm_ingest_v4",
       expect.objectContaining({
         p_diagnostics: expect.objectContaining({ outcome: "link_found" }),
-        p_model: "kiikii",
+        p_model: null,
+        p_message_at: null,
       }),
     );
+  });
+  it("passes separate notes and original event times to the durable routing transaction", async () => {
+    account([{ sender_id: "20", username: "kiikii.bat" }]);
+    await ingestDm(payload({ ...event({ text: "Tuuva" }), timestamp: 1793700002000 }));
+    expect(mock.rpc).toHaveBeenCalledWith(
+      "reel_inbox_dm_ingest_v4",
+      expect.objectContaining({
+        p_model: "tuuva",
+        p_links: [],
+        p_message_at: new Date(1793700002000).toISOString(),
+        p_diagnostics: expect.objectContaining({ outcome: "no_attachment" }),
+      }),
+    );
+  });
+  it("rejects model corrections from users without an operator role", async () => {
+    mock.from.mockReturnValue(query([{ role: "viewer" }]));
+    await expect(reassignDm("viewer", "inbox", "kiikii", "tuuva")).rejects.toThrow(
+      "Nicht freigegeben",
+    );
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+  it("scopes operator corrections to the authenticated owner and selected row", async () => {
+    mock.from.mockImplementation((table: string) =>
+      query(table === "user_roles" ? [{ role: "owner" }] : table === "ig_connections" ? null : []),
+    );
+    await reassignDm("owner", "inbox", "kiikii", "tuuva");
+    expect(mock.rpc).toHaveBeenCalledOnce();
+    expect(mock.rpc).toHaveBeenCalledWith("reel_inbox_dm_reassign", {
+      p_user: "owner",
+      p_inbox: "inbox",
+      p_from_model: "kiikii",
+      p_to_model: "tuuva",
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
   it("does not acknowledge failed persistence and exposes no secrets", async () => {
     account([{ sender_id: "20", username: "kiikii.bat" }]);

@@ -120,7 +120,7 @@ export async function dmOperator(user: string, action: "status" | "enable" | "di
   const receipts = checked(
     await db
       .from("reel_inbox_dm_receipts")
-      .select("sender,status,link_count,received_at,diagnostics,model")
+      .select("sender,status,link_count,received_at,diagnostics,model,routing_status,message_at")
       .eq("user_id", user)
       .order("received_at", { ascending: false })
       .limit(10),
@@ -131,7 +131,7 @@ export async function dmOperator(user: string, action: "status" | "enable" | "di
   const collected = checked(
     await db
       .from("reel_inbox_dm_candidates")
-      .select("model,created_at,reel_inbox_items(canonical_url,shortcode)")
+      .select("inbox_id,model,created_at,reel_inbox_items(canonical_url,shortcode)")
       .eq("user_id", user)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -145,6 +145,26 @@ export async function dmOperator(user: string, action: "status" | "enable" | "di
     receipts: receipts ?? [],
     collected: collected ?? [],
   };
+}
+
+export async function reassignDm(
+  user: string,
+  inboxId: string,
+  fromModel: string,
+  toModel: string,
+) {
+  const roles = checked(await db.from("user_roles").select("role").eq("user_id", user));
+  if (!roles?.some((r) => r.role === "owner" || r.role === "cofounder"))
+    throw new Error("Nicht freigegeben.");
+  checked(
+    await db.rpc("reel_inbox_dm_reassign", {
+      p_user: user,
+      p_inbox: inboxId,
+      p_from_model: fromModel,
+      p_to_model: toModel,
+    }),
+  );
+  return dmOperator(user, "status");
 }
 
 export async function ingestDm(body: unknown) {
@@ -188,14 +208,15 @@ export async function ingestDm(body: unknown) {
       if (!names.has(username)) continue;
     }
     checked(
-      await db.rpc("reel_inbox_dm_ingest_v3", {
+      await db.rpc("reel_inbox_dm_ingest_v4", {
         p_receiver: event.receiver,
         p_sender: event.sender,
         p_username: username,
         p_hash: createHash("sha256").update(event.mid).digest("hex"),
         p_links: event.links,
         p_diagnostics: event.diagnostics,
-        p_model: event.model,
+        p_model: event.explicitModel,
+        p_message_at: event.messageAt,
       }),
     );
   }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reelInboxDmFn } from "@/lib/reel-inbox-dm.functions";
 import { Button } from "@/components/ui/button";
-import { dmReceiptExplanation } from "@/lib/reel-inbox-dm";
+import { dmReceiptExplanation, dmRoutingExplanation } from "@/lib/reel-inbox-dm";
 
 export function ReelInboxDm({ userId }: { userId: string }) {
   const cache = useQueryClient();
@@ -26,8 +26,10 @@ export function ReelInboxDm({ userId }: { userId: string }) {
       <h2 className="font-medium">Collect reels through Instagram DMs</h2>
       <p className="text-sm">@kiikii.bat or @thundeerr999 → send directly to @followerstarteam.</p>
       <p className="text-sm text-muted-foreground">
-        No note → Kiikii. For Tuuva, add “Tuuva” when sharing, not as a separate message afterwards.
-        Reels are only collected; generation does not start automatically.
+        No note → Kiikii. Add “Tuuva” when sharing, or send it immediately afterwards (within 30
+        seconds). Instagram may deliver the note separately; we match it to one recent reel from the
+        same account. If several reels could match, choose the model below. Reels are only
+        collected; generation does not start automatically.
       </p>
       <p role="status" className="text-sm">
         {query.isError
@@ -55,7 +57,8 @@ export function ReelInboxDm({ userId }: { userId: string }) {
           @{r.sender} · {new Date(r.received_at).toLocaleString("de-DE")} ·{" "}
           {r.status === "queued"
             ? `${r.link_count} reel link(s) saved${r.model ? ` · ${r.model === "tuuva" ? "Tuuva" : "Kiikii"}` : ""}`
-            : `${dmReceiptExplanation(r.diagnostics)} Please send the copied reel link as text instead.`}
+            : (dmRoutingExplanation(r.routing_status, r.model, r.message_at) ??
+              `${dmReceiptExplanation(r.diagnostics)} Please send the copied reel link as text instead.`)}
         </p>
       ))}
       {!!status?.collected?.length && (
@@ -71,7 +74,25 @@ export function ReelInboxDm({ userId }: { userId: string }) {
                 key={`${item.model}-${reel.shortcode}-${index}`}
                 className="flex flex-wrap items-center gap-3 rounded-lg border p-3"
               >
-                <strong>{item.model === "tuuva" ? "Tuuva" : "Kiikii"}</strong>
+                <select
+                  aria-label={`Model for reel ${reel.shortcode}`}
+                  className="rounded-md border bg-background px-2 py-1 text-sm font-medium"
+                  value={item.model}
+                  disabled={mutation.isPending}
+                  onChange={(event) =>
+                    mutation.mutate({
+                      data: {
+                        action: "reassign",
+                        inboxId: item.inbox_id,
+                        fromModel: item.model as "kiikii" | "tuuva",
+                        toModel: event.target.value as "kiikii" | "tuuva",
+                      },
+                    })
+                  }
+                >
+                  <option value="kiikii">Kiikii</option>
+                  <option value="tuuva">Tuuva</option>
+                </select>
                 <a href={reel.canonical_url} target="_blank" rel="noreferrer" className="underline">
                   View source
                 </a>
