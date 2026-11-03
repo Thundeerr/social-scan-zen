@@ -94,16 +94,14 @@ export async function commentOperator(
     )
       throw new Error("Comment subscription could not be read back.");
     checked(
-      await db
-        .from("ig_comment_redirect_settings")
-        .upsert(
-          {
-            user_id: user,
-            mode: action === "enable_test" ? "test" : "live",
-            activated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        ),
+      await db.from("ig_comment_redirect_settings").upsert(
+        {
+          user_id: user,
+          mode: action === "enable_test" ? "test" : "live",
+          activated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      ),
     );
   }
   const settings = checked(
@@ -164,6 +162,10 @@ export async function ingestWebsiteComments(body: unknown) {
   if (!cfg || cfg.mode === "off" || !cfg.activated_at) return;
   const c = await connection(dm.user_id);
   if (!redirectConnectionReady(c) || !c.granted_scopes.includes(COMMENT_SCOPE)) return;
+  // Meta uses the Instagram-login scoped id for media.owner, while webhook
+  // entry.id uses user_id. Verify both against this token, not a guessed ID.
+  const ownIds = new Set([KIIKII_ID]);
+  let profileChecked = false;
   const mediaCache = new Map<string, ReturnType<typeof verifiedMediaSchema.parse>>();
   for (const event of events) {
     if ((cfg.mode === "test" || dm.mode === "test") && event.username !== dm.test_username)
@@ -191,7 +193,8 @@ export async function ingestWebsiteComments(body: unknown) {
     const timestamp = Date.parse(v.timestamp);
     if (
       v.id !== event.comment ||
-      v.from.id !== event.sender ||
+      (v.from.id !== undefined && v.from.id !== event.sender) ||
+      v.from.username.toLowerCase() !== event.username ||
       v.media.id !== event.media ||
       v.parent_id ||
       v.hidden ||
@@ -211,8 +214,18 @@ export async function ingestWebsiteComments(body: unknown) {
       const parsed = verifiedMediaSchema.safeParse(
         await commentGraph(`${event.media}?fields=id,owner,caption,permalink`, c.page_access_token),
       );
-      if (!parsed.success || parsed.data.id !== event.media || parsed.data.owner.id !== KIIKII_ID)
-        continue;
+      if (!parsed.success || parsed.data.id !== event.media) continue;
+      if (!ownIds.has(parsed.data.owner.id) && !profileChecked) {
+        const profile = await graph("me?fields=user_id,username", c.page_access_token);
+        if (
+          String(profile.user_id) !== KIIKII_ID ||
+          profile.username?.toLowerCase() !== "kiikii.bat"
+        )
+          return;
+        ownIds.add(String(profile.id));
+        profileChecked = true;
+      }
+      if (!ownIds.has(parsed.data.owner.id)) continue;
       media = parsed.data;
       mediaCache.set(event.media, media);
     }

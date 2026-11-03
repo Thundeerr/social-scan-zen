@@ -69,6 +69,8 @@ function setup() {
   mock.rpc.mockResolvedValue({ data: { send: true, variant: 2 }, error: null });
   vi.mocked(fetch).mockImplementation(async (input) => {
     const url = String(input);
+    if (url.includes("/me?"))
+      return Response.json({ user_id: KIIKII_ID, id: "28348803094791726", username: "kiikii.bat" });
     if (url.includes("/123?")) return Response.json(verified());
     if (url.includes("/456?")) return Response.json(media());
     if (url.endsWith("/messages")) return Response.json({ message_id: "sent-private-reply" });
@@ -147,6 +149,17 @@ describe("comment CTA matching", () => {
 });
 
 describe("comment private delivery", () => {
+  it("handles Meta's live node response with username-only author and login-scoped media owner", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(Response.json(verified({ from: { username: "user_diary01" } })))
+      .mockResolvedValueOnce(Response.json(media({ owner: { id: "28348803094791726" } })));
+    await ingestWebsiteComments(payload());
+    expect(sends()).toHaveLength(1);
+    expect(mock.rpc).toHaveBeenCalledWith(
+      "ig_comment_redirect_reserve",
+      expect.objectContaining({ p_sender: "20", p_username: "user_diary01" }),
+    );
+  });
   it("uses recipient.comment_id and the approved website reply after a durable reservation", async () => {
     await ingestWebsiteComments(payload());
     expect(mock.rpc).toHaveBeenCalledWith(

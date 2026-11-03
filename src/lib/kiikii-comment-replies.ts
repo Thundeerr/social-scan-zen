@@ -94,7 +94,9 @@ export const verifiedCommentSchema = z.object({
   id,
   text: z.string().max(20000),
   timestamp: z.string(),
-  from: z.object({ id, username: z.string() }),
+  // The individual comment endpoint may omit from.id even when the comments
+  // edge and signed webhook include it. Bind the returned username as well.
+  from: z.object({ id: id.optional(), username: z.string().min(1).max(100) }),
   media: z.object({ id }),
   parent_id: id.nullish(),
   hidden: z.boolean().optional(),
