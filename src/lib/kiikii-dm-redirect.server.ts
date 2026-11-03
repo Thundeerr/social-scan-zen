@@ -12,7 +12,7 @@ import {
 } from "./kiikii-dm-redirect";
 
 const db = supabaseAdmin as SupabaseClient;
-function checked<T>(result: { data: T; error: unknown }): T {
+export function checked<T>(result: { data: T; error: unknown }): T {
   if (result.error)
     throw new Error("Could not confirm the DM operation. Reload to check its status.");
   return result.data;
@@ -25,7 +25,7 @@ type Connection = {
   token_expires_at: string;
   status: string;
 };
-async function connection(user: string): Promise<Connection | null> {
+export async function connection(user: string): Promise<Connection | null> {
   return checked(
     await db
       .from("ig_connections")
@@ -46,7 +46,7 @@ export function redirectConnectionReady(c: Connection | null): c is Connection {
     Date.parse(c.token_expires_at) > Date.now() + 60_000,
   );
 }
-async function graph(path: string, token: string, body?: URLSearchParams) {
+export async function graph(path: string, token: string, body?: URLSearchParams) {
   const response = await fetch(`${IG_API_BASE_URL}/${path}`, {
     method: body ? "POST" : "GET",
     headers: { Authorization: `Bearer ${token}` },
@@ -59,6 +59,20 @@ async function graph(path: string, token: string, body?: URLSearchParams) {
       "Meta could not confirm messaging access. Check the connection and app permissions.",
     );
   return response.json();
+}
+
+/** Deleted or inaccessible comments are normal webhook races, not send retries. */
+export async function commentGraph(path: string, token: string) {
+  const response = await fetch(`${IG_API_BASE_URL}/${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    redirect: "manual",
+    signal: AbortSignal.timeout(7000),
+  });
+  const result = await response.json().catch(() => null);
+  if (response.status === 404 || (response.status === 400 && result?.error?.code === 100))
+    return null;
+  if (!response.ok) throw new Error("Could not read the Instagram comment. Check Meta access.");
+  return result;
 }
 
 export async function redirectOperator(
@@ -119,18 +133,16 @@ export async function redirectOperator(
     )
       throw new Error("Messages subscription could not be read back.");
     checked(
-      await db
-        .from("ig_dm_redirect_settings")
-        .upsert(
-          {
-            user_id: user,
-            receiver_id: KIIKII_ID,
-            mode: action === "enable_test" ? "test" : "live",
-            test_username: "user_diary01",
-            activated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        ),
+      await db.from("ig_dm_redirect_settings").upsert(
+        {
+          user_id: user,
+          receiver_id: KIIKII_ID,
+          mode: action === "enable_test" ? "test" : "live",
+          test_username: "user_diary01",
+          activated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      ),
     );
   }
   const settings = checked(
@@ -160,12 +172,20 @@ export async function redirectOperator(
 }
 
 /** Exactly one HTTP attempt after a durable reservation; never replay an ambiguous send. */
-export async function deliverWebsiteReply(token: string, sender: string, text: string) {
+export async function deliverWebsiteReply(
+  token: string,
+  sender: string,
+  text: string,
+  kind: "dm" | "comment" = "dm",
+) {
   try {
     const response = await fetch(`${IG_API_BASE_URL}/${KIIKII_ID}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ recipient: { id: sender }, message: { text } }),
+      body: JSON.stringify({
+        recipient: kind === "comment" ? { comment_id: sender } : { id: sender },
+        message: { text },
+      }),
       redirect: "manual",
       signal: AbortSignal.timeout(7000),
     });

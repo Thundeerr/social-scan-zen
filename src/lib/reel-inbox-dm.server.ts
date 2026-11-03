@@ -242,6 +242,8 @@ export async function dmWebhook(request: Request) {
     await ingestDm(body); // acknowledge only after durable transaction; Meta can retry
     const { ingestWebsiteDm } = await import("./kiikii-dm-redirect.server");
     await ingestWebsiteDm(body);
+    const { ingestWebsiteComments } = await import("./kiikii-comment-replies.server");
+    await ingestWebsiteComments(body);
     return new Response("EVENT_RECEIVED", { headers });
   } catch {
     return new Response("Not confirmed; retry", { status: 503, headers });
