@@ -67,7 +67,7 @@ describe("website reply content and intake", () => {
       expect(text.split(DM_LINK)).toHaveLength(2);
       const urls = text.match(/https:\/\/\S+/g) ?? [];
       expect(urls).toHaveLength(1);
-      const url = new URL(urls[0]);
+      const url = new URL(urls[0]!);
       expect(url.origin).toBe(DM_LINK);
       expect(url.pathname).toBe("/");
       expect(url.hash).toBe("");
@@ -115,6 +115,22 @@ describe("website reply content and intake", () => {
     expect(isOptOut("don't message me")).toBe(true);
     expect(isOptOut("keine nachrichten mehr")).toBe(true);
     expect(isOptOut("i can't stop playing overwatch")).toBe(false);
+  });
+  it.each([
+    "STOP 🖤", "Stop! ❤️‍🔥", "🫶🏿 STOP", "please stop messaging me",
+    "Please, don't message me!", "Don’t message me, please 🖤",
+    "Bitte keine Nachrichten mehr", "schreib mir bitte nicht mehr!",
+    "Keine Nachrichten mehr, bitte.", "ＳＴＯＰ！", "stop\nplease", "SToPP 🖤",
+  ])("honors decorated or polite opt-out %s", (text) => {
+    expect(isOptOut(text)).toBe(true);
+    expect(websiteDmEvents(payload(event({ message: { mid: "opt-out", text } })), now)[0].stop).toBe(true);
+  });
+  it.each([
+    "", "🖤", "please", "i can't stop playing overwatch", "don't stop messaging me",
+    "please don't stop", "nonstop", "stop playing 🖤", "stop 🖤 playing",
+    "how do I unsubscribe?", "stop messaging me about overwatch", "unstoppable 🖤",
+  ])("does not turn an ordinary sentence into an opt-out: %s", (text) => {
+    expect(isOptOut(text)).toBe(false);
   });
 });
 describe("safe sending", () => {

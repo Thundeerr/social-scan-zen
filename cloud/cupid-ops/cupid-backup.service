@@ -1,0 +1,11 @@
+[Unit]
+Description=Bounded Cupid browser snapshot without restarting Chrome
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/bash /usr/local/lib/cupid-browser/cupid-backup.sh
+ExecStopPost=/usr/bin/bash /usr/local/lib/cupid-browser/cupid-backup.sh --thaw-owned
+TimeoutStartSec=120
+Nice=10
+IOSchedulingClass=idle

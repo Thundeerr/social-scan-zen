@@ -28,7 +28,7 @@ try {
     (await migration("20260820154804_add_content_publisher_queue.sql")).split("REVOKE ALL ON")[0],
   );
   await db.exec(
-    `alter table content_posts add column highlight_enabled boolean default false,add column share_to_feed boolean default true,add column story_publish_mode text default 'manual_link_sticker';`,
+    `alter table content_posts add column highlight_enabled boolean default false,add column share_to_feed boolean default true,add column story_publish_mode text default 'manual_link_sticker',add column published_at timestamptz;`,
   );
   await db.exec(await migration("20261011110112_model_publishing_accounts.sql"));
   await db.exec(await migration("20261011100940_content_review.sql"));
@@ -59,11 +59,63 @@ try {
   await db.exec(await migration("20261011112049_model_trial_reels.sql"));
   await db.exec(await migration("20261011125819_model_posting_queue.sql"));
   await db.exec(await migration("20261011131405_review_card_status_sync.sql"));
+  await db.exec(`create table model_pipeline_settings(user_id uuid primary key,enabled boolean,last_seen_at timestamptz);
+    create table model_pipeline_jobs(user_id uuid,model text,state text,created_at timestamptz,reserved_day date,reserved_cents integer);
+    grant select on model_pipeline_settings,model_pipeline_jobs to service_role;`);
+  await db.exec(await migration("20261106181827_model_worker_health_posting_policy.sql"));
+  // Migration only stores policy; it never authorizes a post or starts generation.
+  assert.equal(
+    (await db.query("select count(*)::int n from content_posts where status='scheduled'")).rows[0]
+      .n,
+    0,
+  );
+  const policy = (await db.query("select * from model_posting_policy($1,'kiikii')", [owner]))
+    .rows[0];
+  assert.equal(policy.daily_limit, 1);
+  assert.deepEqual(policy.slots, ["03:00:00"]);
+  assert.equal(
+    (await db.query("select daily_limit from model_posting_policy($1,'tuuva')", [owner])).rows[0]
+      .daily_limit,
+    2,
+  );
+  assert.equal(
+    (await db.query("select daily_limit from model_posting_policy($1,'kiikii')", [other])).rows[0]
+      .daily_limit,
+    2,
+  );
+  for (const invalid of [
+    "array[time '03:00',time '03:00']",
+    "array[]::time[]",
+    "array[null]::time[]",
+  ]) {
+    await assert.rejects(
+      db.query(
+        `update model_posting_policies set slots=${invalid},daily_limit=2 where user_id=$1`,
+        [owner],
+      ),
+    );
+  }
+  await assert.rejects(
+    db.query("update model_posting_policies set timezone='Mars/Olympus' where user_id=$1", [owner]),
+  );
+  const grants = (
+    await db.query(
+      "select has_table_privilege('authenticated','content_posts','TRUNCATE') as truncate,has_table_privilege('authenticated','content_posts','TRIGGER') as trigger,has_table_privilege('authenticated','content_posts','REFERENCES') as references,has_table_privilege('authenticated','content_posts','SELECT') as select_ok,has_table_privilege('authenticated','model_posting_policies','SELECT') as policy_read,has_function_privilege('authenticated','model_next_posting_slot(uuid,text,timestamptz)','EXECUTE') as helper_execute",
+    )
+  ).rows[0];
+  assert.deepEqual(grants, {
+    truncate: false,
+    trigger: false,
+    references: false,
+    select_ok: true,
+    policy_read: false,
+    helper_execute: false,
+  });
   await db.exec("set role service_role");
   await assert.rejects(call("status", ref, other));
   await assert.rejects(call("prepare", prepare));
   await db.query(
-    "insert into ig_connections(user_id,ig_user_id,ig_username,status,token_expires_at,destination) values($1,'123','kiikii.bat','active',now()+interval '10 days','kiikii')",
+    "insert into ig_connections(user_id,ig_user_id,ig_username,status,token_expires_at,destination) values($1,'123','kiikii.bat','active',now()+interval '30 days','kiikii')",
     [owner],
   );
   await assert.rejects(call("prepare", { ...prepare, revision: 2 }));
@@ -157,6 +209,11 @@ try {
   await assert.rejects(call("queue", {}, other));
   await call("schedule", schedule);
   await call("schedule", schedule); // Lost-response retry does not allocate another slot.
+  const sameDayLater = new Date(new Date(slot.scheduled_for).valueOf() + 3600_000).toISOString();
+  await assert.rejects(
+    call("schedule", { ...schedule, ...b, scheduled_for: sameDayLater }),
+    /Daily posting limit/,
+  );
   assert.equal((await call("queue", {})).queue.length, 1);
   assert.equal(
     new Date((await call("status", a)).scheduled_for).valueOf(),
@@ -174,7 +231,7 @@ try {
       minute: "2-digit",
       hourCycle: "h23",
     }).format(new Date(preview.scheduled_for));
-    assert.ok(["00:00", "19:00"].includes(local));
+    assert.equal(local, "03:00");
     await call("schedule", { ...schedule, ...ref, scheduled_for: preview.scheduled_for });
   }
   assert.equal((await call("queue", {})).queue.length, 14);
@@ -213,6 +270,38 @@ try {
     )
   ).rows[0];
   assert.equal(Number(dst.hours), 25);
+  // Policy-based slot selection follows local dates across both DST changes.
+  const spring = (
+    await db.query("select model_next_posting_slot($1,'kiikii','2027-03-27T03:00:00Z') v", [owner])
+  ).rows[0].v;
+  assert.equal(new Date(spring).toISOString(), "2027-03-28T01:00:00.000Z");
+  const autumn = (
+    await db.query("select model_next_posting_slot($1,'kiikii','2027-10-30T02:00:00Z') v", [owner])
+  ).rows[0].v;
+  assert.equal(new Date(autumn).toISOString(), "2027-10-31T02:00:00.000Z");
+  await db.exec("reset role");
+  await db.query(
+    "insert into model_pipeline_settings values($1,true,now()-interval '11 days'),($2,true,now())",
+    [owner, other],
+  );
+  await db.query(
+    "insert into model_pipeline_jobs values($1,'kiikii','queued',now()-interval '13 days',current_date,0),($1,'tuuva','queued',now()-interval '20 days',current_date,0),($2,'kiikii','queued',now()-interval '30 days',current_date,0)",
+    [owner, other],
+  );
+  await db.exec("set role service_role");
+  const health = (await db.query("select business_live_status($1) v", [owner])).rows[0].v
+    .generation_worker;
+  assert.equal(health.enabled, true);
+  assert.equal(health.queued, 1);
+  assert.equal(health.in_progress, 0);
+  assert.ok(Date.now() - Date.parse(health.last_seen_at) > 10 * 86400_000);
+  assert.ok(Date.now() - Date.parse(health.oldest_queued_at) < 14 * 86400_000);
+  const missing = (await db.query("select business_live_status($1) v", [crypto.randomUUID()]))
+    .rows[0].v.generation_worker;
+  assert.equal(missing.configured, false);
+  assert.equal(missing.enabled, null);
+  assert.equal(missing.last_seen_at, null);
+  assert.equal(missing.queued, 0);
   await db.query("update content_review_items set telegram_message_id=10 where id=$1", [b.id]);
   const sync = async (action, data) =>
     (
@@ -258,7 +347,7 @@ try {
     "Telegram card queue passed: lease isolation, new changes preserved, stale receipts rejected, delayed retry and successful completion.",
   );
   console.log(
-    "Posting queue passed: 14 slots, explicit confirmation, account, revision, isolation, collision, idempotency, cancellation, expiry and DST.",
+    "Posting queue passed: stored model policy, 14 daily slots, manual daily cap, confirmation, isolation, collision, idempotency, cancellation, expiry, DST, worker evidence and least privilege.",
   );
   console.log(
     "Model publishing DB passed: owner, revision, separate account, immutable review/target/media, pause, exact confirmation, prepare/cancel, idempotent publish.",

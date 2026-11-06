@@ -1,71 +1,240 @@
-import type { MetricSnapshot } from "./business-report";
+import { berlinTime, type MetricSnapshot } from "./business-report";
 import type { allocationPlan } from "./business-cost-allocation";
+
+const DAY = 86400000;
+const nonnegative = (n: unknown): n is number =>
+  typeof n === "number" && Number.isFinite(n) && n >= 0;
+const date = (day: string) => {
+  const time = Date.parse(day + "T00:00:00Z");
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+    Number.isFinite(time) &&
+    new Date(time).toISOString().slice(0, 10) === day
+    ? time
+    : NaN;
+};
+const daysBetween = (start: string, end: string) => (date(end) - date(start)) / DAY + 1;
+const shortDate = (day: string) => day.split("-").reverse().join(".");
+function monthlyFraction(start: string, end: string) {
+  let fraction = 0;
+  for (let time = date(start); time <= date(end); ) {
+    const d = new Date(time),
+      next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+    const monthDays = new Date(next - DAY).getUTCDate();
+    const until = Math.min(next, date(end) + DAY);
+    fraction += (until - time) / DAY / monthDays;
+    time = until;
+  }
+  return fraction;
+}
+function rates(s: MetricSnapshot | undefined) {
+  if (!s) return null;
+  const monthly = s.values["Monatliche Tarife USD"],
+    weekly = s.values["Wöchentliche Tarife USD"];
+  if (
+    (nonnegative(monthly) || nonnegative(weekly)) &&
+    (monthly === undefined || nonnegative(monthly)) &&
+    (weekly === undefined || nonnegative(weekly))
+  )
+    return { monthly: monthly ?? 0, weekly: weekly ?? 0 };
+  const average = s.values["Monatsmittel USD"];
+  return nonnegative(average) ? { monthly: average, weekly: 0 } : null;
+}
 
 export function profitEstimate(
   snapshots: MetricSnapshot[],
   allocation: ReturnType<typeof allocationPlan>,
   wave: { month: string; observed: string; kiikii: number } | null | undefined,
+  today = berlinTime().day,
 ) {
-  const find = (source: string) => snapshots.find((s) => s.source === source);
-  const fv = find("Fanvue API"),
-    closer = find("Closer Verbrauch (UI)"),
-    payments = find("Closer Zahlungen (Revolut)"),
-    subscriptions = find("CupidBot Abos (Portal)"),
-    fx = find("ECB Wechselkurs");
-  if (!fv || !closer || !payments || !subscriptions || !fx || !wave || !allocation.entries.length)
-    return null;
-  const rate = fx.values["USD pro EUR"];
-  const samePeriod = [closer, payments, subscriptions].every(
-    (s) => s.period_start === fv.period_start && s.period_end === fv.period_end,
+  const ordered = [...snapshots].sort(
+    (a, b) =>
+      Date.parse(b.observed_at) - Date.parse(a.observed_at) ||
+      b.period_end.localeCompare(a.period_end),
   );
+  const find = (source: string) =>
+    ordered
+      .filter(
+        (s) => s.source === source && Number.isFinite(date(s.period_end)) && s.period_end <= today,
+      )
+      .sort((a, b) => b.period_end.localeCompare(a.period_end))[0];
+  const fv = find("Fanvue API"),
+    closer = find("Closer Verbrauch (UI)");
+  const subscriptions = ordered
+    .filter(
+      (s) =>
+        ["CupidBot laufende Abos (Portal)", "CupidBot Abos (Portal)"].includes(s.source) &&
+        rates(s) &&
+        daysBetween(s.period_start, s.period_end) > 0 &&
+        s.period_end <= today,
+    )
+    .sort((a, b) => b.period_start.localeCompare(a.period_start));
+  const payment = ordered
+    .filter(
+      (s) =>
+        ["CupidBot Abos (Portal)", "Closer Zahlungen (Revolut)"].includes(s.source) &&
+        nonnegative(s.values["Bezahlt EUR"]) &&
+        daysBetween(s.period_start, s.period_end) > 0 &&
+        s.period_end <= (fv?.period_end ?? today),
+    )
+    .sort((a, b) => b.period_end.localeCompare(a.period_end))[0];
+  const fixedRows = (allocation.history ?? allocation.entries)
+    .filter(
+      (r) => !r.planned && nonnegative(r.monthly_cents) && Number.isFinite(date(r.effective_from)),
+    )
+    .sort((a, b) => b.effective_from.localeCompare(a.effective_from));
+  const hasWave =
+    !!wave &&
+    nonnegative(wave.kiikii) &&
+    wave.observed.startsWith(wave.month + "-") &&
+    wave.observed.slice(0, 10) <= today &&
+    daysBetween(wave.month + "-01", wave.observed.slice(0, 10)) > 0;
+  if (!fixedRows.some((r) => r.model === "kiikii") && !subscriptions.length && !payment && !hasWave)
+    return null;
+  // Missing currencies/revenue cannot honestly be replaced by zero or an invented rate.
   if (
-    !samePeriod ||
-    fv.period_start !== wave.month + "-01" ||
-    wave.observed.slice(0, 10) !== fv.period_end ||
-    !(rate > 0)
+    !fv ||
+    !Number.isFinite(fv.values["Netto vor Betriebskosten USD"]) ||
+    !(daysBetween(fv.period_start, fv.period_end) > 0)
   )
-    return null;
-  const charged = closer.values["Berechnete Gespräche"],
-    price = closer.values["Preis pro Gespräch USD"];
-  const revenueUsd = fv.values["Netto vor Betriebskosten USD"],
-    paid = payments.values["Bezahlt EUR"];
-  if (![charged, price, revenueUsd, paid, wave.kiikii].every((n) => Number.isFinite(n) && n >= 0))
-    return null;
-  const fixed = allocation.totals.kiikii.EUR / 100 + allocation.totals.kiikii.USD / 100 / rate;
-  const generation = wave.kiikii / rate,
-    usageUsd = charged * price,
-    revenue = revenueUsd / rate;
-  const days = Number(fv.period_end.slice(-2));
-  const currentSubscriptions = find("CupidBot laufende Abos (Portal)") ?? subscriptions;
-  const monthlySubscriptionsUsd = currentSubscriptions.values["Monatsmittel USD"];
-  if (
-    !Number.isFinite(monthlySubscriptionsUsd) ||
-    monthlySubscriptionsUsd < 0 ||
-    subscriptions.values["Bezahlt EUR"] !== paid
-  )
-    return null;
+    return { unavailable: "revenue" as const };
+  const fx = ordered
+    .filter(
+      (s) =>
+        s.source === "ECB Wechselkurs" &&
+        s.values["USD pro EUR"] > 0 &&
+        Number.isFinite(s.values["USD pro EUR"]) &&
+        Number.isFinite(date(s.period_end)) &&
+        s.period_end <= today,
+    )
+    .sort((a, b) => b.period_end.localeCompare(a.period_end))
+    .at(0);
+  if (!fx) return { unavailable: "fx" as const };
+  const rate = fx.values["USD pro EUR"],
+    days = daysBetween(fv.period_start, fv.period_end);
+  const fxStale = (date(today) - date(fx.period_end)) / DAY > 7;
+  const notes: string[] = [];
+  const costDates: string[] = [];
+  const currentReferences = new Set<string>();
+  const rows = fixedRows.filter((r) => {
+    if (r.effective_from > today || currentReferences.has(r.reference)) return false;
+    currentReferences.add(r.reference);
+    return r.model === "kiikii";
+  });
+  const fixedMonthly = rows.reduce(
+    (sum, r) => sum + r.monthly_cents / 100 / (r.currency === "USD" ? rate : 1),
+    0,
+  );
+  let fixed = 0;
+  let fixedDays = 0;
+  // Calendar-day integration preserves version changes without applying a new
+  // price, model assignment or cancellation to the preceding days.
+  for (let time = date(fv.period_start); time <= date(fv.period_end); time += DAY) {
+    const day = new Date(time).toISOString().slice(0, 10);
+    const seen = new Set<string>();
+    const dailyRows = fixedRows.filter((row) => {
+      if (row.effective_from > day || seen.has(row.reference)) return false;
+      seen.add(row.reference);
+      return row.model === "kiikii";
+    });
+    if (dailyRows.length) fixedDays++;
+    for (const row of dailyRows) {
+      fixed +=
+        (row.monthly_cents / 100 / (row.currency === "USD" ? rate : 1)) * monthlyFraction(day, day);
+      costDates.push(row.effective_from);
+    }
+  }
+  if (!fixedDays) notes.push("Fixkostenaufteilung fehlt; nicht enthalten.");
+  else if (fixedDays < days)
+    notes.push(
+      `Fixkosten nur für ${fixedDays} von ${days} Tagen bestätigt; frühere Tage nicht enthalten.`,
+    );
+  // Current one-day portal snapshots start on their observation day; older
+  // period-labelled tariffs remain effective until a newer dated version.
+  const current = subscriptions.at(0);
+  const currentRates = rates(current);
+  let subscriptionCosts = 0;
+  let subscriptionDays = 0;
+  for (let time = date(fv.period_start); time <= date(fv.period_end); time += DAY) {
+    const day = new Date(time).toISOString().slice(0, 10);
+    const subscription = subscriptions.find((s) => s.period_start <= day);
+    const periodRates = rates(subscription);
+    if (subscription && periodRates) {
+      subscriptionDays++;
+      subscriptionCosts +=
+        (periodRates.monthly * monthlyFraction(day, day) + periodRates.weekly / 7) / rate;
+      costDates.push(subscription.period_end);
+    }
+  }
+  if (subscriptionDays > 0 && subscriptionDays < days) {
+    notes.push(
+      `Abokosten nur für ${subscriptionDays} von ${days} Tagen bestätigt; frühere Tage nicht enthalten.`,
+    );
+  } else if (
+    !subscriptionDays &&
+    payment &&
+    daysBetween(payment.period_start, payment.period_end) > 0
+  ) {
+    subscriptionCosts =
+      (payment.values["Bezahlt EUR"] * days) /
+      daysBetween(payment.period_start, payment.period_end);
+    costDates.push(payment.period_end);
+    notes.push("Abokosten aus bestätigtem Zahlungsdurchschnitt geschätzt; Tarif fehlt.");
+  } else if (!subscriptionDays) notes.push("Abokosten fehlen; nicht enthalten.");
+  let generation = 0;
+  if (hasWave && wave) {
+    const observed = wave.observed.slice(0, 10),
+      covered = daysBetween(wave.month + "-01", observed);
+    generation = (wave.kiikii * days) / covered / rate;
+    costDates.push(observed);
+    if (fv.period_start !== wave.month + "-01" || fv.period_end !== observed)
+      notes.push(`Generierung aus dem Tagesdurchschnitt bis ${shortDate(observed)} geschätzt.`);
+  } else notes.push("Generierungskosten fehlen; nicht enthalten.");
+  const costDate = costDates.sort().at(0) ?? payment?.period_end ?? current?.period_end;
+  const estimateLabel = `Schätzung${costDate ? `, Kosten Stand ${shortDate(costDate)}` : ""}`;
+  if (fxStale)
+    notes.push(`ECB-Kurs veraltet: Stand ${shortDate(fx.period_end)} (älter als 7 Tage).`);
+  const monthlySubscriptionsUsd = currentRates
+    ? currentRates.monthly + (currentRates.weekly * 52) / 12
+    : null;
+  const revenue = fv.values["Netto vor Betriebskosten USD"] / rate;
+  const costs = fixed + generation + subscriptionCosts;
+  const charged = closer?.values["Berechnete Gespräche"],
+    price = closer?.values["Preis pro Gespräch USD"];
   return {
     start: fv.period_start,
     end: fv.period_end,
+    days,
     fxDay: fx.period_end,
     rate,
+    fxStale,
+    estimateLabel,
+    notes,
     charged,
-    remaining: closer.values["Restgespräche"],
-    usageUsd,
+    remaining: closer?.values["Restgespräche"],
+    usageDate: closer?.period_end,
+    usageUsd: nonnegative(charged) && nonnegative(price) ? charged * price : null,
     fixed,
+    fixedMonthly,
     generation,
-    paid,
+    subscriptionCosts,
+    paid: payment?.values["Bezahlt EUR"] ?? null,
+    paymentDate: payment?.period_end,
     revenue,
     monthlySubscriptionsUsd,
-    subscriptionCount: currentSubscriptions.values["Aktive Abos"],
-    subscriptionMonthlyUsd: currentSubscriptions.values["Monatliche Tarife USD"],
-    subscriptionWeeklyUsd: currentSubscriptions.values["Wöchentliche Tarife USD"],
-    subscriptionDate: currentSubscriptions.period_end,
-    subscriptionNote: currentSubscriptions.note,
-    costs: fixed + generation + paid,
-    surplus: revenue - fixed - generation - paid,
-    cautiousCosts: fixed + generation + paid,
-    cautiousSurplus: revenue - fixed - generation - paid,
-    monthly: fixed + (generation / days) * 30 + monthlySubscriptionsUsd / rate,
+    subscriptionCount: current?.values["Aktive Abos"],
+    subscriptionMonthlyUsd: current?.values["Monatliche Tarife USD"],
+    subscriptionWeeklyUsd: current?.values["Wöchentliche Tarife USD"],
+    subscriptionDate: current?.period_end,
+    subscriptionNote: current?.note,
+    costs,
+    surplus: revenue - costs,
+    cautiousCosts: costs,
+    cautiousSurplus: revenue - costs,
+    monthly:
+      fixedMonthly +
+      (generation / days) * 30 +
+      (monthlySubscriptionsUsd === null
+        ? (subscriptionCosts / days) * 30
+        : monthlySubscriptionsUsd / rate),
   };
 }

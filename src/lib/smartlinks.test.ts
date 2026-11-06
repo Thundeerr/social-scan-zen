@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { classifyHit, csv, destination, smartlinkAction, renderDraft } from "./smartlinks";
+import {
+  classifyHit,
+  csv,
+  destination,
+  smartlinkAction,
+  renderDraft,
+  visitorEstimate,
+} from "./smartlinks";
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: {} }));
 import { domains, redirectRequest, visitorHash } from "./smartlinks.server";
 const slug = "a".repeat(32),
@@ -22,6 +29,40 @@ function deps() {
     now: () => new Date("2026-11-02T12:00:00Z"),
   };
 }
+describe("Visitor coverage", () => {
+  it("does not report zero visitors for human clicks without hashes", () => {
+    expect(visitorEstimate({ human: 16, unique: 0, unidentified: 16 })).toMatchObject({
+      state: "unavailable",
+      value: "Nicht verfügbar",
+    });
+  });
+  it("labels partially identified traffic as a lower bound", () => {
+    expect(visitorEstimate({ human: 16, unique: 3, unidentified: 10 })).toMatchObject({
+      state: "partial",
+      value: "≥ 3",
+    });
+    expect(visitorEstimate({ human: 16, unique: 3, unidentified: 10 }).hint).toContain("6 von 16");
+  });
+  it("distinguishes a genuinely empty period from missing coverage", () => {
+    expect(visitorEstimate({ human: 0, unique: 0, unidentified: 0 })).toMatchObject({
+      state: "complete",
+      value: 0,
+    });
+    expect(visitorEstimate({ human: 16, unique: 5, unidentified: 0 })).toMatchObject({
+      state: "complete",
+      value: 5,
+    });
+  });
+  it.each([
+    { human: 16, unique: 0 },
+    { human: 16, unique: 0, unidentified: 0 },
+    { human: 16, unique: 8, unidentified: 10 },
+    { human: 16, unique: 0, unidentified: 17 },
+    { human: 16, unique: NaN, unidentified: 0 },
+  ])("withholds inconsistent or legacy coverage data: %j", (data) => {
+    expect(visitorEstimate(data).state).toBe("unavailable");
+  });
+});
 describe("SmartLink validation", () => {
   it.each([
     "javascript:alert(1)",
@@ -168,6 +209,26 @@ describe("Redirect and tracking", () => {
     });
     expect(r.status).toBe(302);
     await work;
+  });
+  it("reports missing visitor prerequisites as booleans without leaking sensitive values", async () => {
+    const onUnidentifiedHuman = vi.fn();
+    const d = { ...deps(), secret: "too-short-secret", onUnidentifiedHuman };
+    const r = await redirectRequest(
+      new Request(base + "/s/" + slug, {
+        headers: { "user-agent": "Mozilla/5.0" },
+      }),
+      d,
+    );
+    expect(r.status).toBe(302);
+    expect(onUnidentifiedHuman).toHaveBeenCalledWith({
+      secretConfigured: false,
+      trustedIpAvailable: true,
+      trustedCountryAvailable: true,
+    });
+    expect(d.record.mock.calls[0][0].visitor_hash).toBeNull();
+    const serialized = JSON.stringify(onUnidentifiedHuman.mock.calls);
+    expect(serialized).not.toContain("203.0.113.1");
+    expect(serialized).not.toContain("too-short-secret");
   });
   it("rejects stored redirect loops", async () => {
     expect(

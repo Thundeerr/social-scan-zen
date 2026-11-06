@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { smartlinkFn } from "@/lib/smartlinks.functions";
-import { csv, type SmartlinkAction } from "@/lib/smartlinks";
+import { csv, visitorEstimate, type SmartlinkAction } from "@/lib/smartlinks";
 import { PageHeader } from "@/components/page-header";
 import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
@@ -313,6 +313,7 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
     }
   }
   const summary = analytics.data;
+  const visitors = summary ? visitorEstimate(summary) : null;
   const pageIds = useMemo(() => links.data?.items.map((l) => l.id) || [], [links.data]);
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -1001,8 +1002,8 @@ export function SmartlinkStudio({ mode }: { mode: "links" | "campaigns" | "analy
                     />
                     <KpiCard
                       label="Unique Visitors ≈"
-                      value={summary.unique}
-                      hint="Geschätzte Besucher-Tage je Kampagne"
+                      value={visitors!.value}
+                      hint={visitors!.hint}
                       icon={Link2}
                     />
                     <KpiCard

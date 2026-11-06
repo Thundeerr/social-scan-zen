@@ -4,6 +4,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { reviewCommand } from "./content-review.server";
 import type { ReviewItem } from "./content-review";
+import { pipelineHealth, pipelineHealthText } from "./model-pipeline-health";
 const db = () => supabaseAdmin as SupabaseClient;
 export async function pipelineCommand(
   action: string,
@@ -29,7 +30,10 @@ export async function pipelineOperator(
     await pipelineCommand("pair", user, { hash: createHash("sha256").update(token).digest("hex") });
     return { token };
   }
-  return pipelineCommand(action, user);
+  const result = await pipelineCommand(action, user);
+  if (action !== "status") return result;
+  const health = pipelineHealth({ ...result, configured: true });
+  return { ...result, health, health_text: pipelineHealthText(health) };
 }
 const ref = { id: z.string().uuid(), lease: z.string().uuid() };
 const worker = z.discriminatedUnion("action", [

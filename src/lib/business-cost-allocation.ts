@@ -18,7 +18,9 @@ export function allocationPlan(rows: CostAllocation[], day: string) {
   const entries = [...latest.values()];
   const totals = { kiikii: { EUR: 0, USD: 0 }, tuuva: { EUR: 0, USD: 0 } };
   for (const r of entries) totals[r.model][r.currency] += r.monthly_cents;
-  return { entries, totals };
+  // Keep dated versions for period reporting: today's allocation alone cannot
+  // reproduce a month containing a cancellation or price change.
+  return { entries, totals, history: rows.filter((row) => row.effective_from <= day) };
 }
 export const money = (cents: number, currency: "EUR" | "USD") =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(cents / 100);

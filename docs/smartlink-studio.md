@@ -105,3 +105,12 @@ The implementation was integrated with all 43 newer main-branch commits through 
 Production database access was recovered via the direct Lovable database connector. Both SmartLink migrations and the daily cron job have been applied and recorded. A 1,000-link production database test verified isolation, RLS and aggregation in a rolled-back transaction. SMARTLINK_DOMAINS is configured to https://instascanner.app; SMARTLINK_HASH_SECRET was generated into project secrets without logging its value. The original section above records the initial handoff state; it is superseded by this follow-up.
 
 Design changes and exact external-asset provenance are documented in design-finish.md. Publication and public redirect verification are the final deployment steps.
+
+
+## Audit repairs (2026-11-06, prepared locally)
+
+The visitor metric now distinguishes complete, partial and missing hash coverage. Human hits with no hashes display `Nicht verfügbar`; partial coverage displays a lower bound and the identified-hit denominator. An empty period can still correctly display zero. Existing campaign names, redirect destinations, messages and click counters are unchanged.
+
+No database migration is needed for this fix: `sl_analytics` already returns `unidentified`. The application must be rebuilt/deployed. For unidentified human requests the server emits a bounded `smartlink_visitor_unavailable` diagnostic with only `secretConfigured`, `trustedIpAvailable` and `trustedCountryAvailable` booleans. It never logs keys, raw IPs or user agents. Outside the native trusted runtime no forwarded header is accepted as proof of client identity.
+
+After deployment, verify one approved test click, inspect these booleans and confirm whether a new event has a hash. A configured secret alone does not prove the hosting runtime provides trusted client metadata. Existing unidentifiable events cannot be reconstructed. This repair does not claim to create individual Fanvue conversion attribution or identify the current production prerequisite failure before observing the deployed runtime.

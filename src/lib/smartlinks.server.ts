@@ -41,22 +41,51 @@ export async function smartlinkCommand(user: string, raw: SmartlinkAction) {
     throw new Error("Nicht freigegeben.");
   if (!checked(await db.rpc("sl_rate", { p_key: `operator:${user}`, p_max: 120, p_seconds: 60 })))
     throw new Error("Zu viele Anfragen. Bitte eine Minute warten.");
-  if (data.action === "provider_stats") return checked(await db.rpc("sl_provider_stats", { p_user: user, p: data.filter }));
+  if (data.action === "provider_stats")
+    return checked(await db.rpc("sl_provider_stats", { p_user: user, p: data.filter }));
   if (data.action === "retry_provider") {
-    checked(await db.from("sl_links").update({provider_state:"pending",provider_error:null}).eq("user_id",user).eq("provider",data.provider).eq("provider_state","failed"));
-    return {ok:true};
+    checked(
+      await db
+        .from("sl_links")
+        .update({ provider_state: "pending", provider_error: null })
+        .eq("user_id", user)
+        .eq("provider", data.provider)
+        .eq("provider_state", "failed"),
+    );
+    return { ok: true };
   }
   if (data.action === "process_provider") {
-    if (!providerConfiguration().find(p => p.id === data.provider)?.configured) throw new Error("Provider nicht verbunden. Server-Zugang einrichten.");
-    if (!checked(await db.rpc("sl_rate", { p_key: `provider:${data.provider}`, p_max: 20, p_seconds: 60 }))) return { state: "throttled" };
-    const job = checked(await db.rpc("sl_provider_claim", { p_user: user, p_provider: data.provider }));
+    if (!providerConfiguration().find((p) => p.id === data.provider)?.configured)
+      throw new Error("Provider nicht verbunden. Server-Zugang einrichten.");
+    if (
+      !checked(
+        await db.rpc("sl_rate", { p_key: `provider:${data.provider}`, p_max: 20, p_seconds: 60 }),
+      )
+    )
+      return { state: "throttled" };
+    const job = checked(
+      await db.rpc("sl_provider_claim", { p_user: user, p_provider: data.provider }),
+    );
     if (!job) return { state: "stopped" };
     const result = await createProviderLink(data.provider, job.domain + "/s/" + job.slug);
-    checked(await db.from("sl_links").update({ provider_state: result.state, short_url: result.url || null, provider_error: result.error || null }).eq("id", job.id).eq("user_id", user).eq("provider_state", "processing"));
+    checked(
+      await db
+        .from("sl_links")
+        .update({
+          provider_state: result.state,
+          short_url: result.url || null,
+          provider_error: result.error || null,
+        })
+        .eq("id", job.id)
+        .eq("user_id", user)
+        .eq("provider_state", "processing"),
+    );
     return { state: result.state };
   }
   if (data.action === "generate") {
-    const missing = data.providers.filter(id => !providerConfiguration().find(p => p.id === id)?.configured);
+    const missing = data.providers.filter(
+      (id) => !providerConfiguration().find((p) => p.id === id)?.configured,
+    );
     if (missing.length) throw new Error("Provider nicht verbunden: " + missing.join(", "));
 
     if (!domains().includes(data.domain))
@@ -108,6 +137,11 @@ type RedirectDependencies = {
   waitUntil?: (promise: Promise<unknown>) => void;
   trusted?: { ip?: string; country?: string };
   now?: () => Date;
+  onUnidentifiedHuman?: (readiness: {
+    secretConfigured: boolean;
+    trustedIpAvailable: boolean;
+    trustedCountryAvailable: boolean;
+  }) => void;
 };
 export async function visitorHash(secret: string, value: string) {
   const key = await crypto.subtle.importKey(
@@ -167,6 +201,18 @@ export async function redirectRequest(request: Request, deps: RedirectDependenci
               `${now.toISOString().slice(0, 10)}|${link.campaign_id}|${ip}|${hit.device}`,
             )
           : null;
+      if (hit.kind === "human" && !hash) {
+        try {
+          deps.onUnidentifiedHuman?.({
+            secretConfigured: Boolean(secret),
+            trustedIpAvailable: Boolean(ip),
+            trustedCountryAvailable:
+              /^[A-Z]{2}$/.test(deps.trusted?.country || "") && deps.trusted?.country !== "ZZ",
+          });
+        } catch {
+          /* Diagnostics must not discard a click. */
+        }
+      }
       if (secret && ip) {
         const key = await visitorHash(secret, `${now.toISOString().slice(0, 10)}|${ip}`);
         if (!(await deps.rate(`track:${key}`, 60, 60))) return;
@@ -189,6 +235,8 @@ export async function redirectRequest(request: Request, deps: RedirectDependenci
     return reply("Weiterleitung vorübergehend nicht verfügbar.", 503);
   }
 }
+// Bounded diagnostics expose prerequisite booleans only, never keys or IPs.
+const reportedReadiness = new Set<string>();
 export async function handleSmartlinkRedirect(
   request: Request,
   ctx?: { waitUntil?: (p: Promise<unknown>) => void },
@@ -203,6 +251,13 @@ export async function handleSmartlinkRedirect(
     trusted: cf
       ? { country: cf.country, ip: request.headers.get("cf-connecting-ip") || undefined }
       : undefined,
+    onUnidentifiedHuman: (readiness) => {
+      const key = JSON.stringify(readiness);
+      if (!reportedReadiness.has(key)) {
+        reportedReadiness.add(key);
+        console.warn("smartlink_visitor_unavailable", readiness);
+      }
+    },
     waitUntil: ctx?.waitUntil?.bind(ctx) ?? runtimeRequest.waitUntil?.bind(runtimeRequest),
     lookup: async (slug, domain) =>
       checked(

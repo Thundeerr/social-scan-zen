@@ -32,10 +32,8 @@ export function ModelPipeline() {
       <div className="mt-4 space-y-3">
         <p>Instagram → FollowerStar → generation → Telegram review → Instagram</p>
         <p>
-          {p?.enabled ? "Processing enabled" : "Processing paused"} ·{" "}
-          {p?.last_seen_at
-            ? "Server last seen: " + new Date(p.last_seen_at).toLocaleString()
-            : "Cloud server not connected yet"}
+          {p?.health_text ?? "Pipeline status unavailable."}
+          {p?.last_seen_at && " · Last contact: " + new Date(p.last_seen_at).toLocaleString()}
         </p>
         {(p?.profiles ?? []).map((m: { model: string; sender_username: string | null }) => (
           <p key={m.model}>
@@ -45,7 +43,7 @@ export function ModelPipeline() {
         ))}
         <div className="flex gap-2">
           <Button
-            disabled={busy || !p?.last_seen_at}
+            disabled={busy || !p || (!p.enabled && p.health?.worker !== "reachable")}
             onClick={() => void act(p?.enabled ? "pause" : "enable")}
           >
             {p?.enabled ? "Pause generation" : "Enable generation"}
