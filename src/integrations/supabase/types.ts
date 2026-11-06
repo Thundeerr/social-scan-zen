@@ -228,6 +228,162 @@ export type Database = {
           },
         ]
       }
+      business_cost_allocations: {
+        Row: {
+          currency: string
+          effective_from: string
+          label: string
+          model: string
+          monthly_cents: number
+          note: string
+          planned: boolean
+          reference: string
+          user_id: string
+        }
+        Insert: {
+          currency: string
+          effective_from: string
+          label: string
+          model: string
+          monthly_cents: number
+          note: string
+          planned?: boolean
+          reference: string
+          user_id: string
+        }
+        Update: {
+          currency?: string
+          effective_from?: string
+          label?: string
+          model?: string
+          monthly_cents?: number
+          note?: string
+          planned?: boolean
+          reference?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_cost_entries: {
+        Row: {
+          cents: number
+          day: string
+          end_day: string | null
+          id: string
+          kind: string
+          label: string
+          note: string
+          reference: string
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cents: number
+          day: string
+          end_day?: string | null
+          id?: string
+          kind: string
+          label: string
+          note?: string
+          reference: string
+          scope: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cents?: number
+          day?: string
+          end_day?: string | null
+          id?: string
+          kind?: string
+          label?: string
+          note?: string
+          reference?: string
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_metric_snapshots: {
+        Row: {
+          id: string
+          note: string
+          observed_at: string
+          period_end: string
+          period_start: string
+          source: string
+          user_id: string
+          values: Json
+        }
+        Insert: {
+          id?: string
+          note: string
+          observed_at: string
+          period_end: string
+          period_start: string
+          source: string
+          user_id: string
+          values: Json
+        }
+        Update: {
+          id?: string
+          note?: string
+          observed_at?: string
+          period_end?: string
+          period_start?: string
+          source?: string
+          user_id?: string
+          values?: Json
+        }
+        Relationships: []
+      }
+      business_report_deliveries: {
+        Row: {
+          created_at: string
+          key: string
+          message_id: number | null
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          message_id?: number | null
+          state?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          message_id?: number | null
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      business_report_settings: {
+        Row: {
+          enabled: boolean
+          monthly_budget_cents: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          enabled?: boolean
+          monthly_budget_cents?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          enabled?: boolean
+          monthly_budget_cents?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       catalogue_clip_recipients: {
         Row: {
           clip_id: string
@@ -383,6 +539,33 @@ export type Database = {
           model?: string
           title?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      closer_analytics_connections: {
+        Row: {
+          last_attempt_at: string
+          last_error: string | null
+          last_synced_at: string | null
+          secret_id: string
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          last_attempt_at?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          secret_id: string
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          last_attempt_at?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          secret_id?: string
+          user_id?: string
+          verified?: boolean
         }
         Relationships: []
       }
@@ -1009,6 +1192,72 @@ export type Database = {
           },
         ]
       }
+      fanvue_connections: {
+        Row: {
+          connected: boolean
+          handle: string | null
+          last_attempt_at: string | null
+          last_error: string | null
+          last_synced_at: string | null
+          lease_id: string | null
+          lease_until: string
+          needs_reconnect: boolean
+          refresh_pending: boolean
+          secret_id: string
+          user_id: string
+        }
+        Insert: {
+          connected?: boolean
+          handle?: string | null
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_synced_at?: string | null
+          lease_id?: string | null
+          lease_until?: string
+          needs_reconnect?: boolean
+          refresh_pending?: boolean
+          secret_id: string
+          user_id: string
+        }
+        Update: {
+          connected?: boolean
+          handle?: string | null
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_synced_at?: string | null
+          lease_id?: string | null
+          lease_until?: string
+          needs_reconnect?: boolean
+          refresh_pending?: boolean
+          secret_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      fanvue_oauth_states: {
+        Row: {
+          browser_hash: string
+          expires_at: string
+          state_hash: string
+          user_id: string
+          verifier: string
+        }
+        Insert: {
+          browser_hash: string
+          expires_at: string
+          state_hash: string
+          user_id: string
+          verifier: string
+        }
+        Update: {
+          browser_hash?: string
+          expires_at?: string
+          state_hash?: string
+          user_id?: string
+          verifier?: string
+        }
+        Relationships: []
+      }
       generation_uploads: {
         Row: {
           created_at: string
@@ -1038,6 +1287,38 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "model_pipeline_profiles"
             referencedColumns: ["user_id", "model"]
+          },
+        ]
+      }
+      ig_comment_redirect_settings: {
+        Row: {
+          activated_at: string | null
+          last_received_at: string | null
+          mode: string
+          test_reply_once_until: string | null
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          last_received_at?: string | null
+          mode?: string
+          test_reply_once_until?: string | null
+          user_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          last_received_at?: string | null
+          mode?: string
+          test_reply_once_until?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_comment_redirect_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "ig_dm_redirect_settings"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1098,13 +1379,124 @@ export type Database = {
         }
         Relationships: []
       }
+      ig_dm_redirect_contacts: {
+        Row: {
+          last_attempt_at: string | null
+          opted_out: boolean
+          previous_variant: number | null
+          sender_id: string
+          user_id: string
+        }
+        Insert: {
+          last_attempt_at?: string | null
+          opted_out?: boolean
+          previous_variant?: number | null
+          sender_id: string
+          user_id: string
+        }
+        Update: {
+          last_attempt_at?: string | null
+          opted_out?: boolean
+          previous_variant?: number | null
+          sender_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_dm_redirect_contacts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "ig_dm_redirect_settings"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      ig_dm_redirect_receipts: {
+        Row: {
+          error_code: string | null
+          event_at: string
+          finished_at: string | null
+          message_hash: string
+          provider_message_id: string | null
+          received_at: string
+          sender_id: string
+          source: string
+          status: string
+          user_id: string
+          variant: number | null
+        }
+        Insert: {
+          error_code?: string | null
+          event_at: string
+          finished_at?: string | null
+          message_hash: string
+          provider_message_id?: string | null
+          received_at?: string
+          sender_id: string
+          source?: string
+          status: string
+          user_id: string
+          variant?: number | null
+        }
+        Update: {
+          error_code?: string | null
+          event_at?: string
+          finished_at?: string | null
+          message_hash?: string
+          provider_message_id?: string | null
+          received_at?: string
+          sender_id?: string
+          source?: string
+          status?: string
+          user_id?: string
+          variant?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_dm_redirect_receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "ig_dm_redirect_settings"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      ig_dm_redirect_settings: {
+        Row: {
+          activated_at: string | null
+          last_received_at: string | null
+          mode: string
+          receiver_id: string
+          test_username: string
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          last_received_at?: string | null
+          mode?: string
+          receiver_id: string
+          test_username?: string
+          user_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          last_received_at?: string | null
+          mode?: string
+          receiver_id?: string
+          test_username?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ig_oauth_states: {
         Row: {
           consumed_at: string | null
           created_at: string
           destination: string
+          dm_redirect: boolean
           expires_at: string
           redirect_uri: string
+          requested_scopes: string[] | null
           state: string
           user_id: string
         }
@@ -1112,8 +1504,10 @@ export type Database = {
           consumed_at?: string | null
           created_at?: string
           destination?: string
+          dm_redirect?: boolean
           expires_at: string
           redirect_uri: string
+          requested_scopes?: string[] | null
           state: string
           user_id: string
         }
@@ -1121,10 +1515,39 @@ export type Database = {
           consumed_at?: string | null
           created_at?: string
           destination?: string
+          dm_redirect?: boolean
           expires_at?: string
           redirect_uri?: string
+          requested_scopes?: string[] | null
           state?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      instagram_analytics_state: {
+        Row: {
+          last_attempt_at: string
+          last_error: string | null
+          last_synced_at: string | null
+          reels: Json
+          user_id: string
+          warnings: Json
+        }
+        Insert: {
+          last_attempt_at?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          reels?: Json
+          user_id: string
+          warnings?: Json
+        }
+        Update: {
+          last_attempt_at?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          reels?: Json
+          user_id?: string
+          warnings?: Json
         }
         Relationships: []
       }
@@ -1467,6 +1890,33 @@ export type Database = {
           resolution?: string
           user_id?: string
           worker_hash?: string | null
+        }
+        Relationships: []
+      }
+      model_posting_policies: {
+        Row: {
+          daily_limit: number
+          model: string
+          slots: string[]
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          daily_limit?: number
+          model: string
+          slots?: string[]
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          daily_limit?: number
+          model?: string
+          slots?: string[]
+          timezone?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2004,30 +2454,126 @@ export type Database = {
         }
         Relationships: []
       }
+      reel_inbox_dm_candidates: {
+        Row: {
+          created_at: string
+          inbox_id: string
+          model: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          inbox_id: string
+          model: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          inbox_id?: string
+          model?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reel_inbox_dm_candidates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_dm_sources"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "reel_inbox_dm_candidates_user_id_inbox_id_fkey"
+            columns: ["user_id", "inbox_id"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_items"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
+      reel_inbox_dm_claims: {
+        Row: {
+          claim_id: string
+          created_at: string
+          inbox_id: string
+          message_hash: string | null
+          model: string
+          user_id: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          inbox_id: string
+          message_hash?: string | null
+          model: string
+          user_id: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          inbox_id?: string
+          message_hash?: string | null
+          model?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reel_inbox_dm_claims_user_id_inbox_id_fkey"
+            columns: ["user_id", "inbox_id"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_items"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "reel_inbox_dm_claims_user_id_message_hash_fkey"
+            columns: ["user_id", "message_hash"]
+            isOneToOne: false
+            referencedRelation: "reel_inbox_dm_receipts"
+            referencedColumns: ["user_id", "message_hash"]
+          },
+        ]
+      }
       reel_inbox_dm_receipts: {
         Row: {
           diagnostics: Json | null
+          explicit_model: string | null
           link_count: number
+          message_at: string | null
           message_hash: string
+          model: string | null
+          paired_message_hash: string | null
           received_at: string
+          routing_locked: boolean
+          routing_status: string
           sender: string
           status: string
           user_id: string
         }
         Insert: {
           diagnostics?: Json | null
+          explicit_model?: string | null
           link_count: number
+          message_at?: string | null
           message_hash: string
+          model?: string | null
+          paired_message_hash?: string | null
           received_at?: string
+          routing_locked?: boolean
+          routing_status?: string
           sender: string
           status: string
           user_id: string
         }
         Update: {
           diagnostics?: Json | null
+          explicit_model?: string | null
           link_count?: number
+          message_at?: string | null
           message_hash?: string
+          model?: string | null
+          paired_message_hash?: string | null
           received_at?: string
+          routing_locked?: boolean
+          routing_status?: string
           sender?: string
           status?: string
           user_id?: string
@@ -2091,6 +2637,7 @@ export type Database = {
       }
       reel_inbox_items: {
         Row: {
+          api_resolve_lease: string | null
           attempts: number
           available_at: string
           canonical_url: string
@@ -2109,6 +2656,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          api_resolve_lease?: string | null
           attempts?: number
           available_at?: string
           canonical_url: string
@@ -2127,6 +2675,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          api_resolve_lease?: string | null
           attempts?: number
           available_at?: string
           canonical_url?: string
@@ -2264,6 +2813,333 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sl_batches: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          fingerprint: Json
+          id: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          fingerprint: Json
+          id: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          fingerprint?: Json
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sl_batches_campaign_id_user_id_fkey"
+            columns: ["campaign_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_campaigns"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      sl_campaigns: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          status: string
+          template: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          template?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          template?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sl_events: {
+        Row: {
+          country: string
+          created_at: string
+          device: string
+          id: string
+          kind: string
+          link_id: string
+          referrer: string
+          visitor_hash: string | null
+        }
+        Insert: {
+          country?: string
+          created_at?: string
+          device: string
+          id: string
+          kind: string
+          link_id: string
+          referrer: string
+          visitor_hash?: string | null
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          device?: string
+          id?: string
+          kind?: string
+          link_id?: string
+          referrer?: string
+          visitor_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sl_events_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "sl_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sl_limits: {
+        Row: {
+          hits: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          hits: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          hits?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      sl_links: {
+        Row: {
+          account_id: string | null
+          active: boolean
+          batch_id: string
+          campaign_id: string
+          created_at: string
+          domain: string
+          id: string
+          provider: string
+          provider_error: string | null
+          provider_started_at: string | null
+          provider_state: string
+          recipient_id: string | null
+          short_url: string | null
+          slug: string
+          target: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          active?: boolean
+          batch_id: string
+          campaign_id: string
+          created_at?: string
+          domain: string
+          id?: string
+          provider?: string
+          provider_error?: string | null
+          provider_started_at?: string | null
+          provider_state?: string
+          recipient_id?: string | null
+          short_url?: string | null
+          slug: string
+          target: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          active?: boolean
+          batch_id?: string
+          campaign_id?: string
+          created_at?: string
+          domain?: string
+          id?: string
+          provider?: string
+          provider_error?: string | null
+          provider_started_at?: string | null
+          provider_state?: string
+          recipient_id?: string | null
+          short_url?: string | null
+          slug?: string
+          target?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sl_links_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ig_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sl_links_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "sl_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sl_links_campaign_id_user_id_fkey"
+            columns: ["campaign_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_campaigns"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "sl_links_recipient_id_user_id_fkey"
+            columns: ["recipient_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_recipients"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      sl_messages: {
+        Row: {
+          body: string
+          campaign_id: string
+          created_at: string
+          error_code: string | null
+          id: string
+          link_id: string
+          recipient_id: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          campaign_id: string
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          link_id: string
+          recipient_id: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          campaign_id?: string
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          link_id?: string
+          recipient_id?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sl_messages_campaign_id_user_id_fkey"
+            columns: ["campaign_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_campaigns"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "sl_messages_link_id_user_id_fkey"
+            columns: ["link_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_links"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "sl_messages_recipient_id_user_id_fkey"
+            columns: ["recipient_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_recipients"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      sl_recipients: {
+        Row: {
+          campaign_id: string
+          consent: string
+          consent_at: string
+          created_at: string
+          evidence: string
+          handle: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          consent: string
+          consent_at?: string
+          created_at?: string
+          evidence?: string
+          handle: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          consent?: string
+          consent_at?: string
+          created_at?: string
+          evidence?: string
+          handle?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sl_recipients_campaign_id_user_id_fkey"
+            columns: ["campaign_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "sl_campaigns"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      sl_suppressions: {
+        Row: {
+          created_at: string
+          handle: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          handle: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          handle?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       tracked_accounts: {
         Row: {
@@ -2483,6 +3359,84 @@ export type Database = {
         }
         Relationships: []
       }
+      wavespeed_analytics_state: {
+        Row: {
+          last_attempt_at: string
+          last_error: string | null
+          last_synced_at: string | null
+          ledger: Json | null
+          report: Json | null
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          last_attempt_at?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          ledger?: Json | null
+          report?: Json | null
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          last_attempt_at?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          ledger?: Json | null
+          report?: Json | null
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wavespeed_monthly_reports: {
+        Row: {
+          ledger: Json
+          month: string
+          observed_at: string
+          report: Json
+          user_id: string
+        }
+        Insert: {
+          ledger: Json
+          month: string
+          observed_at: string
+          report: Json
+          user_id: string
+        }
+        Update: {
+          ledger?: Json
+          month?: string
+          observed_at?: string
+          report?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wavespeed_task_attributions: {
+        Row: {
+          evidence: string
+          model: string
+          provider_id: string
+          user_id: string
+          verified_at: string
+        }
+        Insert: {
+          evidence: string
+          model: string
+          provider_id: string
+          user_id: string
+          verified_at?: string
+        }
+        Update: {
+          evidence?: string
+          model?: string
+          provider_id?: string
+          user_id?: string
+          verified_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       profiles_public: {
@@ -2506,6 +3460,7 @@ export type Database = {
     }
     Functions: {
       approve_content_batch: { Args: { _batch_key: string }; Returns: number }
+      business_live_status: { Args: { p_user: string }; Returns: Json }
       can_access_asset: { Args: { _asset_id: string }; Returns: boolean }
       catalogue_offer_command: {
         Args: { p_action: string; p_data?: Json; p_user: string }
@@ -2561,6 +3516,11 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      closer_analytics_secret_get: { Args: { p_user: string }; Returns: string }
+      closer_analytics_secret_put: {
+        Args: { p_token: string; p_user: string }
+        Returns: undefined
+      }
       confirm_content_handoff: {
         Args: { _channel: string; _content_post_id: string }
         Returns: undefined
@@ -2568,6 +3528,11 @@ export type Database = {
       content_review_command: {
         Args: { p_action: string; p_payload?: Json; p_user: string }
         Returns: Json
+      }
+      fanvue_secret_get: { Args: { p_user: string }; Returns: Json }
+      fanvue_secret_put: {
+        Args: { p_lease?: string; p_user: string; p_value: Json }
+        Returns: undefined
       }
       generation_source_check: {
         Args: { p_data: Json; p_user: string }
@@ -2588,6 +3553,28 @@ export type Database = {
         }
         Returns: boolean
       }
+      ig_comment_redirect_reserve: {
+        Args: {
+          p_event_at: string
+          p_hash: string
+          p_receiver: string
+          p_sender: string
+          p_trigger: boolean
+          p_username: string
+        }
+        Returns: Json
+      }
+      ig_dm_redirect_reserve: {
+        Args: {
+          p_event_at: string
+          p_hash: string
+          p_receiver: string
+          p_sender: string
+          p_stop: boolean
+          p_username: string
+        }
+        Returns: Json
+      }
       import_catalogue_desktop: {
         Args: {
           p_offers: Json
@@ -2603,6 +3590,10 @@ export type Database = {
         Args: { p_action: string; p_data?: Json; p_user?: string }
         Returns: Json
       }
+      model_next_posting_slot: {
+        Args: { p_after?: string; p_model: string; p_user: string }
+        Returns: string
+      }
       model_pipeline_command: {
         Args: {
           p_action: string
@@ -2611,6 +3602,14 @@ export type Database = {
           p_worker_hash?: string
         }
         Returns: Json
+      }
+      model_posting_policy: {
+        Args: { p_model: string; p_user: string }
+        Returns: {
+          daily_limit: number
+          slots: string[]
+          timezone: string
+        }[]
       }
       model_publish_command: {
         Args: { p_action: string; p_data: Json; p_user: string }
@@ -2666,6 +3665,44 @@ export type Database = {
         }
         Returns: Json
       }
+      reel_inbox_dm_ingest_v3: {
+        Args: {
+          p_diagnostics: Json
+          p_hash: string
+          p_links: Json
+          p_model: string
+          p_receiver: string
+          p_sender: string
+          p_username: string
+        }
+        Returns: Json
+      }
+      reel_inbox_dm_ingest_v4: {
+        Args: {
+          p_diagnostics: Json
+          p_hash: string
+          p_links: Json
+          p_message_at: string
+          p_model: string
+          p_receiver: string
+          p_sender: string
+          p_username: string
+        }
+        Returns: Json
+      }
+      reel_inbox_dm_reassign: {
+        Args: {
+          p_from_model: string
+          p_inbox: string
+          p_to_model: string
+          p_user: string
+        }
+        Returns: Json
+      }
+      reel_inbox_resolve_source: {
+        Args: { p_device_hash: string; p_id: string; p_lease: string }
+        Returns: Json
+      }
       release_content_publish_lease: {
         Args: { _content_post_id: string }
         Returns: undefined
@@ -2690,6 +3727,21 @@ export type Database = {
           p_user: string
         }
         Returns: Json
+      }
+      sl_analytics: { Args: { p: Json; p_user: string }; Returns: Json }
+      sl_command: {
+        Args: { p?: Json; p_action: string; p_user: string }
+        Returns: Json
+      }
+      sl_provider_claim: {
+        Args: { p_provider: string; p_user: string }
+        Returns: Json
+      }
+      sl_provider_stats: { Args: { p?: Json; p_user: string }; Returns: Json }
+      sl_purge: { Args: never; Returns: undefined }
+      sl_rate: {
+        Args: { p_key: string; p_max: number; p_seconds: number }
+        Returns: boolean
       }
       verify_publisher_cron_secret: {
         Args: { _candidate: string }
