@@ -237,25 +237,67 @@ export async function redirectRequest(request: Request, deps: RedirectDependenci
 }
 // Bounded diagnostics expose prerequisite booleans only, never keys or IPs.
 const reportedReadiness = new Set<string>();
+type RuntimeRequest = Request & {
+  cf?: { country?: string };
+  ip?: string;
+  runtime?: { cloudflare?: { env?: Record<string, unknown> } };
+  waitUntil?: (p: Promise<unknown>) => void;
+};
+
+export function smartlinkRuntime(
+  request: Request,
+  processSecret: unknown = process.env.SMARTLINK_HASH_SECRET,
+) {
+  const native = request as RuntimeRequest;
+  const cfPresent = typeof native.cf === "object" && native.cf !== null;
+  const cloudflare = native.runtime?.cloudflare;
+  const runtimeCloudflarePresent = typeof cloudflare === "object" && cloudflare !== null;
+  const runtimeIpPresent = typeof native.ip === "string" && native.ip.trim().length > 0;
+  const headerIp = request.headers.get("cf-connecting-ip") || undefined;
+  // Nitro's native Cloudflare adapter sets req.ip. H3 internal subrequests
+  // preserve runtime/ip but omit cf; no HTTP header can create this runtime object.
+  const ip =
+    runtimeCloudflarePresent && runtimeIpPresent ? native.ip : cfPresent ? headerIp : undefined;
+  const binding = runtimeCloudflarePresent ? cloudflare.env?.SMARTLINK_HASH_SECRET : undefined;
+  const validSecret = (value: unknown): value is string =>
+    typeof value === "string" && value.length >= 32;
+  const processSecretConfigured = validSecret(processSecret);
+  const nativeEnvSecretConfigured = validSecret(binding);
+  return {
+    secret: processSecretConfigured
+      ? processSecret
+      : nativeEnvSecretConfigured
+        ? binding
+        : undefined,
+    trusted: { ip, country: cfPresent ? native.cf?.country : undefined },
+    readiness: {
+      cfPresent,
+      runtimeCloudflarePresent,
+      runtimeIpPresent,
+      cfConnectingIpHeaderPresent: Boolean(headerIp),
+      processSecretConfigured,
+      nativeEnvSecretConfigured,
+    },
+  };
+}
+
 export async function handleSmartlinkRedirect(
   request: Request,
   ctx?: { waitUntil?: (p: Promise<unknown>) => void },
 ) {
   // Nitro augments the original Cloudflare request, rather than forwarding fetch's ctx.
-  const runtimeRequest = request as Request & { waitUntil?: (p: Promise<unknown>) => void };
-  const cf = (request as Request & { cf?: { country?: string } }).cf;
+  const runtimeRequest = request as RuntimeRequest;
+  const runtime = smartlinkRuntime(request);
   return redirectRequest(request, {
     domains: domains(),
-    secret: process.env.SMARTLINK_HASH_SECRET,
-    // Never trust forwarded country/IP headers on arbitrary non-Cloudflare runtimes.
-    trusted: cf
-      ? { country: cf.country, ip: request.headers.get("cf-connecting-ip") || undefined }
-      : undefined,
+    secret: runtime.secret,
+    trusted: runtime.trusted,
     onUnidentifiedHuman: (readiness) => {
-      const key = JSON.stringify(readiness);
+      const diagnostic = { ...readiness, ...runtime.readiness };
+      const key = JSON.stringify(diagnostic);
       if (!reportedReadiness.has(key)) {
         reportedReadiness.add(key);
-        console.warn("smartlink_visitor_unavailable", readiness);
+        console.warn("smartlink_visitor_unavailable", diagnostic);
       }
     },
     waitUntil: ctx?.waitUntil?.bind(ctx) ?? runtimeRequest.waitUntil?.bind(runtimeRequest),
