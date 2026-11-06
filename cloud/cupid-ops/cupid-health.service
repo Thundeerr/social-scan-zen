@@ -1,0 +1,15 @@
+[Unit]
+Description=Read-only Cupid process and scan health
+After=cupid-setup-chrome.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/local/lib/cupid-browser/cupid_health.py
+TimeoutStartSec=90
+Nice=10
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/cupid-health
+PrivateTmp=yes

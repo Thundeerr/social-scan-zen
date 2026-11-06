@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Radio, RefreshCw, Send, AlertTriangle, Wallet, Zap } from "lucide-react";
 import { businessReportFn } from "@/lib/business-report.functions";
 import { berlinTime, usd } from "@/lib/business-report";
+import { pipelineHealthText } from "@/lib/model-pipeline-health";
 import { Button } from "@/components/ui/button";
 import { FanvueAnalyticsConnection } from "@/components/FanvueAnalyticsConnection";
 import { InstagramAnalyticsConnection } from "@/components/InstagramAnalyticsConnection";
@@ -10,7 +11,6 @@ import { CloserAnalyticsConnection } from "@/components/CloserAnalyticsConnectio
 import { WaveSpeedAnalytics } from "@/components/WaveSpeedAnalytics";
 import { BusinessCostAllocation } from "@/components/BusinessCostAllocation";
 import { BusinessProfit } from "@/components/BusinessProfit";
-import { profitEstimate } from "@/lib/business-profit";
 import { mixedMoney } from "@/lib/business-cost-allocation";
 export const Route = createFileRoute("/_authenticated/business")({ component: Business });
 const date = (value: string) =>
@@ -142,7 +142,7 @@ function Business() {
             Signal received. Your report is in Telegram. ✓
           </p>
         )}
-        {r && <BusinessProfit value={profitEstimate(r.snapshots, r.allocation, r.wave?.report)} />}
+        {r && <BusinessProfit value={r.profit} />}
         <nav aria-label="Cost overview sections" className="grid grid-cols-3 gap-2">
           {[
             ["#monthly-costs", "01 / Costs"],
@@ -216,6 +216,20 @@ function Business() {
               <p className="mt-4 text-sm text-slate-400">
                 {r.live.jobs_today} new jobs today. Only posts linked to a Kiikii review are counted
                 here.
+              </p>
+              <p
+                className={
+                  r.workerHealth.needsAttention
+                    ? "mt-3 text-sm text-amber-200"
+                    : "mt-3 text-sm text-slate-400"
+                }
+              >
+                {pipelineHealthText(r.workerHealth)}
+                {r.workerHealth.lastSeenAt &&
+                  " · Last contact: " +
+                    new Date(r.workerHealth.lastSeenAt).toLocaleString("de-DE", {
+                      timeZone: "Europe/Berlin",
+                    })}
               </p>
             </section>
             <details

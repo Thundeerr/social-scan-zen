@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly Cupid recovery snapshot
+
+[Timer]
+OnCalendar=Sun *-*-* 06:00:00 Europe/Berlin
+Persistent=true
+AccuracySec=1min
+Unit=cupid-backup.service
+
+[Install]
+WantedBy=timers.target

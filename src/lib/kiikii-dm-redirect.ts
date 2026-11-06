@@ -25,9 +25,16 @@ const eventSchema = z.object({
   }),
 });
 export function isOptOut(text = "") {
-  return /^(stop|unsubscribe|stop messaging me|do not message me|don't message me|dont message me|no more messages|keine nachrichten mehr|schreib mir nicht mehr|abmelden)[.!\s]*$/i.test(
-    text.trim(),
+  // Normalize decoration only at the edges. Removing arbitrary words or emoji
+  // inside a sentence could turn ordinary conversation into a STOP request.
+  const undecorate = (value: string) =>
+    value.replace(/^[\s\p{P}\p{S}\uFE0E\uFE0F\u200D]+|[\s\p{P}\p{S}\uFE0E\uFE0F\u200D]+$/gu, "");
+  let normalized = undecorate(
+    text.normalize("NFKC").replace(/[’‘]/g, "'").replace(/\s+/g, " ").trim(),
   );
+  normalized = undecorate(normalized.replace(/^(?:please|bitte)\b[\s,:;!.-]*/i, ""));
+  normalized = undecorate(normalized.replace(/[\s,:;!.-]+(?:please|bitte)$/i, ""));
+  return /^(?:stop|stopp|unsubscribe|stop messaging me|stop sending me messages|do not message me|don't message me|dont message me|no more messages|keine nachrichten mehr|schreib(?:e)? mir (?:bitte )?nicht mehr|abmelden)$/i.test(normalized);
 }
 export function websiteDmEvents(body: unknown, now = Date.now()) {
   return envelope.parse(body).entry.flatMap((entry) =>

@@ -95,6 +95,11 @@ afterEach(() => {
 const sends = () => vi.mocked(fetch).mock.calls.filter(([u]) => String(u).endsWith("/messages"));
 
 describe("comment CTA matching", () => {
+  it.each(["STOP 🖤", "Please stop messaging me ❤️", "Bitte keine Nachrichten mehr 🫶🏿"])(
+    "gives explicit opt-outs priority over heart CTAs: %s", (text) => {
+      expect(commentTrigger(text, 'comment "STOP" or leave a heart')).toBeNull();
+    },
+  );
   it.each([...HEARTS, "<3", "<333", "< 3", "&lt;3", "❤️‍🔥", "❤️‍🩹", "🫶🏿", "love this 🖤"])(
     "recognizes %s",
     (text) => {

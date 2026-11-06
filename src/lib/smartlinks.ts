@@ -66,7 +66,12 @@ export const smartlinkAction = z.discriminatedUnion("action", [
     domain: z.string().url().max(255),
     count: z.number().int().min(1).max(1000),
     request_id: uuid,
-    providers: z.array(z.enum(["instascanner", "bitly", "tinyurl"])).min(1).max(3).refine(v => new Set(v).size === v.length).default(["instascanner"]),
+    providers: z
+      .array(z.enum(["instascanner", "bitly", "tinyurl"]))
+      .min(1)
+      .max(3)
+      .refine((v) => new Set(v).size === v.length)
+      .default(["instascanner"]),
     account: uuid.nullable().default(null),
   }),
   z.object({
@@ -119,6 +124,47 @@ export const smartlinkAction = z.discriminatedUnion("action", [
   z.object({ action: z.literal("assign_recipients"), campaign: uuid }),
 ]);
 export type SmartlinkAction = z.infer<typeof smartlinkAction>;
+
+// A missing pseudonym is missing coverage, never evidence of zero visitors.
+// These hashes identify visitor-days within campaigns, not individual people.
+export function visitorEstimate(summary: { human: number; unique: number; unidentified?: number }) {
+  const { human, unique, unidentified } = summary;
+  const count = (n: unknown): n is number => Number.isSafeInteger(n) && Number(n) >= 0;
+  if (
+    !count(human) ||
+    !count(unique) ||
+    !count(unidentified) ||
+    unidentified > human ||
+    unique > human - unidentified ||
+    (human > unidentified && unique === 0)
+  ) {
+    return {
+      state: "unavailable" as const,
+      value: "Nicht verfügbar",
+      hint: "Besucherabdeckung unbekannt.",
+    };
+  }
+  if (human > 0 && unidentified === human) {
+    return {
+      state: "unavailable" as const,
+      value: "Nicht verfügbar",
+      hint: `${human} menschliche Aufrufe ohne Besucherkennung.`,
+    };
+  }
+  if (unidentified > 0) {
+    return {
+      state: "partial" as const,
+      value: `≥ ${unique}`,
+      hint: `Teilabdeckung: ${human - unidentified} von ${human} menschlichen Aufrufen; Besucher-Tage je Kampagne.`,
+    };
+  }
+  return {
+    state: "complete" as const,
+    value: unique,
+    hint: "Geschätzte Besucher-Tage je Kampagne.",
+  };
+}
+
 export function classifyHit(request: Request) {
   const ua = (request.headers.get("user-agent") || "").slice(0, 1000);
   const preview =

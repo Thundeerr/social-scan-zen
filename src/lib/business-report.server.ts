@@ -6,6 +6,11 @@ import { waveStatus } from "./wavespeed-analytics.server";
 import { allocationPlan, type CostAllocation } from "./business-cost-allocation";
 import { generationRunRate } from "./wavespeed-analytics";
 import {
+  pipelineHealth,
+  pipelineHealthText,
+  type PipelineHealthInput,
+} from "./model-pipeline-health";
+import {
   berlinTime,
   monthlyCosts,
   forecastCash,
@@ -45,6 +50,44 @@ export async function businessReport(user: string, now = new Date()) {
   if (entries.length >= 1000)
     throw new Error("Kostenliste zu groß: Bericht muss paginiert werden.");
   const snapshots = checked(snapshotResult) as MetricSnapshot[];
+  // Daily API rows can push manual tariffs/rates out of the recent window. Keep
+  // their history, not just the latest tariff, for periods spanning a change.
+  if (snapshots.length === 100) {
+    const sources = [
+      "Closer Verbrauch (UI)",
+      "Closer Zahlungen (Revolut)",
+      "CupidBot Abos (Portal)",
+      "CupidBot laufende Abos (Portal)",
+      "ECB Wechselkurs",
+    ];
+    const older = await Promise.all(
+      sources.map((source) =>
+        db()
+          .from("business_metric_snapshots")
+          .select("*")
+          .eq("user_id", user)
+          .eq("source", source)
+          .order("observed_at", { ascending: false })
+          .limit(1000),
+      ),
+    );
+    for (const result of older) {
+      const history = checked(result) as MetricSnapshot[];
+      if (history.length >= 1000)
+        throw Error("Kostenhistorie zu groß: Bericht muss paginiert werden.");
+      for (const row of history)
+        if (
+          !snapshots.some(
+            (s) =>
+              s.source === row.source &&
+              s.period_start === row.period_start &&
+              s.period_end === row.period_end,
+          )
+        )
+          snapshots.push(row);
+    }
+    snapshots.sort((a, b) => b.observed_at.localeCompare(a.observed_at));
+  }
   const latest = snapshots.filter(
     (s, i) => snapshots.findIndex((t) => t.source === s.source) === i,
   );
@@ -56,7 +99,9 @@ export async function businessReport(user: string, now = new Date()) {
     last_scheduled: string | null;
     published_today: number;
     reserved_month_cents: number;
+    generation_worker?: PipelineHealthInput;
   };
+  const workerHealth = pipelineHealth(live.generation_worker, now);
   const local = berlinTime(now);
   const allocationRows = checked(allocationResult) as CostAllocation[];
   if (allocationRows.length >= 1000) throw Error("Kostenaufteilung zu groß.");
@@ -77,21 +122,27 @@ export async function businessReport(user: string, now = new Date()) {
   const wave = await waveStatus(user);
   const wr = wave?.report;
   const generation = wr ? generationRunRate(wr) : null;
-  const profit = profitEstimate(latest, allocation, wr);
+  const profit = profitEstimate(snapshots, allocation, wr, local.day);
   const euro = (n: number) => n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   const text = [
     "🦇 MIDNA // KIIKII MONEY CHECK",
     `${local.day} · ${local.time} Uhr`,
     "",
-    ...(profit
+    ...(profit && !("unavailable" in profit)
       ? [
           `💜 Übrig: ${euro(profit.surplus)} · Schätzung vor Steuern`,
           `Rechnung: ${profit.start} – ${profit.end}`,
+          profit.estimateLabel,
+          ...profit.notes,
           `Einnahmen netto ${euro(profit.revenue)} − Kosten ${euro(profit.costs)}`,
           `Monatskosten bei diesem Tempo: ≈ ${euro(profit.monthly)}`,
         ]
       : [
-          "⚠️ Gewinn offen: Daten fehlen oder Zeiträume passen nicht zusammen.",
+          !profit
+            ? "⚠️ Gewinn offen: Keine bestätigten Kostendaten vorhanden."
+            : profit.unavailable === "fx"
+              ? "⚠️ Umrechnung offen: Gültiger ECB-Wechselkurs fehlt."
+              : "⚠️ Umsatz offen: Gültige Fanvue-Einnahmen fehlen.",
           ...(fv
             ? [
                 `Fanvue netto: ${fv.values["Netto vor Betriebskosten USD"] === undefined ? "unbekannt" : usd(fv.values["Netto vor Betriebskosten USD"] * 100)} · ${fv.period_start} – ${fv.period_end} · vor Betriebskosten`,
@@ -103,6 +154,7 @@ export async function businessReport(user: string, now = new Date()) {
     live.last_scheduled
       ? `Vorlauf bis ${berlinTime(new Date(live.last_scheduled)).day}`
       : "⚠️ Kein Vorlauf – Queue braucht Nachschub.",
+    `${workerHealth.needsAttention ? "⚠️ " : ""}${pipelineHealthText(workerHealth)}`,
     wr
       ? `⚡ WaveSpeed: ${usd(wr.balance * 100)} Guthaben · Stand ${berlinTime(new Date(wr.observed)).day}${wr.balance < 5 ? " · ⚠️ niedrig" : ""}`
       : "⚠️ WaveSpeed-Abrechnung fehlt.",
@@ -125,6 +177,8 @@ export async function businessReport(user: string, now = new Date()) {
     wave,
     allocation,
     generation,
+    workerHealth,
+    profit,
     at: local,
   };
 }

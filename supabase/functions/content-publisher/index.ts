@@ -1,6 +1,6 @@
 // Edge-runtime types come from the Deno runtime itself; the jsr type import is
 // intentionally omitted because it transitively requires npm:openai.
-import { createClient } from "npm:@supabase/supabase-js@2.110.0";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.110.0";
 import { buildReelContainerFields, applyModelReelMode } from "../_shared/instagram-reel.ts";
 import {
   buildCarouselContainerFields,
@@ -13,8 +13,17 @@ const postLocationId = () => Deno.env.get("INSTAGRAM_DEFAULT_LOCATION_ID") ?? ""
 const GRAPH_TIMEOUT_MS = 20_000;
 const SIGNED_URL_SECONDS = 12 * 60 * 60;
 const MAX_PUBLICATION_ATTEMPTS = 3;
+const MAX_PROCESSING_WAIT_MS = 30 * 60 * 1000;
+const POLL_DELAY_MS = 60 * 1000;
 
 type JsonRecord = Record<string, unknown>;
+type PublishLease = { postId: string; token: string };
+class LeaseLostError extends Error {
+  constructor() {
+    super("Publisher lease expired, was replaced, or publishing was paused");
+  }
+}
+class PublicationRecoveryRequired extends Error {}
 type Publication = {
   id: string;
   channel: "reel" | "story" | "story_handoff" | "highlight_handoff" | "first_comment" | "feed";
@@ -23,6 +32,10 @@ type Publication = {
   platform_container_id: string | null;
   platform_child_container_ids: string[];
   platform_media_id: string | null;
+  external_action_started_at: string | null;
+  recovery_required: boolean;
+  processing_started_at: string | null;
+  updated_at: string;
 };
 
 function response(body: JsonRecord, status = 200) {
@@ -54,7 +67,12 @@ async function graphRequest(
   token: string,
   method: "GET" | "POST",
   values: Record<string, string | boolean | number> = {},
+  ownership?: { admin: SupabaseClient; lease: PublishLease },
 ) {
+  if (method === "POST") {
+    if (!ownership) throw new LeaseLostError();
+    await renewLease(ownership.admin, ownership.lease);
+  }
   const base = `${apiBaseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
   const headers = { Authorization: `Bearer ${token}` };
   let result: Response;
@@ -89,7 +107,7 @@ async function graphRequest(
 
 async function authorize(
   request: Request,
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
 ): Promise<{ kind: "cron"; userId: null } | { kind: "operator"; userId: string }> {
   const cronSecret = request.headers.get("x-cron-secret")?.trim();
   if (cronSecret) {
@@ -114,7 +132,7 @@ async function authorize(
 }
 
 async function signedMediaUrl(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   storagePath: string,
   mediaKind: "video" | "image" | "cover",
 ) {
@@ -142,24 +160,45 @@ async function signedMediaUrl(
   return data.signedUrl;
 }
 
+async function renewLease(admin: SupabaseClient, lease: PublishLease) {
+  const { data, error } = await admin.rpc("renew_content_publish_lease", {
+    _content_post_id: lease.postId,
+    _lease_token: lease.token,
+  });
+  if (error) throw error;
+  if (data !== true) throw new LeaseLostError();
+}
+
+async function writeState(admin: SupabaseClient, lease: PublishLease, values: JsonRecord) {
+  const { data, error } = await admin.rpc("write_content_publish_state", {
+    _content_post_id: lease.postId,
+    _lease_token: lease.token,
+    ...values,
+  });
+  if (error) throw error;
+  if (data !== true) throw new LeaseLostError();
+}
+
 async function updatePublication(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
+  lease: PublishLease,
   id: string,
   values: JsonRecord,
 ) {
-  const { error } = await admin
-    .from("content_publications")
-    .update({ ...values, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
+  await writeState(admin, lease, { _publication_id: id, _publication_values: values });
 }
 
 async function addEvent(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   contentPostId: string,
   eventType: string,
   detail: JsonRecord = {},
+  lease?: PublishLease,
 ) {
+  if (lease) {
+    await writeState(admin, lease, { _event_type: eventType, _event_detail: detail });
+    return;
+  }
   const { error } = await admin.from("content_events").insert({
     content_post_id: contentPostId,
     event_type: eventType,
@@ -168,8 +207,131 @@ async function addEvent(
   if (error) throw error;
 }
 
+async function requireRecovery(
+  input: {
+    admin: SupabaseClient;
+    lease: PublishLease;
+    publication: Publication;
+  },
+  reason: string,
+): Promise<never> {
+  const message = `Instagram outcome needs reconciliation: ${reason}. Do not resend automatically.`;
+  await updatePublication(input.admin, input.lease, input.publication.id, {
+    status: "failed",
+    recovery_required: true,
+    last_error: message,
+  });
+  throw new PublicationRecoveryRequired(message);
+}
+
+function checkProcessingDeadline(publication: Publication) {
+  const started = Date.parse(publication.processing_started_at ?? publication.updated_at);
+  if (!Number.isFinite(started) || Date.now() - started > MAX_PROCESSING_WAIT_MS) {
+    throw new Error(
+      "Instagram container processing timed out; inspect the container before retrying",
+    );
+  }
+}
+
+async function publishContainer(
+  input: {
+    admin: SupabaseClient;
+    lease: PublishLease;
+    postId: string;
+    publication: Publication;
+    igUserId: string;
+    apiBaseUrl: string;
+    token: string;
+  },
+  label: string,
+) {
+  const publication = input.publication;
+  if (publication.platform_media_id) {
+    await updatePublication(input.admin, input.lease, publication.id, {
+      status: "published",
+      recovery_required: false,
+      last_error: null,
+    });
+    return "done";
+  }
+  if (
+    publication.recovery_required ||
+    (publication.external_action_started_at && !publication.platform_media_id)
+  ) {
+    return requireRecovery(input, `${label} send was reserved but no durable receipt exists`);
+  }
+  if (!publication.platform_container_id) throw new Error(`${label} container id is missing`);
+  const status = await graphRequest(
+    input.apiBaseUrl,
+    publication.platform_container_id,
+    input.token,
+    "GET",
+    {
+      fields: "status_code,status",
+    },
+  );
+  const statusCode = String(status.status_code ?? "").toUpperCase();
+  if (statusCode === "PUBLISHED")
+    return requireRecovery(input, `${label} is already published but its media ID is missing`);
+  if (["ERROR", "EXPIRED"].includes(statusCode))
+    throw new Error(`${label} processing failed: ${String(status.status ?? statusCode)}`);
+  if (statusCode !== "FINISHED") {
+    checkProcessingDeadline(publication);
+    return "waiting";
+  }
+
+  // This reservation survives a crash or a lost HTTP response. Re-entry requires
+  // reconciliation; neither container status FINISHED nor a manual retry proves
+  // that the previous POST was not accepted.
+  await updatePublication(input.admin, input.lease, publication.id, {
+    external_action_started_at: new Date().toISOString(),
+  });
+  let published: JsonRecord;
+  try {
+    published = await graphRequest(
+      input.apiBaseUrl,
+      `${input.igUserId}/media_publish`,
+      input.token,
+      "POST",
+      { creation_id: publication.platform_container_id },
+      input,
+    );
+    if (typeof published.id !== "string")
+      throw new Error(`Instagram did not return a ${label} media id`);
+  } catch (error) {
+    if (error instanceof LeaseLostError) throw error;
+    return requireRecovery(input, `${label} publish response was not confirmed`);
+  }
+  // Save receipt and event atomically before optional metadata requests.
+  await writeState(input.admin, input.lease, {
+    _publication_id: publication.id,
+    _publication_values: {
+      status: "published",
+      platform_media_id: published.id,
+      published_ig_user_id: input.igUserId,
+      published_at: new Date().toISOString(),
+      recovery_required: false,
+      last_error: null,
+    },
+    _event_type: `${label}_published`,
+    _event_detail: { media_id: published.id },
+  });
+  let permalink: string | null = null;
+  try {
+    const media = await graphRequest(input.apiBaseUrl, String(published.id), input.token, "GET", {
+      fields: "id,permalink,media_type,media_product_type,timestamp",
+    });
+    permalink = typeof media.permalink === "string" ? media.permalink : null;
+    if (permalink) await updatePublication(input.admin, input.lease, publication.id, { permalink });
+  } catch {
+    /* The durable media receipt must survive optional metadata failure. */
+  }
+  return "done";
+}
+
 async function processVideoPublication(input: {
-  admin: ReturnType<typeof createClient>;
+  admin: SupabaseClient;
+  lease: PublishLease;
   postId: string;
   publication: Publication;
   channel: "reel" | "story";
@@ -185,7 +347,21 @@ async function processVideoPublication(input: {
 }) {
   const { admin, publication, channel, apiBaseUrl, token } = input;
   if (publication.status === "published" || publication.status === "skipped") return "done";
+  if (publication.platform_media_id) {
+    await updatePublication(input.admin, input.lease, publication.id, {
+      status: "published",
+      recovery_required: false,
+      last_error: null,
+    });
+    return "done";
+  }
   if (publication.status === "failed") return "failed";
+  if (
+    publication.recovery_required ||
+    (publication.external_action_started_at && !publication.platform_media_id)
+  ) {
+    return requireRecovery({ ...input, publication }, "previous send has no confirmed receipt");
+  }
 
   if (publication.status === "pending") {
     if (publication.attempts >= MAX_PUBLICATION_ATTEMPTS) {
@@ -219,67 +395,41 @@ async function processVideoPublication(input: {
     }
     if (input.modelPublishMode) applyModelReelMode(body, input.modelPublishMode);
     if (channel === "reel") Object.assign(body, applyPostLocation({}, postLocationId()));
-    const created = await graphRequest(apiBaseUrl, `${input.igUserId}/media`, token, "POST", body);
+    const created = await graphRequest(
+      apiBaseUrl,
+      `${input.igUserId}/media`,
+      token,
+      "POST",
+      body,
+      input,
+    );
     if (typeof created.id !== "string")
       throw new Error(`Instagram did not return a ${channel} container`);
-    await updatePublication(admin, publication.id, {
+    await updatePublication(admin, input.lease, publication.id, {
       status: "publishing",
       attempts: publication.attempts + 1,
       platform_container_id: created.id,
+      processing_started_at: new Date().toISOString(),
       last_error: null,
     });
-    await addEvent(admin, input.postId, `${channel}_container_created`, {
-      container_id: created.id,
-    });
+    await addEvent(
+      admin,
+      input.postId,
+      `${channel}_container_created`,
+      {
+        container_id: created.id,
+      },
+      input.lease,
+    );
     return "waiting";
   }
 
-  if (!publication.platform_container_id) throw new Error(`${channel} container id is missing`);
-  const status = await graphRequest(apiBaseUrl, publication.platform_container_id, token, "GET", {
-    fields: "status_code,status",
-  });
-  const statusCode = String(status.status_code ?? "").toUpperCase();
-  if (["ERROR", "EXPIRED"].includes(statusCode)) {
-    throw new Error(`${channel} processing failed: ${String(status.status ?? statusCode)}`);
-  }
-  if (statusCode !== "FINISHED") return "waiting";
-
-  const published = await graphRequest(
-    apiBaseUrl,
-    `${input.igUserId}/media_publish`,
-    token,
-    "POST",
-    { creation_id: publication.platform_container_id },
-  );
-  if (typeof published.id !== "string")
-    throw new Error(`Instagram did not return a ${channel} media id`);
-
-  let permalink: string | null = null;
-  try {
-    const media = await graphRequest(apiBaseUrl, published.id, token, "GET", {
-      fields: "id,permalink,media_type,media_product_type,timestamp",
-    });
-    permalink = typeof media.permalink === "string" ? media.permalink : null;
-  } catch {
-    // Publishing succeeded. A permalink lookup must never trigger a duplicate retry.
-  }
-  await updatePublication(admin, publication.id, {
-    status: "published",
-    platform_media_id: published.id,
-    published_ig_user_id: input.igUserId,
-    permalink,
-    published_at: new Date().toISOString(),
-    last_error: null,
-  });
-  await addEvent(admin, input.postId, `${channel}_published`, {
-    media_id: published.id,
-    permalink,
-  });
-  return "done";
+  return publishContainer(input, channel);
 }
 
 async function finishImagePublication(input: {
-  admin: ReturnType<typeof createClient>;
+  admin: SupabaseClient;
+  lease: PublishLease;
   postId: string;
   publication: Publication;
   label: "image" | "carousel" | "story";
@@ -287,53 +437,12 @@ async function finishImagePublication(input: {
   apiBaseUrl: string;
   token: string;
 }) {
-  const containerId = input.publication.platform_container_id;
-  if (!containerId) throw new Error(`${input.label} container id is missing`);
-  const status = await graphRequest(input.apiBaseUrl, containerId, input.token, "GET", {
-    fields: "status_code,status",
-  });
-  const statusCode = String(status.status_code ?? "").toUpperCase();
-  if (["ERROR", "EXPIRED"].includes(statusCode)) {
-    throw new Error(`${input.label} processing failed: ${String(status.status ?? statusCode)}`);
-  }
-  if (statusCode && statusCode !== "FINISHED") return "waiting";
-
-  const published = await graphRequest(
-    input.apiBaseUrl,
-    `${input.igUserId}/media_publish`,
-    input.token,
-    "POST",
-    { creation_id: containerId },
-  );
-  if (typeof published.id !== "string") {
-    throw new Error(`Instagram did not return a ${input.label} media id`);
-  }
-  let permalink: string | null = null;
-  try {
-    const media = await graphRequest(input.apiBaseUrl, published.id, input.token, "GET", {
-      fields: "id,permalink,media_type,media_product_type,timestamp",
-    });
-    permalink = typeof media.permalink === "string" ? media.permalink : null;
-  } catch {
-    // The post exists. A failed permalink lookup must never create a duplicate retry.
-  }
-  await updatePublication(input.admin, input.publication.id, {
-    status: "published",
-    platform_media_id: published.id,
-    published_ig_user_id: input.igUserId,
-    permalink,
-    published_at: new Date().toISOString(),
-    last_error: null,
-  });
-  await addEvent(input.admin, input.postId, `${input.label}_published`, {
-    media_id: published.id,
-    permalink,
-  });
-  return "done";
+  return publishContainer(input, input.label);
 }
 
 async function processImagePublication(input: {
-  admin: ReturnType<typeof createClient>;
+  admin: SupabaseClient;
+  lease: PublishLease;
   postId: string;
   publication: Publication;
   storagePath: string;
@@ -347,7 +456,21 @@ async function processImagePublication(input: {
   const { publication } = input;
   const label = input.asStory ? "story" : "image";
   if (publication.status === "published" || publication.status === "skipped") return "done";
+  if (publication.platform_media_id) {
+    await updatePublication(input.admin, input.lease, publication.id, {
+      status: "published",
+      recovery_required: false,
+      last_error: null,
+    });
+    return "done";
+  }
   if (publication.status === "failed") return "failed";
+  if (
+    publication.recovery_required ||
+    (publication.external_action_started_at && !publication.platform_media_id)
+  ) {
+    return requireRecovery({ ...input, publication }, "previous send has no confirmed receipt");
+  }
 
   if (publication.status === "pending") {
     if (publication.attempts >= MAX_PUBLICATION_ATTEMPTS) {
@@ -368,19 +491,27 @@ async function processImagePublication(input: {
         });
         return input.asStory ? fields : applyPostLocation(fields, postLocationId());
       })(),
+      input,
     );
     if (typeof created.id !== "string") {
       throw new Error(`Instagram did not return an ${label} container`);
     }
-    await updatePublication(input.admin, publication.id, {
+    await updatePublication(input.admin, input.lease, publication.id, {
       status: "publishing",
       attempts: publication.attempts + 1,
       platform_container_id: created.id,
+      processing_started_at: new Date().toISOString(),
       last_error: null,
     });
-    await addEvent(input.admin, input.postId, `${label}_container_created`, {
-      container_id: created.id,
-    });
+    await addEvent(
+      input.admin,
+      input.postId,
+      `${label}_container_created`,
+      {
+        container_id: created.id,
+      },
+      input.lease,
+    );
     return "waiting";
   }
 
@@ -388,7 +519,8 @@ async function processImagePublication(input: {
 }
 
 async function processCarouselPublication(input: {
-  admin: ReturnType<typeof createClient>;
+  admin: SupabaseClient;
+  lease: PublishLease;
   postId: string;
   publication: Publication;
   storagePaths: string[];
@@ -400,7 +532,21 @@ async function processCarouselPublication(input: {
 }) {
   const { publication } = input;
   if (publication.status === "published" || publication.status === "skipped") return "done";
+  if (publication.platform_media_id) {
+    await updatePublication(input.admin, input.lease, publication.id, {
+      status: "published",
+      recovery_required: false,
+      last_error: null,
+    });
+    return "done";
+  }
   if (publication.status === "failed") return "failed";
+  if (
+    publication.recovery_required ||
+    (publication.external_action_started_at && !publication.platform_media_id)
+  ) {
+    return requireRecovery({ ...input, publication }, "previous send has no confirmed receipt");
+  }
   if (input.storagePaths.length < 2 || input.storagePaths.length > 10) {
     throw new Error("Carousel requires 2–10 slides");
   }
@@ -422,19 +568,26 @@ async function processCarouselPublication(input: {
           altText: input.altTexts[index] ?? input.altTexts[0] ?? "",
           isCarouselItem: true,
         }),
+        input,
       );
       if (typeof created.id !== "string") {
         throw new Error(`Instagram did not return carousel child ${index + 1}`);
       }
       childIds.push(created.id);
-      await updatePublication(input.admin, publication.id, {
+      await updatePublication(input.admin, input.lease, publication.id, {
         platform_child_container_ids: childIds,
         last_error: null,
       });
-      await addEvent(input.admin, input.postId, "carousel_child_created", {
-        position: index + 1,
-        container_id: created.id,
-      });
+      await addEvent(
+        input.admin,
+        input.postId,
+        "carousel_child_created",
+        {
+          position: index + 1,
+          container_id: created.id,
+        },
+        input.lease,
+      );
     }
 
     const parent = await graphRequest(
@@ -446,21 +599,29 @@ async function processCarouselPublication(input: {
         buildCarouselContainerFields({ children: childIds, caption: input.caption }),
         postLocationId(),
       ),
+      input,
     );
     if (typeof parent.id !== "string") {
       throw new Error("Instagram did not return a carousel container");
     }
-    await updatePublication(input.admin, publication.id, {
+    await updatePublication(input.admin, input.lease, publication.id, {
       status: "publishing",
       attempts: publication.attempts + 1,
       platform_container_id: parent.id,
+      processing_started_at: new Date().toISOString(),
       platform_child_container_ids: childIds,
       last_error: null,
     });
-    await addEvent(input.admin, input.postId, "carousel_container_created", {
-      container_id: parent.id,
-      child_count: childIds.length,
-    });
+    await addEvent(
+      input.admin,
+      input.postId,
+      "carousel_container_created",
+      {
+        container_id: parent.id,
+        child_count: childIds.length,
+      },
+      input.lease,
+    );
     return "waiting";
   }
 
@@ -468,7 +629,8 @@ async function processCarouselPublication(input: {
 }
 
 async function processFirstComment(input: {
-  admin: ReturnType<typeof createClient>;
+  admin: SupabaseClient;
+  lease: PublishLease;
   postId: string;
   publication: Publication | undefined;
   reel: Publication;
@@ -480,34 +642,63 @@ async function processFirstComment(input: {
   if (!publication || publication.status === "published" || publication.status === "skipped") {
     return "done";
   }
+  if (publication.platform_media_id) {
+    await updatePublication(input.admin, input.lease, publication.id, {
+      status: "published",
+      recovery_required: false,
+      last_error: null,
+    });
+    return "done";
+  }
   if (publication.status === "failed") return "failed";
+  if (publication.recovery_required || publication.external_action_started_at) {
+    return requireRecovery(
+      { ...input, publication },
+      "first comment was reserved but no durable receipt exists",
+    );
+  }
   if (!input.message.trim()) {
-    await updatePublication(input.admin, publication.id, { status: "skipped" });
+    await updatePublication(input.admin, input.lease, publication.id, { status: "skipped" });
     return "done";
   }
   if (input.reel.status !== "published" || !input.reel.platform_media_id) return "waiting";
-  const posted = await graphRequest(
-    input.apiBaseUrl,
-    `${input.reel.platform_media_id}/comments`,
-    input.token,
-    "POST",
-    { message: input.message },
-  );
-  if (typeof posted.id !== "string") throw new Error("Instagram did not return a comment id");
-  await updatePublication(input.admin, publication.id, {
-    status: "published",
-    platform_media_id: posted.id,
+  await updatePublication(input.admin, input.lease, publication.id, {
+    status: "publishing",
+    external_action_started_at: new Date().toISOString(),
     attempts: publication.attempts + 1,
-    published_at: new Date().toISOString(),
-    last_error: null,
   });
-  await addEvent(input.admin, input.postId, "first_comment_published", {
-    comment_id: posted.id,
+  let posted: JsonRecord;
+  try {
+    posted = await graphRequest(
+      input.apiBaseUrl,
+      `${input.reel.platform_media_id}/comments`,
+      input.token,
+      "POST",
+      { message: input.message },
+      input,
+    );
+    if (typeof posted.id !== "string") throw new Error("Instagram did not return a comment id");
+  } catch (error) {
+    if (error instanceof LeaseLostError) throw error;
+    return requireRecovery({ ...input, publication }, "first-comment response was not confirmed");
+  }
+  await writeState(input.admin, input.lease, {
+    _publication_id: publication.id,
+    _publication_values: {
+      status: "published",
+      platform_media_id: posted.id,
+      attempts: publication.attempts + 1,
+      published_at: new Date().toISOString(),
+      recovery_required: false,
+      last_error: null,
+    },
+    _event_type: "first_comment_published",
+    _event_detail: { comment_id: posted.id },
   });
   return "done";
 }
 
-async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
+async function cleanupExpiredMedia(admin: SupabaseClient) {
   const { data: due, error } = await admin
     .from("content_posts")
     .select(
@@ -547,7 +738,8 @@ async function cleanupExpiredMedia(admin: ReturnType<typeof createClient>) {
   return cleaned;
 }
 
-async function processPost(admin: ReturnType<typeof createClient>, postId: string) {
+async function processPost(admin: SupabaseClient, postId: string, lease: PublishLease) {
+  await renewLease(admin, lease);
   const { data: post, error: postError } = await admin
     .from("content_posts")
     .select("*")
@@ -572,7 +764,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
   const { data: rows, error: publicationError } = await admin
     .from("content_publications")
     .select(
-      "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id",
+      "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id,external_action_started_at,recovery_required,processing_started_at,updated_at",
     )
     .eq("content_post_id", postId);
   if (publicationError) throw publicationError;
@@ -583,6 +775,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
   const apiBaseUrl = connection.api_base_url ?? "https://graph.facebook.com/v25.0";
   const common = {
     admin,
+    lease,
     postId,
     igUserId: connection.ig_user_id,
     apiBaseUrl,
@@ -631,7 +824,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
           await admin
             .from("content_publications")
             .select(
-              "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id",
+              "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id,external_action_started_at,recovery_required,processing_started_at,updated_at",
             )
             .eq("id", primary.id)
             .single()
@@ -639,6 +832,7 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
 
   const commentState = await processFirstComment({
     admin,
+    lease,
     postId,
     publication: publications.get("first_comment"),
     reel: refreshedPrimary,
@@ -674,22 +868,22 @@ async function processPost(admin: ReturnType<typeof createClient>, postId: strin
 
   const completedAt = new Date();
   const cleanupAt = new Date(completedAt.getTime() + 48 * 60 * 60 * 1000);
-  const { error: finishError } = await admin
-    .from("content_posts")
-    .update({
+  await writeState(admin, lease, {
+    _post_values: {
       status: "published",
       published_at: completedAt.toISOString(),
       media_cleanup_after:
         post.story_publish_mode === "automatic_no_link" ? cleanupAt.toISOString() : null,
-      publish_lease_until: null,
       last_publish_error: null,
-    })
-    .eq("id", postId);
-  if (finishError) throw finishError;
-  await addEvent(admin, postId, "publishing_completed", {
-    instagram_username: connection.ig_username,
-    story_mode: post.story_publish_mode,
-    cleanup_after: post.story_publish_mode === "automatic_no_link" ? cleanupAt.toISOString() : null,
+      publish_next_attempt_at: null,
+    },
+    _event_type: "publishing_completed",
+    _event_detail: {
+      instagram_username: connection.ig_username,
+      story_mode: post.story_publish_mode,
+      cleanup_after:
+        post.story_publish_mode === "automatic_no_link" ? cleanupAt.toISOString() : null,
+    },
   });
   return { state: "published", channel: null };
 }
@@ -728,12 +922,17 @@ Deno.serve(async (request: Request) => {
     console.error("[content-publisher] cleanup", safeError(error));
   }
 
-  const { data: claimedId, error: claimError } = await admin.rpc("claim_due_content_post", {
+  const { data: claim, error: claimError } = await admin.rpc("claim_due_content_post_v2", {
     _content_post_id: requestedPostId,
     _user_id: actor.userId,
   });
   if (claimError) return response({ ok: false, error: safeError(claimError), cleaned }, 500);
-  if (!claimedId) return response({ ok: true, state: "idle", cleaned });
+  if (!claim) return response({ ok: true, state: "idle", cleaned });
+  if (typeof claim.post_id !== "string" || typeof claim.lease_token !== "string") {
+    return response({ ok: false, error: "Invalid publisher lease response", cleaned }, 500);
+  }
+  const claimedId = claim.post_id;
+  const lease: PublishLease = { postId: claimedId, token: claim.lease_token };
 
   let token: string | undefined;
   try {
@@ -752,25 +951,44 @@ Deno.serve(async (request: Request) => {
         .maybeSingle();
       token = claimedConnection?.page_access_token;
     }
-    const outcome = await processPost(admin, claimedId);
-    await admin.rpc("release_content_publish_lease", { _content_post_id: claimedId });
+    const outcome = await processPost(admin, claimedId, lease);
+    if (outcome.state === "waiting") {
+      await writeState(admin, lease, {
+        _post_values: {
+          publish_next_attempt_at: new Date(Date.now() + POLL_DELAY_MS).toISOString(),
+        },
+      });
+    } else if (outcome.state === "failed") {
+      await writeState(admin, lease, {
+        _post_values: {
+          status: "failed",
+          last_publish_error: `The ${outcome.channel} publication requires review`,
+        },
+      });
+    }
     return response({ ok: true, post_id: claimedId, ...outcome, cleaned });
   } catch (error) {
     const message = safeError(error, token);
     console.error("[content-publisher] post failed", claimedId, message);
-    await admin
-      .from("content_posts")
-      .update({
-        status: "failed",
-        last_publish_error: message,
-        publish_lease_until: null,
-      })
-      .eq("id", claimedId);
     try {
-      await addEvent(admin, claimedId, "publishing_failed", { error: message });
+      await writeState(admin, lease, {
+        _post_values: { status: "failed", last_publish_error: message },
+        _event_type:
+          error instanceof PublicationRecoveryRequired
+            ? "publishing_recovery_required"
+            : "publishing_failed",
+        _event_detail: { error: message },
+      });
     } catch {
       // Preserve the original failure.
     }
     return response({ ok: false, post_id: claimedId, error: message, cleaned }, 500);
+  } finally {
+    // Stale invocations can release only their own token, never a successor's.
+    const { error } = await admin.rpc("release_content_publish_lease_v2", {
+      _content_post_id: claimedId,
+      _lease_token: lease.token,
+    });
+    if (error) console.error("[content-publisher] lease release", safeError(error));
   }
 });
