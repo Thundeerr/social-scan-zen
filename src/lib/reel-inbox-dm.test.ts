@@ -246,7 +246,7 @@ describe("DM authentication and durable intake", () => {
     mock.from.mockReturnValue(query(null));
     expect((await dmWebhook(request(payload()))).status).toBe(200);
     expect(fetch).not.toHaveBeenCalled();
-    expect(mock.rpc).not.toHaveBeenCalled();
+    expect(mock.rpc.mock.calls.filter(([name]) => name !== "ig_webhook_note")).toHaveLength(0);
   });
   function account(senders: unknown[]) {
     mock.from.mockImplementation((table: string) =>
@@ -287,7 +287,7 @@ describe("DM authentication and durable intake", () => {
     account([{ sender_id: "20", username: "kiikii.bat" }]);
     expect((await dmWebhook(request(payload()))).status).toBe(200);
     expect(fetch).not.toHaveBeenCalled();
-    expect(mock.rpc).toHaveBeenCalledOnce();
+    expect(mock.rpc.mock.calls.filter(([name]) => name !== "ig_webhook_note")).toHaveLength(1);
     expect(mock.rpc).toHaveBeenCalledWith(
       "reel_inbox_dm_ingest_v4",
       expect.objectContaining({

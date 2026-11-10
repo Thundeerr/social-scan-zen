@@ -43,6 +43,7 @@ import { Route as AuthenticatedDiscoveryAnalyticsRouteImport } from './routes/_a
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 import { Route as ApiPublicTelegramReviewRouteImport } from './routes/api/public/telegram/review'
 import { Route as ApiPublicInstagramInboxWebhookRouteImport } from './routes/api/public/instagram/inbox-webhook'
+import { Route as ApiPublicInstagramCommentCampaignPollRouteImport } from './routes/api/public/instagram/comment-campaign-poll'
 import { Route as ApiPublicInstagramCallbackRouteImport } from './routes/api/public/instagram/callback'
 import { Route as ApiPublicHooksScannerTickRouteImport } from './routes/api/public/hooks/scanner-tick'
 import { Route as ApiPublicHooksDiscoveryTickRouteImport } from './routes/api/public/hooks/discovery-tick'
@@ -230,6 +231,12 @@ const ApiPublicInstagramInboxWebhookRoute =
     path: '/api/public/instagram/inbox-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicInstagramCommentCampaignPollRoute =
+  ApiPublicInstagramCommentCampaignPollRouteImport.update({
+    id: '/api/public/instagram/comment-campaign-poll',
+    path: '/api/public/instagram/comment-campaign-poll',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInstagramCallbackRoute =
   ApiPublicInstagramCallbackRouteImport.update({
     id: '/api/public/instagram/callback',
@@ -315,6 +322,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
+  '/api/public/instagram/comment-campaign-poll': typeof ApiPublicInstagramCommentCampaignPollRoute
   '/api/public/instagram/inbox-webhook': typeof ApiPublicInstagramInboxWebhookRoute
   '/api/public/telegram/review': typeof ApiPublicTelegramReviewRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -357,6 +365,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
+  '/api/public/instagram/comment-campaign-poll': typeof ApiPublicInstagramCommentCampaignPollRoute
   '/api/public/instagram/inbox-webhook': typeof ApiPublicInstagramInboxWebhookRoute
   '/api/public/telegram/review': typeof ApiPublicTelegramReviewRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -402,6 +411,7 @@ export interface FileRoutesById {
   '/api/public/hooks/discovery-tick': typeof ApiPublicHooksDiscoveryTickRoute
   '/api/public/hooks/scanner-tick': typeof ApiPublicHooksScannerTickRoute
   '/api/public/instagram/callback': typeof ApiPublicInstagramCallbackRoute
+  '/api/public/instagram/comment-campaign-poll': typeof ApiPublicInstagramCommentCampaignPollRoute
   '/api/public/instagram/inbox-webhook': typeof ApiPublicInstagramInboxWebhookRoute
   '/api/public/telegram/review': typeof ApiPublicTelegramReviewRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
@@ -447,6 +457,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
+    | '/api/public/instagram/comment-campaign-poll'
     | '/api/public/instagram/inbox-webhook'
     | '/api/public/telegram/review'
     | '/api/public/telegram/webhook'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
+    | '/api/public/instagram/comment-campaign-poll'
     | '/api/public/instagram/inbox-webhook'
     | '/api/public/telegram/review'
     | '/api/public/telegram/webhook'
@@ -533,6 +545,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/discovery-tick'
     | '/api/public/hooks/scanner-tick'
     | '/api/public/instagram/callback'
+    | '/api/public/instagram/comment-campaign-poll'
     | '/api/public/instagram/inbox-webhook'
     | '/api/public/telegram/review'
     | '/api/public/telegram/webhook'
@@ -554,6 +567,7 @@ export interface RootRouteChildren {
   ApiPublicHooksDiscoveryTickRoute: typeof ApiPublicHooksDiscoveryTickRoute
   ApiPublicHooksScannerTickRoute: typeof ApiPublicHooksScannerTickRoute
   ApiPublicInstagramCallbackRoute: typeof ApiPublicInstagramCallbackRoute
+  ApiPublicInstagramCommentCampaignPollRoute: typeof ApiPublicInstagramCommentCampaignPollRoute
   ApiPublicInstagramInboxWebhookRoute: typeof ApiPublicInstagramInboxWebhookRoute
   ApiPublicTelegramReviewRoute: typeof ApiPublicTelegramReviewRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
@@ -799,6 +813,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInstagramInboxWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/instagram/comment-campaign-poll': {
+      id: '/api/public/instagram/comment-campaign-poll'
+      path: '/api/public/instagram/comment-campaign-poll'
+      fullPath: '/api/public/instagram/comment-campaign-poll'
+      preLoaderRoute: typeof ApiPublicInstagramCommentCampaignPollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/instagram/callback': {
       id: '/api/public/instagram/callback'
       path: '/api/public/instagram/callback'
@@ -957,6 +978,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksDiscoveryTickRoute: ApiPublicHooksDiscoveryTickRoute,
   ApiPublicHooksScannerTickRoute: ApiPublicHooksScannerTickRoute,
   ApiPublicInstagramCallbackRoute: ApiPublicInstagramCallbackRoute,
+  ApiPublicInstagramCommentCampaignPollRoute:
+    ApiPublicInstagramCommentCampaignPollRoute,
   ApiPublicInstagramInboxWebhookRoute: ApiPublicInstagramInboxWebhookRoute,
   ApiPublicTelegramReviewRoute: ApiPublicTelegramReviewRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,

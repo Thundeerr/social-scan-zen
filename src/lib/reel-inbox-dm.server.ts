@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { dmEvents, DM_RECEIVER, DM_SENDERS, DM_WEBHOOK } from "./reel-inbox-dm";
 import { IG_API_BASE_URL } from "./instagram-oauth";
 import { COMMENT_CAMPAIGN_VERSION } from "./kiikii-comment-campaigns";
+import { noteWebhook } from "./instagram-webhook-health.server";
 
 const db = supabaseAdmin as SupabaseClient;
 const scope = "instagram_business_manage_messages";
@@ -224,6 +225,7 @@ export async function ingestDm(body: unknown) {
 }
 export async function dmWebhook(request: Request) {
   const headers = { "Cache-Control": "no-store", "X-Kiikii-Comment-Campaign-Version": COMMENT_CAMPAIGN_VERSION };
+  if (request.method === "POST") await noteWebhook("received");
   const key = secret();
   if (!key) return new Response("Not configured", { status: 503, headers });
   if (request.method === "GET") {
@@ -239,8 +241,10 @@ export async function dmWebhook(request: Request) {
     return new Response(challenge, { headers });
   }
   if (request.method !== "POST") return new Response(null, { status: 405, headers });
-  if (!/^sha256=[a-f0-9]{64}$/.test(request.headers.get("x-hub-signature-256") ?? ""))
+  if (!/^sha256=[a-f0-9]{64}$/.test(request.headers.get("x-hub-signature-256") ?? "")) {
+    await noteWebhook("rejected");
     return new Response("Forbidden", { status: 403, headers });
+  }
   const reader = request.body?.getReader();
   if (!reader) return new Response(null, { status: 400, headers });
   let size = 0;
@@ -257,9 +261,13 @@ export async function dmWebhook(request: Request) {
       chunks.push(part.value);
     }
     const bytes = Buffer.concat(chunks);
-    if (!validSignature(bytes, request.headers.get("x-hub-signature-256") ?? "", key))
+    if (!validSignature(bytes, request.headers.get("x-hub-signature-256") ?? "", key)) {
+      await noteWebhook("rejected");
       return new Response("Forbidden", { status: 403, headers });
+    }
+    await noteWebhook("verified");
     const body = JSON.parse(bytes.toString("utf8"));
+    await noteWebhook("parsed", body);
     dmEvents(body); // malformed batches are rejected before any storage
     await ingestDm(body); // acknowledge only after durable transaction; Meta can retry
     const { ingestWebsiteDm } = await import("./kiikii-dm-redirect.server");
@@ -270,6 +278,7 @@ export async function dmWebhook(request: Request) {
     await ingestCampaignComments(body);
     return new Response("EVENT_RECEIVED", { headers });
   } catch {
+    await noteWebhook("failed");
     return new Response("Not confirmed; retry", { status: 503, headers });
   }
 }
