@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { dmEvents, DM_RECEIVER, DM_SENDERS, DM_WEBHOOK } from "./reel-inbox-dm";
 import { IG_API_BASE_URL } from "./instagram-oauth";
+import { COMMENT_CAMPAIGN_VERSION } from "./kiikii-comment-campaigns";
 
 const db = supabaseAdmin as SupabaseClient;
 const scope = "instagram_business_manage_messages";
@@ -222,7 +223,7 @@ export async function ingestDm(body: unknown) {
   }
 }
 export async function dmWebhook(request: Request) {
-  const headers = { "Cache-Control": "no-store" };
+  const headers = { "Cache-Control": "no-store", "X-Kiikii-Comment-Campaign-Version": COMMENT_CAMPAIGN_VERSION };
   const key = secret();
   if (!key) return new Response("Not configured", { status: 503, headers });
   if (request.method === "GET") {
@@ -265,6 +266,8 @@ export async function dmWebhook(request: Request) {
     await ingestWebsiteDm(body);
     const { ingestWebsiteComments } = await import("./kiikii-comment-replies.server");
     await ingestWebsiteComments(body);
+    const { ingestCampaignComments } = await import("./kiikii-comment-campaigns.server");
+    await ingestCampaignComments(body);
     return new Response("EVENT_RECEIVED", { headers });
   } catch {
     return new Response("Not confirmed; retry", { status: 503, headers });

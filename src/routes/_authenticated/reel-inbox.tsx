@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ReelInboxDm } from "@/components/reel-inbox-dm";
 import { KiikiiDmRedirect } from "@/components/kiikii-dm-redirect";
 import { KiikiiCommentReplies } from "@/components/kiikii-comment-replies";
+import { KiikiiCommentCampaign } from "@/components/kiikii-comment-campaign";
 
 export const Route = createFileRoute("/_authenticated/reel-inbox")({ component: ReelInbox });
 const statuses = {
@@ -99,6 +100,7 @@ function ReelInbox() {
         )}
       </p>
       <KiikiiDmRedirect userId={user.id} />
+      <KiikiiCommentCampaign userId={user.id} />
       <KiikiiCommentReplies userId={user.id} />
       <ReelInboxDm userId={user.id} />
       <section className="space-y-3 rounded-xl border bg-card p-4">
