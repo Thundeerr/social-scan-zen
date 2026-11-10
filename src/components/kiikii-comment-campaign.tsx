@@ -26,6 +26,7 @@ export function KiikiiCommentCampaign({ userId }: { userId: string }) {
     </div>
     <p className="text-xs text-muted-foreground">{campaign?.backfillComplete ? "Vorhandene Kommentare wurden vollständig geprüft." : "Vorhandene Kommentare werden in kleinen Gruppen nachgeholt. Neue Kommentare werden auch bei ausgeschaltetem PC automatisch verarbeitet."}</p>
     <p className="text-xs text-muted-foreground">Letzter Kommentar-Eingang: {campaign?.lastWebhookAt ? new Date(campaign.lastWebhookAt).toLocaleString("de-DE") : "noch keiner bestätigt"}. Letzte angenommene Intro-DM: {campaign?.lastDeliveryAt ? new Date(campaign.lastDeliveryAt).toLocaleString("de-DE") : "noch keine über diese Automatik"}.</p>
+    <p className="text-xs text-muted-foreground">Letzte automatische Prüfung: {campaign?.lastPollCompletedAt ? new Date(campaign.lastPollCompletedAt).toLocaleString("de-DE") : "noch nicht bestätigt"}{campaign?.lastPollError ? " · Bei der letzten Prüfung ist ein Fehler aufgetreten." : ""}.</p>
     {fields && <details className="text-xs"><summary>Verbindungsdetails</summary><p>Account-Abonnements: {fields.join(", ")}. Das App-Abonnement wird separat in Meta geprüft; ein neuer Kommentar-Eingang bestätigt die Zustellung.</p></details>}
     {!s?.ready && <p className="text-sm">Der alte DM-Responder muss pausiert und die Kiikii-Verbindung gültig sein.</p>}
     {(change.error || campaign?.lastError) && <p role="alert" className="text-sm text-destructive">{change.error?.message ?? `Letzter Fehler: ${campaign?.lastError}`}</p>}

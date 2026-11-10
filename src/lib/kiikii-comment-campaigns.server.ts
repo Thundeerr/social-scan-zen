@@ -32,17 +32,18 @@ async function ownReel(token: string) {
 }
 
 /** Called only by the signature-verified webhook or the authenticated owner catch-up. */
-export async function processCampaignEvents(events: Event[], source: "webhook" | "catchup") {
+export async function processCampaignEvents(events: Event[], source: "webhook" | "catchup" | "poll") {
+  const outcome = { complete: true, deliveryFailed: false };
   const targeted = events.filter((event) => event.media === CAMPAIGN_MEDIA_ID);
-  if (!targeted.length) return;
+  if (!targeted.length) return outcome;
   const dm = checked(await db.from("ig_dm_redirect_settings").select("user_id,mode").eq("receiver_id", KIIKII_ID).maybeSingle());
-  if (!dm) return;
+  if (!dm) return outcome;
   const campaign = await campaignFor(dm.user_id);
-  if (!campaign) return;
+  if (!campaign) return outcome;
   if (source === "webhook") {
     checked(await db.from("ig_comment_campaigns").update({ last_webhook_at: new Date().toISOString() }).eq("id", campaign.id));
   }
-  if (!campaign.enabled) return;
+  if (!campaign.enabled) return outcome;
   let stage = "connection_not_ready";
   try {
     const c = await connection(dm.user_id);
@@ -84,11 +85,13 @@ export async function processCampaignEvents(events: Event[], source: "webhook" |
       checked(await db.from("ig_comment_campaigns").update(result.status === "sent"
         ? { last_delivery_at: new Date().toISOString(), last_error_code: null, last_error_at: null }
         : { last_error_code: result.error_code, last_error_at: new Date().toISOString() }).eq("id", campaign.id));
+      if (result.status !== "sent") outcome.deliveryFailed = true;
     }
   } catch {
     await noteError(campaign.id, stage);
     throw new Error("Comment campaign could not finish; check its status.");
   }
+  return outcome;
 }
 
 export async function ingestCampaignComments(body: unknown) {
@@ -156,5 +159,58 @@ export async function campaignOperator(user: string, action: "status" | "enable"
   return { ready, permalink: CAMPAIGN_PERMALINK, accountSubscribedFields: subscribedFields, receipts: receipts ?? [],
     campaign: current ? { enabled: current.enabled, reply: current.reply_text, lastWebhookAt: current.last_webhook_at,
       lastDeliveryAt: current.last_delivery_at, lastError: current.last_error_code, lastCatchupAt: current.last_catchup_at,
+      lastPollCompletedAt: current.last_poll_completed_at ?? null, lastPollError: current.last_poll_error ?? null,
       backfillComplete: Boolean(current.backfill_complete_at), backfillHasMore: Boolean(current.backfill_cursor) } : null };
+}
+
+/** Fixed campaign only. The existing worker credential cannot enable or retarget it. */
+export async function campaignPoll(request: Request) {
+  const respond = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+  if (request.method !== "POST") return respond({ ok: false }, 405);
+  const token = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get("authorization") ?? "")?.[1];
+  if (!token) return respond({ ok: false }, 401);
+  let lease: string | null = null, finishAttempted = false;
+  let failure = "poll_failed";
+  try {
+    const claim = checked(await db.rpc("ig_comment_campaign_poll_claim", { p_worker_hash: hash(token) }));
+    if (!claim?.authorized) return respond({ ok: false }, 401);
+    if (!claim.claimed) return respond({ ok: true, processed: false, reason: claim.reason, lastSuccessfulPollAt: claim.lastSuccessfulPollAt ?? null });
+    lease = claim.lease;
+    const c = await connection("e4ee414f-fbb6-4f82-b5fc-22d74ed6b3cc");
+    if (!redirectConnectionReady(c) || !c.granted_scopes.includes(COMMENT_SCOPE)) throw new Error("Connection not ready");
+    const base = `${CAMPAIGN_MEDIA_ID}/comments?fields=id,from,parent_id,hidden&limit=3`;
+    const suffix = claim.cursor ? `&after=${encodeURIComponent(claim.cursor)}` : "";
+    let seen: string[] = claim.cursorHashes ?? [];
+    let page;
+    try { page = await graph(`${base}${suffix}`, c.page_access_token); }
+    catch {
+      if (!claim.cursor) throw new Error("Comment read failed");
+      // A rejected/expired opaque cursor must not wedge all future polls. A
+      // successful head probe safely restarts the traversal; receipts dedupe it.
+      page = await graph(base, c.page_access_token);
+      seen = [];
+    }
+    if (!Array.isArray(page.data) || page.data.length > 3) throw new Error("Invalid comment page");
+    let next = page.paging?.next ? page.paging?.cursors?.after : null;
+    if (page.paging?.next && (typeof next !== "string" || !next || next.length > 4096 || seen.includes(hash(next)))) {
+      failure = "invalid_cursor";
+      throw new Error("Invalid pagination cursor");
+    }
+    const events = websiteCommentEvents({ object: "instagram", entry: [{ id: KIIKII_ID, changes: page.data.map((item: Record<string, unknown>) => ({ field: "comments", value: { ...item, media: { id: CAMPAIGN_MEDIA_ID } } })) }] });
+    // Three comments bound provider calls while completing every fetched page.
+    const result = await processCampaignEvents(events, "poll");
+    seen = next ? [...seen, hash(next)] : [];
+    finishAttempted = true;
+    const finished = checked(await db.rpc("ig_comment_campaign_poll_finish", { p_lease: lease, p_cursor: next, p_cursor_hashes: seen, p_error: result.deliveryFailed ? "delivery_failed" : null }));
+    if (!finished) throw new Error("Poll lease changed");
+    if (result.deliveryFailed) return respond({ ok: false }, 503);
+    return respond({ ok: true, processed: true, pageComplete: result.complete });
+  } catch {
+    if (lease && !finishAttempted) {
+      try { checked(await db.rpc("ig_comment_campaign_poll_finish", { p_lease: lease, p_cursor: null, p_cursor_hashes: [], p_error: failure })); }
+      catch { console.error("[kiikii-comment-campaign] poll_finish_failed"); }
+    }
+    console.error("[kiikii-comment-campaign] poll_failed");
+    return respond({ ok: false }, 503);
+  }
 }
