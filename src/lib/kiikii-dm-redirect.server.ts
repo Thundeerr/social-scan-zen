@@ -177,6 +177,7 @@ export async function deliverWebsiteReply(
   sender: string,
   text: string,
   kind: "dm" | "comment" = "dm",
+  expectedRecipient?: string,
 ) {
   try {
     const response = await fetch(`${IG_API_BASE_URL}/${KIIKII_ID}/messages`, {
@@ -190,12 +191,15 @@ export async function deliverWebsiteReply(
       signal: AbortSignal.timeout(7000),
     });
     const result = await response.json().catch(() => null);
-    if (response.ok && typeof result?.message_id === "string")
+    if (response.ok && !result?.error && typeof result?.message_id === "string" && result.message_id.trim().length > 0 && result.message_id.length <= 2000 &&
+      (!expectedRecipient || result.recipient_id === undefined || result.recipient_id === expectedRecipient))
       return {
         status: "sent",
         provider_message_id: result.message_id.slice(0, 2000),
         error_code: null,
       };
+    if (expectedRecipient && result?.recipient_id !== undefined && result.recipient_id !== expectedRecipient)
+      return { status: "uncertain", provider_message_id: null, error_code: "recipient_mismatch" };
     const code = Number.isInteger(result?.error?.code)
       ? `meta_${result.error.code}`
       : `http_${response.status}`;
