@@ -69,6 +69,8 @@ const js = ts.transpileModule(source, {
 let calls = [],
   responses = [],
   trace = [],
+  eventRecords = [],
+  postState = {},
   records = new Map(),
   failReceipt = false,
   leaseValid = true;
@@ -85,6 +87,8 @@ const admin = {
       const row = records.get(args._publication_id);
       Object.assign(row, args._publication_values);
     }
+    if (args._post_values) Object.assign(postState, args._post_values);
+    if (args._event_type) eventRecords.push({ type: args._event_type, detail: args._event_detail });
     return { data: true, error: null };
   },
 };
@@ -114,6 +118,8 @@ const reset = (overrides = {}) => {
   calls = [];
   responses = [];
   trace = [];
+  eventRecords = [];
+  postState = {};
   failReceipt = false;
   leaseValid = true;
   const row = {
@@ -166,6 +172,36 @@ assert.equal(await api.processVideoPublication(input), "done");
 assert.equal(records.get("publication").platform_media_id, "media");
 assert.ok(trace.indexOf("receipt") < trace.lastIndexOf("get"));
 pass("durable receipt precedes optional metadata and survives metadata failure");
+
+for (const configIssue of ["USER_TAGGING_FAILURE", "CAPTION_NOT_ATTACHED"]) {
+  input = reset({ channel: configIssue === "USER_TAGGING_FAILURE" ? "story" : "reel" });
+  input.channel = input.publication.channel;
+  responses = [
+    { status_code: "FINISHED" },
+    { id: "partial-media", config_issue: configIssue },
+    new Error("Permalink unavailable"),
+  ];
+  await assert.rejects(api.processVideoPublication(input), new RegExp(configIssue));
+  assert.equal(records.get("publication").platform_media_id, "partial-media");
+  assert.equal(records.get("publication").status, "published");
+  assert.equal(records.get("publication").recovery_required, true);
+  assert.equal(postState.status, "failed");
+  assert.equal(postState.publish_next_attempt_at, null);
+  assert.equal(eventRecords.at(-1).detail.config_issue, configIssue);
+  assert.equal(eventRecords.at(-1).detail.media_id, "partial-media");
+  assert.ok(trace.indexOf("receipt") < trace.lastIndexOf("get"));
+  const previousCalls = calls.length;
+  await assert.rejects(
+    api.processVideoPublication({ ...input, publication: { ...records.get("publication") } }),
+    new RegExp(configIssue),
+  );
+  assert.equal(calls.length, previousCalls);
+  assert.equal(calls.filter((c) => c.method === "POST").length, 1);
+  assert.equal(records.get("publication").recovery_required, true);
+  pass(
+    `${configIssue} preserves published receipt and issue, holds parent, and never republishes on replay`,
+  );
+}
 
 input = reset();
 responses = [{ status_code: "FINISHED" }, { id: "media" }];

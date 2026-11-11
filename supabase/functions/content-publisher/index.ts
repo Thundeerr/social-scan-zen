@@ -2,6 +2,7 @@
 // intentionally omitted because it transitively requires npm:openai.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.110.0";
 import { buildReelContainerFields, applyModelReelMode } from "../_shared/instagram-reel.ts";
+import { buildStoryMentionFields } from "../_shared/instagram-story.ts";
 import {
   buildCarouselContainerFields,
   buildImageContainerFields,
@@ -18,6 +19,7 @@ const POLL_DELAY_MS = 60 * 1000;
 
 type JsonRecord = Record<string, unknown>;
 type PublishLease = { postId: string; token: string };
+type PostOutcome = { state: string; channel: string | null; nextAttemptAt?: string };
 class LeaseLostError extends Error {
   constructor() {
     super("Publisher lease expired, was replaced, or publishing was paused");
@@ -34,6 +36,7 @@ type Publication = {
   platform_media_id: string | null;
   external_action_started_at: string | null;
   recovery_required: boolean;
+  last_error: string | null;
   processing_started_at: string | null;
   updated_at: string;
 };
@@ -246,6 +249,7 @@ async function publishContainer(
   label: string,
 ) {
   const publication = input.publication;
+  holdPublishedConfigIssue(publication);
   if (publication.platform_media_id) {
     await updatePublication(input.admin, input.lease, publication.id, {
       status: "published",
@@ -302,7 +306,15 @@ async function publishContainer(
     if (error instanceof LeaseLostError) throw error;
     return requireRecovery(input, `${label} publish response was not confirmed`);
   }
-  // Save receipt and event atomically before optional metadata requests.
+  const configIssue =
+    typeof published.config_issue === "string" && published.config_issue.trim()
+      ? published.config_issue.replace(/[\r\n]+/g, " ").slice(0, 200)
+      : null;
+  const partialMessage = configIssue
+    ? `INSTAGRAM_CONFIG_ISSUE: ${configIssue}. ${label} ${published.id} is already published; review this media, do not republish.`
+    : null;
+  // A valid media ID is a receipt even when Meta dropped a requested tag/caption.
+  // Keep it and the issue atomically; the parent is held without another send.
   await writeState(input.admin, input.lease, {
     _publication_id: publication.id,
     _publication_values: {
@@ -310,11 +322,23 @@ async function publishContainer(
       platform_media_id: published.id,
       published_ig_user_id: input.igUserId,
       published_at: new Date().toISOString(),
-      recovery_required: false,
-      last_error: null,
+      recovery_required: Boolean(configIssue),
+      last_error: partialMessage,
     },
-    _event_type: `${label}_published`,
-    _event_detail: { media_id: published.id },
+    ...(partialMessage
+      ? {
+          _post_values: {
+            status: "failed",
+            last_publish_error: partialMessage,
+            publish_next_attempt_at: null,
+          },
+        }
+      : {}),
+    _event_type: configIssue ? `${label}_published_with_config_issue` : `${label}_published`,
+    _event_detail: {
+      media_id: published.id,
+      ...(configIssue ? { config_issue: configIssue } : {}),
+    },
   });
   let permalink: string | null = null;
   try {
@@ -326,7 +350,18 @@ async function publishContainer(
   } catch {
     /* The durable media receipt must survive optional metadata failure. */
   }
+  if (partialMessage) throw new PublicationRecoveryRequired(partialMessage);
   return "done";
+}
+
+function holdPublishedConfigIssue(publication: Publication) {
+  if (
+    publication.platform_media_id &&
+    publication.recovery_required &&
+    publication.last_error?.startsWith("INSTAGRAM_CONFIG_ISSUE:")
+  ) {
+    throw new PublicationRecoveryRequired(publication.last_error);
+  }
 }
 
 async function processVideoPublication(input: {
@@ -339,6 +374,7 @@ async function processVideoPublication(input: {
   coverStoragePath?: string;
   allowVideoCover?: boolean;
   modelPublishMode?: string;
+  storyMentionUsername?: string | null;
   caption: string;
   shareToFeed: boolean;
   igUserId: string;
@@ -346,6 +382,7 @@ async function processVideoPublication(input: {
   token: string;
 }) {
   const { admin, publication, channel, apiBaseUrl, token } = input;
+  holdPublishedConfigIssue(publication);
   if (publication.status === "published" || publication.status === "skipped") return "done";
   if (publication.platform_media_id) {
     await updatePublication(input.admin, input.lease, publication.id, {
@@ -371,6 +408,7 @@ async function processVideoPublication(input: {
     const body: Record<string, string | boolean | number> = {
       media_type: channel === "reel" ? "REELS" : "STORIES",
       video_url: videoUrl,
+      ...(channel === "story" ? buildStoryMentionFields(input.storyMentionUsername) : {}),
     };
     if (channel === "reel") {
       if (!input.coverStoragePath && !input.allowVideoCover)
@@ -418,6 +456,9 @@ async function processVideoPublication(input: {
       `${channel}_container_created`,
       {
         container_id: created.id,
+        ...(channel === "story" && input.storyMentionUsername
+          ? { mention_username: input.storyMentionUsername }
+          : {}),
       },
       input.lease,
     );
@@ -449,12 +490,14 @@ async function processImagePublication(input: {
   altText: string;
   caption: string;
   asStory?: boolean;
+  storyMentionUsername?: string | null;
   igUserId: string;
   apiBaseUrl: string;
   token: string;
 }) {
   const { publication } = input;
   const label = input.asStory ? "story" : "image";
+  holdPublishedConfigIssue(publication);
   if (publication.status === "published" || publication.status === "skipped") return "done";
   if (publication.platform_media_id) {
     await updatePublication(input.admin, input.lease, publication.id, {
@@ -485,11 +528,13 @@ async function processImagePublication(input: {
       (() => {
         const fields = buildImageContainerFields({
           imageUrl,
-          altText: input.altText,
+          altText: input.asStory ? undefined : input.altText,
           caption: input.asStory ? "" : input.caption,
           mediaType: input.asStory ? "STORIES" : undefined,
         });
-        return input.asStory ? fields : applyPostLocation(fields, postLocationId());
+        return input.asStory
+          ? { ...fields, ...buildStoryMentionFields(input.storyMentionUsername) }
+          : applyPostLocation(fields, postLocationId());
       })(),
       input,
     );
@@ -509,6 +554,9 @@ async function processImagePublication(input: {
       `${label}_container_created`,
       {
         container_id: created.id,
+        ...(input.asStory && input.storyMentionUsername
+          ? { mention_username: input.storyMentionUsername }
+          : {}),
       },
       input.lease,
     );
@@ -531,6 +579,7 @@ async function processCarouselPublication(input: {
   token: string;
 }) {
   const { publication } = input;
+  holdPublishedConfigIssue(publication);
   if (publication.status === "published" || publication.status === "skipped") return "done";
   if (publication.platform_media_id) {
     await updatePublication(input.admin, input.lease, publication.id, {
@@ -702,7 +751,7 @@ async function cleanupExpiredMedia(admin: SupabaseClient) {
   const { data: due, error } = await admin
     .from("content_posts")
     .select(
-      "id,reel_storage_path,story_storage_path,cover_storage_path,primary_media_storage_paths",
+      "id,reel_storage_path,story_storage_path,story_media_reusable,cover_storage_path,primary_media_storage_paths",
     )
     .is("media_cleaned_at", null)
     .lte("media_cleanup_after", new Date().toISOString())
@@ -715,7 +764,7 @@ async function cleanupExpiredMedia(admin: SupabaseClient) {
       ...new Set(
         [
           post.reel_storage_path,
-          post.story_storage_path,
+          post.story_media_reusable ? null : post.story_storage_path,
           post.cover_storage_path,
           ...(post.primary_media_storage_paths ?? []),
         ].filter(Boolean),
@@ -738,7 +787,11 @@ async function cleanupExpiredMedia(admin: SupabaseClient) {
   return cleaned;
 }
 
-async function processPost(admin: SupabaseClient, postId: string, lease: PublishLease) {
+async function processPost(
+  admin: SupabaseClient,
+  postId: string,
+  lease: PublishLease,
+): Promise<PostOutcome> {
   await renewLease(admin, lease);
   const { data: post, error: postError } = await admin
     .from("content_posts")
@@ -764,7 +817,7 @@ async function processPost(admin: SupabaseClient, postId: string, lease: Publish
   const { data: rows, error: publicationError } = await admin
     .from("content_publications")
     .select(
-      "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id,external_action_started_at,recovery_required,processing_started_at,updated_at",
+      "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id,external_action_started_at,recovery_required,last_error,processing_started_at,updated_at",
     )
     .eq("content_post_id", postId);
   if (publicationError) throw publicationError;
@@ -824,7 +877,7 @@ async function processPost(admin: SupabaseClient, postId: string, lease: Publish
           await admin
             .from("content_publications")
             .select(
-              "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id,external_action_started_at,recovery_required,processing_started_at,updated_at",
+              "id,channel,status,attempts,platform_container_id,platform_child_container_ids,platform_media_id,external_action_started_at,recovery_required,last_error,processing_started_at,updated_at",
             )
             .eq("id", primary.id)
             .single()
@@ -843,15 +896,46 @@ async function processPost(admin: SupabaseClient, postId: string, lease: Publish
   if (commentState !== "done") return { state: commentState, channel: "first_comment" };
 
   if (post.story_publish_mode === "automatic_no_link") {
+    if (
+      post.story_mention_username &&
+      (refreshedPrimary?.status !== "published" || !refreshedPrimary.platform_media_id)
+    ) {
+      throw new Error("Mention Story requires a confirmed primary Reel publication");
+    }
     const story = publications.get("story");
     if (!story || !post.story_storage_path) throw new Error("Story publication is incomplete");
+    holdPublishedConfigIssue(story);
+    if (
+      post.story_mention_username &&
+      post.story_media_reusable &&
+      post.story_media_type === "image" &&
+      (story.status === "pending" || story.status === "publishing") &&
+      !story.recovery_required &&
+      !story.external_action_started_at &&
+      !story.platform_media_id
+    ) {
+      const { data: due, error: dueError } = await admin.rpc("ensure_model_story_time", {
+        p_post_id: postId,
+        p_lease_token: lease.token,
+      });
+      if (dueError) throw dueError;
+      if (typeof due !== "string" || !Number.isFinite(Date.parse(due)))
+        throw new Error("Story due time was not confirmed");
+      if (Date.now() < Date.parse(due))
+        return { state: "waiting", channel: "story", nextAttemptAt: new Date(due).toISOString() };
+    }
+    const storyMediaType =
+      post.story_media_type ?? (post.content_type === "reel" ? "video" : "image");
+    if (storyMediaType !== "video" && storyMediaType !== "image")
+      throw new Error("Story media type is invalid");
     const storyState =
-      post.content_type === "reel"
+      storyMediaType === "video"
         ? await processVideoPublication({
             ...common,
             publication: story,
             channel: "story",
             storagePath: post.story_storage_path,
+            storyMentionUsername: post.story_mention_username,
             caption: "",
             shareToFeed: false,
           })
@@ -862,6 +946,7 @@ async function processPost(admin: SupabaseClient, postId: string, lease: Publish
             altText: post.alt_text,
             caption: "",
             asStory: true,
+            storyMentionUsername: post.story_mention_username,
           });
     if (storyState !== "done") return { state: storyState, channel: "story" };
   }
@@ -955,7 +1040,8 @@ Deno.serve(async (request: Request) => {
     if (outcome.state === "waiting") {
       await writeState(admin, lease, {
         _post_values: {
-          publish_next_attempt_at: new Date(Date.now() + POLL_DELAY_MS).toISOString(),
+          publish_next_attempt_at:
+            outcome.nextAttemptAt ?? new Date(Date.now() + POLL_DELAY_MS).toISOString(),
         },
       });
     } else if (outcome.state === "failed") {
